@@ -17,11 +17,11 @@ INVALID_CATEGORY_RESPONSE = {"Response": "False", "Error": "Invalid category."}
 NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 
 def view_reviews(request):
-    return HttpResponse('Under construction :)')
+    return render(request, 'review/view_reviews.html')
 
 @login_required
 def add_review(request):
-    return HttpResponse('testing')
+    return render(request, 'review/add_review.html')
 
 def search_review_item(request, category, search_term):
     if not request.user.is_authenticated:
