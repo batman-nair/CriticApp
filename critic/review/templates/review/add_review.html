@@ -7,6 +7,8 @@
 
 <input id="autoComplete">
 
+<p id="result">Result</p>
+
 
 
 <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.6/dist/autoComplete.min.js"></script>
@@ -15,15 +17,50 @@
     config = {
         placeHolder: "Search for Food...",
         data: {
-            src: ["Sauce - Thousand Island", "Wild Boar - Tenderloin", "Goat - Whole Cut"]
+            src: async (query) => {
+                try {
+                    const search_url = window.location.origin + '/search_item/movie/' + query
+                    const source = await fetch(search_url)
+                    const data = await source.json()
+                    console.log('Got data from search', query, data)
+                    if (data["Response"] == "False") {
+                        console.log("Got error from search ", query, data["Error"])
+                        return []
+                    }
+                    return data["Search"]
+                } catch (error) {
+                    console.log("Error fetching search data ", query, error)
+                    return error
+                }
+            },
+            keys: ["Title"],
         },
+        placeHolder: 'Search...',
+        threshold: 3,
+        debounce: 300,
         resultItem: {
-            highlight: {
-                render: true
+            element: (item, data) => {
+                console.log('Got item, data', item, data)
+                const item_img = document.createElement('img')
+                // TODO: Add default image
+                const image_url = data['value']['ImageURL']
+                if (image_url == "N/A") {
+                    return
+                }
+                item_img.src = image_url
+                item_img.width = 100
+                item.prepend(item_img)
             }
-        }
+        },
+        submit: false,
     }
     const autoCompleteJS = new autoComplete(config);
 
+    document.querySelector("#autoComplete").addEventListener("selection", function (event) {
+        const selection = event.detail.selection.value
+        result = document.querySelector("#result")
+        result.innerText = selection["ItemID"]
+        console.log(result, selection, event.detail);
+    });
 </script>
 {% endblock content %}
