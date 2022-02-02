@@ -3,8 +3,8 @@ import requests
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
-OMDB_API = os.environ['OMDB_API']
-BASE_URL = 'http://www.omdbapi.com/?apikey={}&'.format(OMDB_API)
+OMDB_API_KEY = os.environ['OMDB_API_KEY']
+BASE_URL = 'http://www.omdbapi.com/?apikey={}&'.format(OMDB_API_KEY)
 NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 
 def get_omdb_search(movie_name: str) -> dict:
