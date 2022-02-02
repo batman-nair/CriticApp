@@ -2,14 +2,19 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
-from .utils import get_omdb_info, get_omdb_search, convert_omdb_to_review
+from . import utils
 
 CATEGORIES = {
     'movie': {
-        'search': get_omdb_search,
-        'info': get_omdb_info,
-        'convert': convert_omdb_to_review,
-    }
+        'search': utils.get_omdb_search,
+        'info': utils.get_omdb_info,
+        'convert': utils.convert_omdb_to_review,
+    },
+    'game': {
+        'search': utils.get_rawg_search,
+        'info': utils.get_rawg_info,
+        'convert': utils.convert_rawg_to_review,
+    },
 }
 
 INVALID_USER_RESPONSE = {"Response": "False", "Error": "User not authenticated."}
@@ -30,6 +35,9 @@ def search_review_item(request, category, search_term):
         return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
     util_funcs = CATEGORIES[category]
     json_data = util_funcs['search'](search_term)
+    if json_data["Response"] == "False":
+        print('Error fetching search data from API ', json_data)
+        return JsonResponse(json_data)
     item_data = util_funcs['convert'](json_data)
     return JsonResponse(item_data)
 
@@ -40,5 +48,8 @@ def get_review_item_info(request, category, item_id):
         return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
     util_funcs = CATEGORIES[category]
     json_data = util_funcs['info'](item_id)
+    if json_data["Response"] == "False":
+        print('Error fetching info data from API ', json_data)
+        return JsonResponse(json_data)
     item_data = util_funcs['convert'](json_data)
     return JsonResponse(item_data)
