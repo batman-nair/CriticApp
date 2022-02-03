@@ -6,12 +6,16 @@
 
 <h1>Content my friend</h1>
 
+<select id="review-category" class="form-select" aria-label="Select Category">
+  <option value="movie">Movie</option>
+  <option value="game">Game</option>
+</select>
 <input id="autoComplete">
 
 <div id="review-card" class="card mb-3" hidden>
   <div class="row g-0">
     <div class="col-md-4">
-      <img src="..." class="img-fluid rounded-start" alt="...">
+      <img class="img-fluid rounded-start" alt="Poster Image">
     </div>
     <div class="col-md-8">
       <div class="card-body">
@@ -19,6 +23,7 @@
         <p class="card-text"><small class="attr1 text-muted">Attribute 1</small></p>
         <p class="description card-text">This is a wider card with supporting text below as a natural lead-in to additional content. This content is a little bit longer.</p>
         <p class="attr2 card-text">Attribute 2</p>
+        <p class="rating card-text">Rating</p>
       </div>
     </div>
   </div>
@@ -31,44 +36,48 @@
 
 <script>
     config = {
-        placeHolder: "Search for Food...",
-        data: {
-            src: async (query) => {
-                try {
-                    return getSearchItems(query)
-                } catch (error) {
-                    console.log("Error fetching search data ", query, error)
-                    return error
-                }
-            },
-            keys: ["Title"],
+      data: {
+        src: async (query) => {
+          const category = document.querySelector("#review-category").value
+          try {
+            return getSearchItems(category, query)
+          } catch (error) {
+            console.log("Error fetching search data ", query, error)
+            return error
+          }
         },
-        placeHolder: 'Search...',
-        threshold: 3,
-        debounce: 300,
-        resultItem: {
-            element: (item, data) => {
-                const item_img = document.createElement('img')
-                // TODO: Add default image
-                const image_url = data['value']['ImageURL']
-                if (image_url == "N/A") {
-                    return
-                }
-                item_img.src = image_url
-                item_img.width = 100
-                item.prepend(item_img)
-            }
-        },
-        submit: false,
+        keys: ["Title"],
+      },
+      searchEngine: (query, record) => {
+        return record;
+      },
+      placeHolder: 'Search...',
+      threshold: 3,
+      debounce: 300,
+      resultItem: {
+        element: (item, data) => {
+          const item_img = document.createElement('img')
+          // TODO: Add default image
+          const image_url = data['value']['ImageURL']
+          if (image_url == "N/A") {
+              return
+          }
+          item_img.src = image_url
+          item_img.width = 100
+          item.prepend(item_img)
+        }
+      },
+      submit: false,
     }
     const autoCompleteJS = new autoComplete(config);
 
     const reviewCard = document.querySelector("#review-card")
     document.querySelector("#autoComplete").addEventListener("selection", function (event) {
-        const selection = event.detail.selection.value
-        const itemID = selection["ItemID"]
-        updateReviewItem(itemID, reviewCard)
-        console.log('Selected: ', selection, event.detail);
+      const category = document.querySelector("#review-category").value
+      const selection = event.detail.selection.value
+      const itemID = selection["ItemID"]
+      updateReviewItem(category, itemID, reviewCard)
+      console.log('Selected: ', selection, event.detail);
     });
 </script>
 {% endblock content %}
