@@ -11,6 +11,8 @@ whitenoise = "*"
 psycopg2 = "*"
 python-dotenv = "*"
 requests = "*"
+pytest = "*"
+pytest-django = "*"
 
 [dev-packages]
 

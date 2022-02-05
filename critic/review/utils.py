@@ -73,7 +73,7 @@ def get_rawg_search(query: str) -> dict:
     r = requests.get(search_url)
     if r.status_code == 200:
         response = r.json()
-        response["Response"] = "True"
+        response["Response"] = "True" if len(response["results"]) > 0 else "False"
         return response
     else:
         response = NOT_OK_RESPONSE.copy()
@@ -96,6 +96,8 @@ def get_rawg_info(item_id: str) -> dict:
 
 def convert_rawg_to_review(rawg_json: dict) -> dict:
     json_data = dict()
+    if rawg_json["Response"] == "False":
+        return rawg_json
     if "results" in rawg_json:
         json_data["Search"] = []
         for item in rawg_json["results"][:10]:
