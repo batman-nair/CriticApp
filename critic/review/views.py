@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
 from . import utils
+from .models import ReviewItem
 
 CATEGORIES = {
     'movie': {
@@ -46,10 +47,21 @@ def get_review_item_info(request, category, item_id):
         return JsonResponse(str(INVALID_USER_RESPONSE))
     if category not in CATEGORIES:
         return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
+    try:
+        review_item = ReviewItem.objects.get(item_id=item_id)
+        print('Got item from db {} {}'.format(category, item_id))
+        return JsonResponse(review_item.to_review_json())
+    except ReviewItem.DoesNotExist:
+        print('Didn\'t find review item {} {} in db, fetching from API'.format(category, item_id))
     util_funcs = CATEGORIES[category]
     json_data = util_funcs['info'](item_id)
     if json_data["Response"] == "False":
         print('Error fetching info data from API ', json_data)
         return JsonResponse(json_data)
     item_data = util_funcs['convert'](json_data)
+    item_data["Category"] = category
+    if item_data["Response"] == "True":
+        review_item = ReviewItem.from_review_json(**item_data)
+        review_item.save()
+        print('Saved item to db', category, item_id)
     return JsonResponse(item_data)
