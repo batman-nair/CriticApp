@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.6/dist/css/autoComplete.min.css">
@@ -29,6 +30,11 @@
   </div>
 </div>
 
+<form method="post">
+  {% csrf_token %}
+  {{ form|crispy }}
+  <input type="submit" value="Submit">
+</form>
 
 
 <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.6/dist/autoComplete.min.js"></script>
@@ -77,6 +83,7 @@
       const selection = event.detail.selection.value
       const itemID = selection["ItemID"]
       updateReviewItem(category, itemID, reviewCard)
+      updateForm(category, itemID)
       console.log('Selected: ', selection, event.detail);
     });
 </script>

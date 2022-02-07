@@ -33,3 +33,8 @@ async function updateReviewItem(category, itemID, reviewCard) {
     reviewCard.querySelector(".rating").innerText = data["Rating"]
     reviewCard.removeAttribute("hidden")
 }
+
+function updateForm(category, itemID) {
+    document.querySelector("#id_item_id").value = itemID
+    document.querySelector("#id_category").value = category
+}

@@ -1,6 +1,8 @@
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+
+from .forms import ReviewForm
 
 from . import utils
 from .models import ReviewItem
@@ -27,7 +29,17 @@ def view_reviews(request):
 
 @login_required
 def add_review(request):
-    return render(request, 'review/add_review.html')
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            if request.user.is_authenticated:
+                print('Damn, its working', request.user.id, form.cleaned_data)
+                return HttpResponseRedirect('/add')
+        else:
+            print('Hmm okay', form)
+    else:
+        form = ReviewForm()
+    return render(request, 'review/add_review.html', {'form': form})
 
 def search_review_item(request, category, search_term):
     if not request.user.is_authenticated:
