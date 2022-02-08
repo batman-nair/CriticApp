@@ -1,6 +1,5 @@
-from pyexpat import model
-from unicodedata import category
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 
 class ReviewItem(models.Model):
     item_id = models.CharField(max_length=20, primary_key=True)
@@ -35,3 +34,6 @@ class ReviewItem(models.Model):
          }
         return review_json
 
+
+class ReviewUser(AbstractUser):
+    pass

@@ -148,3 +148,7 @@ DATABASES['default'].update(prod_db)
 LOGIN_URL = '/admin/'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+AUTH_USER_MODEL = 'review.ReviewUser'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'
