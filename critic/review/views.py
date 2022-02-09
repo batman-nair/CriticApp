@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from .forms import ReviewForm
 
 from . import utils
-from .models import ReviewItem
+from .models import ReviewItem, Review
 
 CATEGORIES = {
     'movie': {
@@ -33,8 +33,17 @@ def add_review(request):
         form = ReviewForm(request.POST)
         if form.is_valid():
             if request.user.is_authenticated:
-                print('Damn, its working', request.user.id, form.cleaned_data)
-                return HttpResponseRedirect('/add')
+                try:
+                    form_data = form.cleaned_data
+                    review_item = ReviewItem.objects.get(item_id=form_data['item_id'])
+                    user = request.user
+                    review_data = form_data['review']
+                    rating = form_data['rating']
+                    review_obj = Review(user=user, review_item=review_item, review_rating=rating, review_data=review_data)
+                    review_obj.save()
+                    return HttpResponseRedirect('/add')
+                except ReviewItem.DoesNotExist:
+                    print('ReviewItem does not exist', form_data)
         else:
             print('Hmm okay', form)
     else:

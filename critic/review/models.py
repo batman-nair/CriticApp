@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 
 class ReviewItem(models.Model):
     item_id = models.CharField(max_length=20, primary_key=True)
@@ -37,3 +38,9 @@ class ReviewItem(models.Model):
 
 class ReviewUser(AbstractUser):
     pass
+
+class Review(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    review_item = models.ForeignKey(ReviewItem, on_delete=models.CASCADE)
+    review_rating = models.FloatField()
+    review_data = models.TextField(null=True)
