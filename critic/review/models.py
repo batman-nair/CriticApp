@@ -35,10 +35,6 @@ class ReviewItem(models.Model):
          }
         return review_json
 
-
-class ReviewUser(AbstractUser):
-    pass
-
 class Review(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     review_item = models.ForeignKey(ReviewItem, on_delete=models.CASCADE)

@@ -1,8 +1,6 @@
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import logout
-from django.shortcuts import redirect
 
 from .forms import ReviewForm
 
@@ -29,7 +27,7 @@ NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 def view_reviews(request):
     return render(request, 'review/view_reviews.html')
 
-@login_required(login_url='/login')
+@login_required()
 def add_review(request):
     if request.method == 'POST':
         form = ReviewForm(request.POST)
@@ -89,6 +87,3 @@ def get_review_item_info(request, category, item_id):
         print('Saved item to db', category, item_id)
     return JsonResponse(item_data)
 
-def logout_view(request):
-    logout(request)
-    return redirect('/')

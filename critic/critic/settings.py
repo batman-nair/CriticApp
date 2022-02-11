@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'review',
     'crispy_forms',
+    'users'
 ]
 
 MIDDLEWARE = [
@@ -145,10 +146,10 @@ import dj_database_url
 prod_db  =  dj_database_url.config(conn_max_age=500)
 DATABASES['default'].update(prod_db)
 
-LOGIN_URL = '/admin/'
+LOGIN_URL = 'users:login'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
-AUTH_USER_MODEL = 'review.ReviewUser'
+AUTH_USER_MODEL = 'users.User'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'

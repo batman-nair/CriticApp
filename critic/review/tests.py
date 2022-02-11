@@ -1,11 +1,11 @@
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 from . import utils
 
 class APITestCase(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='123test123')
+        self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
 
     def tearDown(self):
