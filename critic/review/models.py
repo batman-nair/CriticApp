@@ -40,3 +40,4 @@ class Review(models.Model):
     review_item = models.ForeignKey(ReviewItem, on_delete=models.CASCADE)
     review_rating = models.FloatField()
     review_data = models.TextField(null=True)
+    modified_date = models.DateField(auto_now=True)
