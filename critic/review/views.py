@@ -1,5 +1,5 @@
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 
 from .forms import ReviewForm
@@ -87,3 +87,9 @@ def get_review_item_info(request, category, item_id):
         print('Saved item to db', category, item_id)
     return JsonResponse(item_data)
 
+@login_required
+def profile_redirect(request):
+    return redirect('review:profile', username=request.user.username)
+
+def view_profile(request, username):
+    return HttpResponse('Building up')

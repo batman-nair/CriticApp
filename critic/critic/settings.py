@@ -151,5 +151,5 @@ LOGIN_URL = 'users:login'
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 AUTH_USER_MODEL = 'users.User'
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/u'
 LOGOUT_REDIRECT_URL = '/'
