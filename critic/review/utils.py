@@ -9,6 +9,7 @@ NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 # OMDB API
 OMDB_API_KEY = os.environ['OMDB_API_KEY']
 BASE_OMDB_URL = 'http://www.omdbapi.com/?apikey={}&'.format(OMDB_API_KEY)
+OMDB_PREFIX = 'omdb_'
 
 def get_omdb_search(query: str) -> dict:
     search_url = '{base_url}s={movie_name}'.format(base_url=BASE_OMDB_URL, movie_name=query)
@@ -22,6 +23,8 @@ def get_omdb_search(query: str) -> dict:
         return response
 
 def get_omdb_info(item_id: str) -> dict:
+    if item_id.startswith(OMDB_PREFIX):
+        item_id = item_id[len(OMDB_PREFIX):]
     info_url = '{base_url}i={imdb_id}'.format(base_url=BASE_OMDB_URL, imdb_id=item_id)
     r = requests.get(info_url)
     if r.status_code == 200:
@@ -48,7 +51,7 @@ def convert_omdb_to_review(omdb_json: dict) -> dict:
 
 def _convert_omdb_item_to_review(omdb_json: dict, detailed: bool=False) -> dict:
     json_data = dict()
-    json_data["ItemID"] = omdb_json["imdbID"]
+    json_data["ItemID"] = OMDB_PREFIX + omdb_json["imdbID"]
     json_data["Title"] = omdb_json["Title"]
     json_data["ImageURL"] = omdb_json["Poster"]
     json_data["Year"] = omdb_json["Year"]
@@ -67,6 +70,7 @@ def _convert_omdb_item_to_review(omdb_json: dict, detailed: bool=False) -> dict:
 # RAWG API
 RAWG_API_KEY = os.environ['RAWG_API_KEY']
 BASE_RAWG_URL = 'https://api.rawg.io/api'
+RAWG_PREFIX = 'rawg_'
 
 def get_rawg_search(query: str) -> dict:
     search_url = '{base_url}/games?key={api_key}&search={game_name}'.format(base_url=BASE_RAWG_URL, api_key=RAWG_API_KEY, game_name=query)
@@ -82,6 +86,8 @@ def get_rawg_search(query: str) -> dict:
         return response
 
 def get_rawg_info(item_id: str) -> dict:
+    if item_id.startswith(RAWG_PREFIX):
+        item_id = item_id[len(RAWG_PREFIX):]
     info_url = '{base_url}/games/{game_id}?key={api_key}'.format(base_url=BASE_RAWG_URL, api_key=RAWG_API_KEY, game_id=item_id)
     r = requests.get(info_url)
     if r.status_code == 200:
@@ -110,7 +116,7 @@ def convert_rawg_to_review(rawg_json: dict) -> dict:
 
 def _convert_rawg_item_to_review(rawg_json: dict, detailed: bool=False) -> dict:
     json_data = dict()
-    json_data["ItemID"] = rawg_json["id"]
+    json_data["ItemID"] = RAWG_PREFIX + str(rawg_json["id"])
     json_data["Title"] = rawg_json["name"]
     json_data["ImageURL"] = rawg_json["background_image"]
     if not json_data["ImageURL"] or json_data["ImageURL"] == "null":
