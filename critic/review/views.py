@@ -92,4 +92,5 @@ def profile_redirect(request):
     return redirect('review:profile', username=request.user.username)
 
 def view_profile(request, username):
-    return HttpResponse('Building up')
+    reviews = Review.objects.order_by('-modified_date')
+    return render(request, 'review/view_reviews.html', {'reviews': reviews})
