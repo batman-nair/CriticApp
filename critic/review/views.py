@@ -70,6 +70,7 @@ def get_review_item_info(request, category, item_id):
         return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
     try:
         review_item = ReviewItem.objects.get(item_id=item_id)
+        review_item["Response"] = "True"
         print('Got item from db {} {}'.format(category, item_id))
         return JsonResponse(review_item.to_review_json())
     except ReviewItem.DoesNotExist:
@@ -94,3 +95,8 @@ def profile_redirect(request):
 def view_profile(request, username):
     reviews = Review.objects.order_by('-modified_date')
     return render(request, 'review/view_reviews.html', {'reviews': reviews})
+
+def get_reviews(request):
+    reviews = utils.get_filtered_review_objects()
+    json_data = utils.convert_reviews_to_json(reviews)
+    return JsonResponse(json_data)

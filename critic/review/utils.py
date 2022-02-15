@@ -3,6 +3,8 @@ import requests
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 
+from .models import Review
+
 load_dotenv(find_dotenv())
 NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 
@@ -137,3 +139,23 @@ def _convert_rawg_item_to_review(rawg_json: dict, detailed: bool=False) -> dict:
     json_data["Description"] = rawg_json["description"]
     json_data["Rating"] = rawg_json["rating"]
     return json_data
+
+def get_filtered_review_objects(query=None, username=None, categories=None):
+    reviews = Review.objects.order_by('-modified_date')
+    return reviews
+
+def convert_reviews_to_json(reviews: list) -> dict:
+    json_data = {'Results': []}
+    for review in reviews:
+        json_data['Results'].append(_convert_review_to_json(review))
+    return json_data
+
+def _convert_review_to_json(review: Review) -> dict:
+    review_item_json = review.review_item.to_review_json()
+    review_json = {
+        'ReviewData': review.review_data,
+        'Rating': review.review_rating,
+        'ModifiedDate': review.modified_date,
+        'ReviewItem': review_item_json
+    }
+    return review_json

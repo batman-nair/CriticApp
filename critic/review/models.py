@@ -31,7 +31,6 @@ class ReviewItem(models.Model):
             'Attr3': self.attr3,
             'Description': self.description,
             'Rating': self.rating,
-            'Response': "True",
          }
         return review_json
 
