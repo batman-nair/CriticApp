@@ -14,6 +14,7 @@ requests = "*"
 pytest = "*"
 pytest-django = "*"
 django-crispy-forms = "*"
+model-bakery = "*"
 
 [dev-packages]
 

@@ -1,6 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
+from model_bakery import baker
+
+from .models import Review, ReviewItem
+
 from . import utils
 
 class APITestCase(TestCase):
@@ -76,3 +80,40 @@ class APITestCase(TestCase):
         invalid_info_json = utils.get_rawg_info('laksjdflkasjdflkasjdalskdjfl')
         review_json = utils.convert_rawg_to_review(invalid_info_json)
         self.assertEqual(review_json["Response"], "False")
+
+SAMPLE_REVIEW_ITEM_JSON = {
+    "Category": "movie",
+    "ItemID": "test1",
+    "Title": "Cool title",
+    "ImageURL": "http://fakeurl.com",
+    "Year": "2021",
+    "Attr1": "Attr1",
+    "Attr2": "Attr2",
+    "Attr3": "Attr3",
+    "Description": "Sample desc",
+    "Rating": "10",
+    "Response": "True",
+}
+class ReviewTestCase(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
+        self.review_item1 = ReviewItem.from_review_json(**SAMPLE_REVIEW_ITEM_JSON)
+        self.review_item1.save()
+        self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=10)
+        self.fake_reviews = [baker.make(Review) for _ in range(10)]
+
+
+    def tearDown(self):
+        self.user.delete()
+
+    def test_basic_review_query(self):
+        reviews = utils.get_filtered_review_objects()
+        self.assertGreaterEqual(len(reviews), 10)
+        json_data = utils.convert_reviews_to_json(reviews)
+        self.assertTrue("Results" in json_data)
+        self.assertGreaterEqual(len(json_data["Results"]), 10)
+        review_json = json_data["Results"][0]
+        self.assertTrue(all(field in review_json for field in ["ReviewData", "Rating", "ModifiedDate", "ReviewItem"]))
+
+
+
