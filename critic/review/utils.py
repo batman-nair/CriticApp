@@ -140,7 +140,7 @@ def _convert_rawg_item_to_review(rawg_json: dict, detailed: bool=False) -> dict:
     json_data["Rating"] = rawg_json["rating"]
     return json_data
 
-def get_filtered_review_objects(query=None, username=None, categories=None):
+def get_filtered_review_objects(query: str=None, username: str=None, categories: list=None) -> list[Review]:
     reviews = Review.objects.order_by('-modified_date')
     return reviews
 
