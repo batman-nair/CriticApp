@@ -99,7 +99,8 @@ class ReviewTestCase(TestCase):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.review_item1 = ReviewItem.from_review_json(**SAMPLE_REVIEW_ITEM_JSON)
         self.review_item1.save()
-        self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=10)
+        self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=9.5)
+        self.review1.save()
         self.fake_reviews = [baker.make(Review) for _ in range(10)]
 
 
@@ -115,5 +116,23 @@ class ReviewTestCase(TestCase):
         review_json = json_data["Results"][0]
         self.assertTrue(all(field in review_json for field in ["ReviewData", "Rating", "ModifiedDate", "ReviewItem"]))
 
+    def test_query_filter(self):
+        reviews = utils.get_filtered_review_objects(query='Cool')
+        self.assertTrue(len(reviews))
+        reviews = utils.get_filtered_review_objects(query='This should not hopefull match any random string')
+        self.assertFalse(len(reviews))
 
+    def test_username_filter(self):
+        reviews = utils.get_filtered_review_objects(username='testuser')
+        self.assertTrue(len(reviews))
+        reviews = utils.get_filtered_review_objects(username='Please dont match a random string')
+        self.assertFalse(len(reviews))
 
+    def test_category_filter(self):
+        reviews = utils.get_filtered_review_objects(filter_categories=['movie'])
+        self.assertTrue(all([review.review_item.category != 'movie' for review in reviews]))
+
+    def test_multi_filter(self):
+        reviews = utils.get_filtered_review_objects(query='Cool', username='testuser', filter_categories=['random'])
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(reviews[0].review_rating, 9.5)

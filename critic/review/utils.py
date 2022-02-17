@@ -140,8 +140,12 @@ def _convert_rawg_item_to_review(rawg_json: dict, detailed: bool=False) -> dict:
     json_data["Rating"] = rawg_json["rating"]
     return json_data
 
-def get_filtered_review_objects(query: str=None, username: str=None, categories: list=None) -> list[Review]:
-    reviews = Review.objects.order_by('-modified_date')
+def get_filtered_review_objects(query: str='', username: str=None, filter_categories: list=None) -> list[Review]:
+    reviews = Review.objects.filter(review_item__title__contains=query)
+    if username:
+        reviews = reviews.filter(user__username=username)
+    if filter_categories:
+        reviews = reviews.exclude(review_item__category__in=filter_categories)
     return reviews
 
 def convert_reviews_to_json(reviews: list) -> dict:
