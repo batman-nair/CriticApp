@@ -93,10 +93,13 @@ def profile_redirect(request):
     return redirect('review:profile', username=request.user.username)
 
 def view_profile(request, username):
-    reviews = Review.objects.order_by('-modified_date')
+    reviews = utils.get_filtered_review_objects(username=username)
     return render(request, 'review/view_reviews.html', {'reviews': reviews})
 
 def get_reviews(request):
-    reviews = utils.get_filtered_review_objects()
+    query = request.GET.get('query', '')
+    username = request.GET.get('username', '')
+    filter_categories = request.GET.getlist('filter_categories')
+    reviews = utils.get_filtered_review_objects(query, username, filter_categories)
     json_data = utils.convert_reviews_to_json(reviews)
     return JsonResponse(json_data)
