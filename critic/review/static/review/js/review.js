@@ -38,3 +38,20 @@ function updateForm(category, itemID) {
     document.querySelector("#id_item_id").value = itemID
     document.querySelector("#id_category").value = category
 }
+
+async function getReviews(query='', username='', filter_categories=[]) {
+    const reviewUrl = new URL(`${baseUrl}/reviews`)
+    if (query) {
+        reviewUrl.searchParams.append('query', query)
+    }
+    if (username) {
+        reviewUrl.searchParams.append('username', username)
+    }
+    for (category in filter_categories) {
+        reviewUrl.searchParams.append('filter_categories', category)
+    }
+    const response = await fetch(reviewUrl)
+    const data = await response.json()
+    console.log('Got reviews', data)
+    return data["Results"]
+}
