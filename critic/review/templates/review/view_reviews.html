@@ -1,28 +1,65 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
-<button type="button" class="btn btn-primary active" data-bs-toggle="button" autocomplete="off" aria-pressed="true">Movies</button>
-<button type="button" class="btn btn-primary active" data-bs-toggle="button" autocomplete="off" aria-pressed="true">Games</button>
+<link rel="stylesheet" href="{% static 'review/css/review.css' %}">
 
-<input type="search" id="form1" class="form-control" placeholder="Type to filter reviews" aria-label="Search" />
+<button type="button" class="btn btn-outline-secondary active" data-bs-toggle="button" autocomplete="off" aria-pressed="true">Movies</button>
+<button type="button" class="btn btn-outline-secondary active" data-bs-toggle="button" autocomplete="off" aria-pressed="true">Games</button>
 
+<input type="search" id="filter-text" class="form-control mb-4" placeholder="Type to filter reviews" aria-label="Search" />
+
+<div class="row justify-content-evenly" id="review-container" >
 {% for review in reviews %}
-    <div id="review-card" class="card mb-3">
-    <div class="row g-0">
-        <div class="col-md-4">
-        <img class="img-fluid rounded-start" src="{{ review.review_item.image_url }}" alt="Poster Image">
+    {% if review.review_item.category == 'movie' %}
+    <div class="col-4 col-lg-3 mb-4">
+    {% else %}
+    <div class="col-8 col-lg-6 mb-4">
+    {% endif %}
+        <div class="card review-card">
+            <img src="{{ review.review_item.image_url }}" class="card-img-top" alt="Poster Image">
+            <div class="card-body">
+                <h5 class="card-title">{{ review.review_item.title }}</h5>
+                <p class="card-text"><small class="attr1 text-muted">{{ review.review_item.attr1 }}</small></p>
+                <p class="description card-text">{{ review.review_data }}</p>
+                <p class="rating card-text">{{ review.review_rating }}⭐</p>
+            </div>
         </div>
-        <div class="col-md-8">
-        <div class="card-body">
-            <h5 class="review-title card-title">{{ review.review_item.title }} <small class="year text-muted text-end">{{ review.review_item.year }}</small></h5>
-            <p class="card-text"><small class="attr1 text-muted">{{ review.review_item.attr1 }}</small></p>
-            <p class="description card-text">{{ review.review_data }}</p>
-            <p class="rating card-text">{{ review.review_rating }}⭐</p>
-        </div>
-        </div>
-    </div>
     </div>
 {% endfor %}
+</div>
+
+<script src="{% static 'review/js/review.js' %}"></script>
+<script src="{% static 'js/masonry.pkgd.min.js' %}"></script>
+
+<script>
+    var reviewsData;
+    var queryString='', username='', filterCategories=[];
+    const masonry = new Masonry('#review-container', options={
+        percentPosition: true,
+        horizontalOrder: false,
+    });
+
+    function updateReviewsImpl() {
+        getReviews(queryString, username, filterCategories)
+          .then((reviews) => {
+              populateReviewCards('#review-container', reviews);
+              masonry.reloadItems();
+              masonry.layout();
+          })
+    }
+    const updateReviews = debounce(updateReviewsImpl);
+
+    const queryTextBox = document.querySelector("#filter-text")
+    queryTextBox.addEventListener('input', (e) => {
+        queryString = e.target.value;
+        updateReviews();
+    })
+
+    updateReviewsImpl()
+
+</script>
+
 
 {% endblock content %}
