@@ -15,22 +15,16 @@
             <span class="visually-hidden">Categories</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="category-filter-dropdown">
+            {% for category in categories %}
             <li>
                 <div class="dropdown-item">
-                    <input class="form-check-input" type="checkbox" checked value="" id="filter-movies">
-                    <label class="form-check-label w-100" for="filter-movies">
-                        Movies
+                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ category }}" onchange="updateReviews()" id="filter-{{ category }}">
+                    <label class="form-check-label filter-category-label w-100" for="filter-{{ category }}">
+                        {{ category }}
                     </label>
                 </div>
             </li>
-            <li>
-                <div class="dropdown-item">
-                    <input class="form-check-input" type="checkbox" checked value="" id="filter-games">
-                    <label class="form-check-label w-100" for="filter-games">
-                        Games
-                    </label>
-                </div>
-            </li>
+            {% endfor %}
         </ul>
     </div>
     <div class="btn-group">
@@ -80,7 +74,16 @@
         horizontalOrder: false,
     });
 
+    function populateFilterCategories() {
+        filterCategories = [];
+        for (var element of document.querySelectorAll(".filter-category")) {
+            if (!element.checked) {
+                filterCategories.push(element.value)
+            }
+        }
+    }
     function updateReviewsImpl() {
+        populateFilterCategories();
         getReviews(queryString, username, filterCategories)
           .then((reviews) => {
               populateReviewCards('#review-container', reviews);

@@ -57,7 +57,6 @@ async function getReviews(query='', username='', filter_categories=[]) {
 }
 
 function buildReviewCard(review) {
-    console.log('Review:', review)
     const reviewCardWrapper = document.createElement("div")
     reviewCardWrapper.classList.add('mb-4')
     if (review.ReviewItem.Category == 'game') {
@@ -84,7 +83,6 @@ function buildReviewCard(review) {
 function populateReviewCards(parentSelector, reviews) {
     const container = document.querySelector(parentSelector)
     container.innerHTML = ""
-    console.log('Reviews:', reviews)
     for (var review of reviews) {
         const reviewCard = buildReviewCard(review)
         container.appendChild(reviewCard)

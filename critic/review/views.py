@@ -25,7 +25,7 @@ INVALID_CATEGORY_RESPONSE = {"Response": "False", "Error": "Invalid category."}
 NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
 
 def view_reviews(request):
-    return render(request, 'review/view_reviews.html')
+    return render(request, 'review/view_reviews.html', {'categories': CATEGORIES.keys()})
 
 @login_required()
 def add_review(request):
@@ -94,7 +94,7 @@ def profile_redirect(request):
 
 def view_profile(request, username):
     reviews = utils.get_filtered_review_objects(username=username)
-    return render(request, 'review/view_reviews.html', {'reviews': reviews})
+    return render(request, 'review/view_reviews.html', {'categories': CATEGORIES.keys()})
 
 def get_reviews(request):
     query = request.GET.get('query', '')
