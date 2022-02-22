@@ -36,9 +36,10 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sort-dropdown">
                 <li><a class="dropdown-item">Relevance</a></li>
-                <li><a class="dropdown-item">Modified Date</a></li>
-                <li><a class="dropdown-item">Rating: High to Low</a></li>
-                <li><a class="dropdown-item">Rating: Low to High</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('alpha')">A-Z</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('modified-date')">Modified Date</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('rating')">Rating: High to Low</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('-rating')">Rating: Low to High</a></li>
         </ul>
     </div>
 </div>
@@ -68,11 +69,16 @@
 
 <script>
     var reviewsData;
-    var queryString='', username='{{ username }}', filterCategories=[];
+    var queryString='', username='{{ username }}', filterCategories=[], ordering='';
     const masonry = new Masonry('#review-container', options={
         percentPosition: true,
         horizontalOrder: false,
     });
+
+    function updateOrder(order) {
+        ordering = order;
+        updateReviews();
+    }
 
     function populateFilterCategories() {
         filterCategories = [];
@@ -84,7 +90,7 @@
     }
     function updateReviewsImpl() {
         populateFilterCategories();
-        getReviews(queryString, username, filterCategories)
+        getReviews(queryString, username, filterCategories, ordering)
           .then((reviews) => {
               populateReviewCards('#review-container', reviews);
               masonry.reloadItems();

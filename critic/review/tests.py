@@ -132,6 +132,11 @@ class ReviewTestCase(TestCase):
         reviews = utils.get_filtered_review_objects(filter_categories=['movie'])
         self.assertTrue(all([review.review_item.category != 'movie' for review in reviews]))
 
+    def test_ordering_filter(self):
+        reviews = utils.get_filtered_review_objects(ordering='alpha')
+        reviews = list(reviews)
+        self.assertTrue(all(val[0].review_item.title <= val[1].review_item.title for val in zip(reviews[:-1], reviews[1:])))
+
     def test_multi_filter(self):
         reviews = utils.get_filtered_review_objects(query='Cool', username='testuser', filter_categories=['random'])
         self.assertEqual(len(reviews), 1)
