@@ -1,3 +1,10 @@
 .filter-category-label {
     text-transform: capitalize;
 }
+
+.dropdown-item {
+    cursor: pointer;
+}
+.dropdown-item > * {
+    cursor: pointer;
+}
