@@ -93,8 +93,7 @@ def profile_redirect(request):
     return redirect('review:profile', username=request.user.username)
 
 def view_profile(request, username):
-    reviews = utils.get_filtered_review_objects(username=username)
-    return render(request, 'review/view_reviews.html', {'categories': CATEGORIES.keys()})
+    return render(request, 'review/view_reviews.html', {'categories': CATEGORIES.keys(), 'username': username})
 
 def get_reviews(request):
     query = request.GET.get('query', '')
