@@ -8,3 +8,29 @@
 .dropdown-item > * {
     cursor: pointer;
 }
+
+#review-category {
+    width: unset;
+    flex: unset;
+}
+.autoComplete_wrapper {
+    flex-grow: 1!important;
+}
+#autoComplete {
+    width: 100%;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    height: unset;
+}
+#autoComplete_list_1 {
+    max-height: 70vh;
+}
+
+.review-search-element > img {
+    max-width: 5em;
+    max-height: 5em;
+    margin-right: 0.5em;
+}
+.review-search-element > small {
+    margin-left: 0.5em;
+}

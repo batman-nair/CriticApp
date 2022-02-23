@@ -3,15 +3,18 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.6/dist/css/autoComplete.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.6/dist/css/autoComplete.02.min.css">
+<link rel="stylesheet" href="{% static 'review/css/review.css' %}">
 
-<h1>Content my friend</h1>
+<h1>Add Review</h1>
 
-<select id="review-category" class="form-select" aria-label="Select Category">
-  <option value="movie">Movie</option>
-  <option value="game">Game</option>
-</select>
-<input id="autoComplete">
+<div class="input-group mb-4">
+  <select id="review-category" class="flex-shrink-1 form-select" aria-label="Select Category">
+    <option value="movie">Movie</option>
+    <option value="game">Game</option>
+  </select>
+  <input id="autoComplete" class="form-control">
+</div>
 
 <div id="review-card" class="card mb-3" hidden>
   <div class="row g-0">
@@ -63,14 +66,16 @@
       resultItem: {
         element: (item, data) => {
           const item_img = document.createElement('img')
-          // TODO: Add default image
           const image_url = data['value']['ImageURL']
           if (image_url == "N/A") {
               return
           }
           item_img.src = image_url
-          item_img.width = 100
           item.prepend(item_img)
+          item.classList.add('review-search-element')
+          const year_span = document.createElement('small')
+          year_span.innerText = data['value']['Year']
+          item.append(year_span)
         }
       },
       submit: false,
