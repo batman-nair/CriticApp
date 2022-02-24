@@ -52,9 +52,9 @@ def add_review(request):
 
 def search_review_item(request, category, search_term):
     if not request.user.is_authenticated:
-        return JsonResponse(str(INVALID_USER_RESPONSE))
+        return JsonResponse(INVALID_USER_RESPONSE)
     if category not in CATEGORIES:
-        return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
+        return JsonResponse(INVALID_CATEGORY_RESPONSE)
     util_funcs = CATEGORIES[category]
     json_data = util_funcs['search'](search_term)
     if json_data["Response"] == "False":
@@ -65,14 +65,15 @@ def search_review_item(request, category, search_term):
 
 def get_review_item_info(request, category, item_id):
     if not request.user.is_authenticated:
-        return JsonResponse(str(INVALID_USER_RESPONSE))
+        return JsonResponse(INVALID_USER_RESPONSE)
     if category not in CATEGORIES:
-        return JsonResponse(str(INVALID_CATEGORY_RESPONSE))
+        return JsonResponse(INVALID_CATEGORY_RESPONSE)
     try:
         review_item = ReviewItem.objects.get(item_id=item_id)
-        review_item["Response"] = "True"
         print('Got item from db {} {}'.format(category, item_id))
-        return JsonResponse(review_item.to_review_json())
+        review_item_json = review_item.to_review_json()
+        review_item_json["Response"] = "True"
+        return JsonResponse(review_item_json)
     except ReviewItem.DoesNotExist:
         print('Didn\'t find review item {} {} in db, fetching from API'.format(category, item_id))
     util_funcs = CATEGORIES[category]

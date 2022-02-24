@@ -7,7 +7,7 @@ from .models import Review, ReviewItem
 
 from . import utils
 
-class APITestCase(TestCase):
+class APITest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
@@ -36,9 +36,9 @@ class APITestCase(TestCase):
         self.assertEqual(search_json["Response"], "False")
 
     def check_review_search_json(self, search_json):
-        self.assertTrue("Search" in search_json)
+        self.assertTrue("Results" in search_json)
         self.assertEqual(search_json["Response"], "True")
-        review_search_result = search_json["Search"][0]
+        review_search_result = search_json["Results"][0]
         review_search_params = ["Title", "ItemID", "ImageURL", "Year"]
         self.assertTrue(all(param in review_search_result for param in review_search_params))
 
@@ -94,7 +94,7 @@ SAMPLE_REVIEW_ITEM_JSON = {
     "Rating": "10",
     "Response": "True",
 }
-class ReviewTestCase(TestCase):
+class ReviewQueryTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.review_item1 = ReviewItem.from_review_json(**SAMPLE_REVIEW_ITEM_JSON)

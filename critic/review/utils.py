@@ -42,9 +42,9 @@ def convert_omdb_to_review(omdb_json: dict) -> dict:
     if omdb_json["Response"] == "False":
         return omdb_json
     if "Search" in omdb_json:
-        json_data["Search"] = []
+        json_data["Results"] = []
         for item in omdb_json["Search"][:10]:
-            json_data["Search"].append(_convert_omdb_item_to_review(item))
+            json_data["Results"].append(_convert_omdb_item_to_review(item))
     else:
         json_data = _convert_omdb_item_to_review(omdb_json, detailed=True)
     json_data["Response"] = "True"
@@ -79,7 +79,12 @@ def get_rawg_search(query: str) -> dict:
     r = requests.get(search_url)
     if r.status_code == 200:
         response = r.json()
-        response["Response"] = "True" if len(response["results"]) > 0 else "False"
+        response["Response"] = "True"
+        if len(response["results"]) == 0:
+            response = {
+                "Response": "False",
+                "Error": "Game not found!"
+            }
         return response
     else:
         response = NOT_OK_RESPONSE.copy()
@@ -107,9 +112,9 @@ def convert_rawg_to_review(rawg_json: dict) -> dict:
     if rawg_json["Response"] == "False":
         return rawg_json
     if "results" in rawg_json:
-        json_data["Search"] = []
+        json_data["Results"] = []
         for item in rawg_json["results"][:10]:
-            json_data["Search"].append(_convert_rawg_item_to_review(item))
+            json_data["Results"].append(_convert_rawg_item_to_review(item))
     else:
         json_data = _convert_rawg_item_to_review(rawg_json, detailed=True)
     json_data["Response"] = "True"

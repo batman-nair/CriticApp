@@ -9,7 +9,7 @@ async function getSearchItems(category, query) {
         console.log("Got error from search ", query, data["Error"])
         return []
     }
-    return data["Search"]
+    return data["Results"]
 }
 
 async function getReviewItem(category, itemID) {
