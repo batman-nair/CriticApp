@@ -154,7 +154,7 @@ ORDERING_DICT = {
     'relevance': '',
 }
 def get_filtered_review_objects(query: str='', username: str='', filter_categories: list=None, ordering: str='') -> list[Review]:
-    reviews = Review.objects.filter(review_item__title__contains=query)
+    reviews = Review.objects.filter(review_item__title__icontains=query)
     if username:
         reviews = reviews.filter(user__username=username)
     if filter_categories:
