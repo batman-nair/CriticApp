@@ -66,6 +66,7 @@
 
 <script src="{% static 'review/js/review.js' %}"></script>
 <script src="{% static 'js/masonry.pkgd.min.js' %}"></script>
+<script src="{% static 'js/imagesloaded.pkgd.min.js' %}"></script>
 
 <script>
     var reviewsData;
@@ -93,8 +94,10 @@
         getReviews(queryString, username, filterCategories, ordering)
           .then((reviews) => {
               populateReviewCards('#review-container', reviews);
-              masonry.reloadItems();
-              masonry.layout();
+              imagesLoaded('#review-container', () => {
+                masonry.reloadItems();
+                masonry.layout();
+              })
           })
     }
     const updateReviews = debounce(updateReviewsImpl);
