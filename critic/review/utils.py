@@ -60,7 +60,9 @@ def _convert_omdb_item_to_review(omdb_json: dict, detailed: bool=False) -> dict:
     if not detailed:
         return json_data
     json_data["Attr1"] = omdb_json["Genre"]
-    crew = set([omdb_json["Director"], omdb_json["Writer"], omdb_json["Actors"]])
+    crew = set()
+    for role in ["Director", "Writer", "Actors"]:
+        crew.update([name.strip() for name in omdb_json[role].split(',')])
     crew.discard("N/A")
     json_data["Attr2"] = ', '.join(crew)
     json_data["Attr3"] = omdb_json["Type"]
