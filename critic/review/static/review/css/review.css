@@ -1,7 +1,7 @@
+/* Review search bar */
 .filter-category-label {
     text-transform: capitalize;
 }
-
 .dropdown-item {
     cursor: pointer;
 }
@@ -9,6 +9,10 @@
     cursor: pointer;
 }
 
+
+/* Add reviews page */
+
+/* Review item search */
 #review-category {
     width: unset;
     flex: unset;
@@ -25,7 +29,6 @@
 #autoComplete_list_1 {
     max-height: 70vh;
 }
-
 .review-search-element > img {
     max-width: 5em;
     max-height: 5em;
@@ -33,4 +36,24 @@
 }
 .review-search-element > small {
     margin-left: 0.5em;
+}
+
+/* Review item card */
+.review-image > img {
+    max-width: 20em;
+    max-height: 20em;
+}
+.review-text-container {
+    height: 100%;
+}
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+}
+.review-description-below {
+  padding: 1em;
+}
+.review-attr2 {
+  margin: 0;
+  color: #606060;
 }

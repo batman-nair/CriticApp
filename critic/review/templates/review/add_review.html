@@ -16,22 +16,37 @@
   <input id="autoComplete" class="form-control">
 </div>
 
-<div id="review-card" class="card mb-3" hidden>
-  <div class="row g-0">
-    <div class="col-md-4">
-      <img class="img-fluid rounded-start" alt="Poster Image">
+<div id="review-card" class="review-card card mb-3 shadow" hidden>
+  <div class="d-md-flex g-0">
+    <div class="review-image text-center">
+      <img class="img-fluid rounded-start" alt="Poster Image" src="{{ review.ImageURL }}">
     </div>
-    <div class="col-md-8">
-      <div class="card-body">
-        <h5 class="review-title card-title">Review Title <small class="year text-muted text-end">Year</small></h5>
-        <p class="card-text"><small class="attr1 text-muted">Attribute 1</small></p>
-        <p class="description card-text">This is a wider card with supporting text below as a natural lead-in to additional content. This content is a little bit longer.</p>
-        <p class="attr2 card-text">Attribute 2</p>
-        <p class="rating card-text">Rating</p>
+    <div class="flex-grow-1">
+      <div class="review-text-container card-body d-flex flex-column">
+        <div class="review-card-header">
+          <h4 class="review-title card-title">{{ review.Title }} <small class="review-year text-muted text-end">{{ review.Year }}</small></h4>
+          <div>
+            <p>
+              <span class="review-rating">{{ review.Rating }}</span><small>/10</small>⭐</span>
+            </p>
+          </div>
+        </div>
+        <p class="card-text"><small class="review-attr1 text-muted">{{ review.Attr1 }}</small></p>
+        <p class="review-attr2 card-text order-md-last mb-3 mb-md-0">{{ review.Attr2 }}</p>
+        <p class="review-description card-text flex-grow-1">
+          {% if review.Category == 'movie' %}{{ review.Description }}{% endif %}
+        </p>
+
       </div>
     </div>
   </div>
+  <div class="review-description-below card-text">
+  {% if review.Category == 'game' %}
+    {{ review.Description | safe }}
+  {% endif %}
+  </div>
 </div>
+
 
 <form method="post">
   {% csrf_token %}

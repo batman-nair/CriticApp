@@ -22,15 +22,32 @@ async function getReviewItem(category, itemID) {
 async function updateReviewItem(category, itemID, reviewCard) {
     const data = await getReviewItem(category, itemID)
     console.log('Got review item data: ', data)
-    reviewCard.querySelector(".review-title").innerHTML = data["Title"] + " " + reviewCard.querySelector(".year").outerHTML
+    let titleDOM = reviewCard.querySelector(".review-title");
+    let yearDOM = reviewCard.querySelector(".review-year");
+    let imageDOM = reviewCard.querySelector("img");
+    titleDOM.innerHTML = data["Title"] + " " + yearDOM.outerHTML;
     if (data["ImageURL"] != "N/A") {
-        reviewCard.querySelector("img").src = data["ImageURL"]
+        imageDOM.src = data["ImageURL"];
+    } else {
+        imageDOM.src = "";
     }
-    reviewCard.querySelector(".year").innerText = data["Year"]
-    reviewCard.querySelector(".attr1").innerText = data["Attr1"]
-    reviewCard.querySelector(".description").innerHTML = data["Description"]
-    reviewCard.querySelector(".attr2").innerText = data["Attr2"]
-    reviewCard.querySelector(".rating").innerText = data["Rating"]
+    reviewCard.querySelector(".review-year").innerText = data["Year"]
+    reviewCard.querySelector(".review-attr1").innerText = data["Attr1"]
+    console.log(reviewCard.querySelector("img").height, reviewCard.querySelector("img").width)
+    let descriptionDOM = reviewCard.querySelector(".review-description");
+    let descriptionDOMBelow = reviewCard.querySelector(".review-description-below");
+    console.log('Details', imageDOM.width, imageDOM.height, data["Description"].length)
+    if (imageDOM.width > imageDOM.height || data["Description"].length > 300) {
+        descriptionDOM.innerHTML = "";
+        descriptionDOM = descriptionDOMBelow;
+        descriptionDOMBelow.removeAttribute("hidden");
+    } else {
+        descriptionDOMBelow.innerHTML = ""
+        descriptionDOMBelow.setAttribute("hidden", "");
+    }
+    descriptionDOM.innerHTML = data["Description"]
+    reviewCard.querySelector(".review-attr2").innerText = data["Attr2"]
+    reviewCard.querySelector(".review-rating").innerText = data["Rating"]
     reviewCard.removeAttribute("hidden")
 }
 
