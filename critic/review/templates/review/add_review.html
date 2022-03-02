@@ -49,9 +49,35 @@
 
 
 <form method="post">
+  <fieldset id="review-form">
   {% csrf_token %}
-  {{ form|crispy }}
-  <input type="submit" value="Submit">
+
+  {% for hidden in form.hidden_fields %}
+  {{ hidden }}
+  {% endfor %}
+
+  <div class="row gx-5 mb-3">
+    <div class="col-3">
+      <div class="input-group">
+        <label for="{{ form.rating.id_for_label }}" class="pe-4 col-form-label">Rating</label>
+        <input type="number" name="{{ form.rating.html_name }}" class="form-control" id="{{ form.rating.id_for_label }}" step="0.01" min="0" max="10" aria-label="Review rating" aria-describedBy="rating-suffix">
+        <span class="input-group-text" id="rating-suffix">/10</span>
+      </div>
+    </div>
+    <div class="col">
+      <div class="input-group">
+        <label for="{{ form.tags.id_for_label }}" class="pe-4 col-form-label">Tags</label>
+        <input type="text" class="form-control" placeholder="Anime, language" aria-label="Review tags">
+      </div>
+    </div>
+  </div>
+  <div class="form-floating mb-3">
+    <input type="text" name="{{ form.review.html_name }}" class="form-control" id="{{ form.review.id_for_label }}" placeHolder="Review">
+    <label for="{{ form.review.id_for_label }}">{{ form.review.label }}</label>
+  </div>
+
+  <button type="submit" class="btn btn-primary" value="Submit">Add Review</button>
+  </fieldset>
 </form>
 
 
