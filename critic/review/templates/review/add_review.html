@@ -16,7 +16,7 @@
   <input id="autoComplete" class="form-control">
 </div>
 
-<div id="review-card" class="review-card card mb-3 shadow" hidden>
+<div id="review-card" class="review-card card mb-4 shadow-sm" hidden>
   <div class="d-md-flex g-0">
     <div class="review-image text-center">
       <img class="img-fluid rounded-start" alt="Poster Image" src="{{ review.ImageURL }}">
@@ -49,7 +49,7 @@
 
 
 <form method="post">
-  <fieldset id="review-form">
+  <fieldset id="review-form" disabled>
   {% csrf_token %}
 
   {% for hidden in form.hidden_fields %}

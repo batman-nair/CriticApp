@@ -54,6 +54,7 @@ async function updateReviewItem(category, itemID, reviewCard) {
 function updateForm(category, itemID) {
     document.querySelector("#id_item_id").value = itemID
     document.querySelector("#id_category").value = category
+    document.querySelector("#review-form").removeAttribute("disabled")
 }
 
 async function getReviews(query='', username='', filter_categories=[], ordering='') {
