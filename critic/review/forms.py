@@ -5,3 +5,4 @@ class ReviewForm(forms.Form):
     category = forms.CharField(label='Category', max_length=10, widget=forms.HiddenInput())
     rating = forms.FloatField(label='Rating')
     review = forms.CharField(label='Review', required=False)
+    tags = forms.CharField(label='Tags', required=False)

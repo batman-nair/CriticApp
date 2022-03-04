@@ -39,7 +39,8 @@ def add_review(request):
                     user = request.user
                     review_data = form_data['review']
                     rating = form_data['rating']
-                    review_obj = Review(user=user, review_item=review_item, review_rating=rating, review_data=review_data)
+                    tags = form_data['tags']
+                    review_obj = Review(user=user, review_item=review_item, review_rating=rating, review_data=review_data, review_tags=tags)
                     review_obj.save()
                     return HttpResponseRedirect('/add')
                 except ReviewItem.DoesNotExist:

@@ -67,7 +67,7 @@
     <div class="col">
       <div class="input-group">
         <label for="{{ form.tags.id_for_label }}" class="pe-4 col-form-label">Tags</label>
-        <input type="text" class="form-control" placeholder="Anime, language" aria-label="Review tags">
+        <input type="text" name="{{ form.tags.html_name }}" class="form-control" id="{{ form.tags.id_for_label }}" placeholder="Extra info to search items" aria-label="Review tags">
       </div>
     </div>
   </div>
