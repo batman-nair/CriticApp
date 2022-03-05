@@ -38,8 +38,8 @@
                 <li><a class="dropdown-item">Relevance</a></li>
                 <li><a class="dropdown-item" onclick="updateOrder('alpha')">A-Z</a></li>
                 <li><a class="dropdown-item" onclick="updateOrder('modified-date')">Modified Date</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('rating')">Rating: High to Low</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('-rating')">Rating: Low to High</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('-rating')">Rating: High to Low</a></li>
+                <li><a class="dropdown-item" onclick="updateOrder('rating')">Rating: Low to High</a></li>
         </ul>
     </div>
 </div>
@@ -85,7 +85,7 @@
         filterCategories = [];
         for (var element of document.querySelectorAll(".filter-category")) {
             if (!element.checked) {
-                filterCategories.push(element.value)
+                filterCategories.push(element.value);
             }
         }
     }
@@ -102,13 +102,13 @@
     }
     const updateReviews = debounce(updateReviewsImpl);
 
-    const queryTextBox = document.querySelector("#filter-text")
+    const queryTextBox = document.querySelector("#filter-text");
     queryTextBox.addEventListener('input', (e) => {
         queryString = e.target.value;
         updateReviews();
     })
 
-    updateReviewsImpl()
+    updateReviewsImpl();
 
 </script>
 
