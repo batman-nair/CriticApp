@@ -85,52 +85,56 @@
 <script src="{% static 'review/js/review.js' %}"></script>
 
 <script>
-    config = {
-      data: {
-        src: async (query) => {
-          const category = document.querySelector("#review-category").value
-          try {
-            return getSearchItems(category, query)
-          } catch (error) {
-            console.log("Error fetching search data ", query, error)
-            return error
-          }
-        },
-        keys: ["Title"],
-      },
-      searchEngine: (query, record) => {
-        return record;
-      },
-      placeHolder: 'Search...',
-      threshold: 3,
-      debounce: 300,
-      resultItem: {
-        element: (item, data) => {
-          const item_img = document.createElement('img')
-          const image_url = data['value']['ImageURL']
-          if (image_url == "N/A") {
-              return
-          }
-          item_img.src = image_url
-          item.prepend(item_img)
-          item.classList.add('review-search-element')
-          const year_span = document.createElement('small')
-          year_span.innerText = data['value']['Year']
-          item.append(year_span)
+  document.querySelector("#id_item_id").addEventListener('input', () => {
+    document.querySelector("#review-form").removeAttribute("disabled");
+  })
+
+  config = {
+    data: {
+      src: async (query) => {
+        const category = document.querySelector("#review-category").value;
+        try {
+          return getSearchItems(category, query);
+        } catch (error) {
+          console.log("Error fetching search data ", query, error);
+          return error;
         }
       },
-      submit: false,
-    }
-    const autoCompleteJS = new autoComplete(config);
+      keys: ["Title"],
+    },
+    searchEngine: (query, record) => {
+      return record;
+    },
+    placeHolder: 'Search...',
+    threshold: 3,
+    debounce: 300,
+    resultItem: {
+      element: (item, data) => {
+        const item_img = document.createElement('img');
+        const image_url = data['value']['ImageURL'];
+        if (image_url == "N/A") {
+            return;
+        }
+        item_img.src = image_url;
+        item.prepend(item_img);
+        item.classList.add('review-search-element');
+        const year_span = document.createElement('small');
+        year_span.innerText = data['value']['Year'];
+        item.append(year_span);
+      }
+    },
+    submit: false,
+  }
+  const autoCompleteJS = new autoComplete(config);
 
-    const reviewCard = document.querySelector("#review-card")
-    document.querySelector("#autoComplete").addEventListener("selection", function (event) {
-      const category = document.querySelector("#review-category").value
-      const selection = event.detail.selection.value
-      const itemID = selection["ItemID"]
-      updateReviewItem(category, itemID, reviewCard)
-      updateForm(category, itemID)
-      console.log('Selected: ', selection, event.detail);
-    });
+  const reviewCard = document.querySelector("#review-card");
+  document.querySelector("#autoComplete").addEventListener("selection", function (event) {
+    const category = document.querySelector("#review-category").value;
+    const selection = event.detail.selection.value;
+    const itemID = selection["ItemID"];
+    updateReviewItem(category, itemID, reviewCard);
+    updateForm(category, itemID);
+    console.log('Selected: ', selection, event.detail);
+  });
 </script>
 {% endblock content %}
