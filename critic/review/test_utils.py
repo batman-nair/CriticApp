@@ -5,7 +5,7 @@ from model_bakery import baker
 
 from .models import Review, ReviewItem
 
-from . import utils
+from utils import review_utils as utils
 
 class APITest(TestCase):
     def setUp(self):

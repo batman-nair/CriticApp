@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 
 from .forms import ReviewForm
 
-from . import utils
+from utils import review_utils as utils
 from .models import ReviewItem, Review
 
 CATEGORIES = {
