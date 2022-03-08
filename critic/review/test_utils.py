@@ -5,9 +5,53 @@ from model_bakery import baker
 
 from .models import Review, ReviewItem
 
-from utils import review_utils as utils
+from .utils import review_utils as utils
+from .utils import api_utils
+
+_JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
 class APITest(TestCase):
+    def setUp(self):
+        self.omdb_api = api_utils.OMDBItemAPI()
+        self.rawg_api = api_utils.RAWGItemAPI()
+
+    def test_search(self):
+        self._test_search_api(self.omdb_api, 'Breaking Bad')
+        self._test_search_api(self.rawg_api, 'Ori and the Blind Forest')
+
+    def _test_search_api(self, api_obj: api_utils.ReviewItemAPIBase, success_query: str):
+        search_json = api_obj.search(success_query)
+        self._check_review_search_json(search_json)
+        search_json = api_obj.search(_JUNK_DATA)
+        self._check_invalid_response(search_json)
+
+    def _check_review_search_json(self, search_json: str):
+        self.assertTrue("Results" in search_json)
+        self.assertEqual(search_json["Response"], "True")
+        review_search_result = search_json["Results"][0]
+        review_search_params = ["Title", "ItemID", "ImageURL", "Year"]
+        self.assertTrue(all(param in review_search_result for param in review_search_params))
+
+    def test_details(self):
+        self._test_details_api(self.omdb_api, 'tt3896198')
+        self._test_details_api(self.rawg_api, '19590')
+
+    def _test_details_api(self, api_obj: api_utils.ReviewItemAPIBase, success_id: str):
+        details_json = api_obj.get_details(success_id)
+        self._check_review_info_json(details_json)
+        details_json = api_obj.get_details(_JUNK_DATA)
+        self._check_invalid_response(details_json)
+
+    def _check_review_info_json(self, info_json):
+        self.assertTrue(info_json["Response"], "True")
+        review_info_params = ["Title", "ItemID", "ImageURL", "Year", "Attr1", "Attr2", "Attr3", "Description", "Rating"]
+        self.assertTrue(all(param in info_json for param in review_info_params))
+
+    def _check_invalid_response(self, json_data: dict):
+        self.assertTrue(json_data["Response"], "False")
+
+
+class APITestOld(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
