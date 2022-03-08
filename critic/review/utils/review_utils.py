@@ -3,7 +3,7 @@ import requests
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 
-from .models import Review
+from review.models import Review
 
 load_dotenv(find_dotenv())
 NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
