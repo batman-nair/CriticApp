@@ -4,8 +4,14 @@ from django.contrib.auth.decorators import login_required
 
 from .forms import ReviewForm
 
-from utils import review_utils as utils
+from .utils import review_utils as utils
+from .utils import api_utils
 from .models import ReviewItem, Review
+
+CATEGORY_TO_API = {
+    'movie': api_utils.OMDBItemAPI(),
+    'game': api_utils.RAWGItemAPI(),
+}
 
 CATEGORIES = {
     'movie': {
@@ -54,6 +60,14 @@ def add_review(request):
 def search_review_item(request, category, search_term):
     if not request.user.is_authenticated:
         return JsonResponse(INVALID_USER_RESPONSE)
+    if category not in CATEGORY_TO_API:
+        return JsonResponse(INVALID_CATEGORY_RESPONSE)
+    api_obj = CATEGORY_TO_API[category]
+    return JsonResponse(api_obj.search(search_term))
+
+def search_review_item_old(request, category, search_term):
+    if not request.user.is_authenticated:
+        return JsonResponse(INVALID_USER_RESPONSE)
     if category not in CATEGORIES:
         return JsonResponse(INVALID_CATEGORY_RESPONSE)
     util_funcs = CATEGORIES[category]
@@ -65,6 +79,26 @@ def search_review_item(request, category, search_term):
     return JsonResponse(item_data)
 
 def get_review_item_info(request, category, item_id):
+    if not request.user.is_authenticated:
+        return JsonResponse(INVALID_USER_RESPONSE)
+    if category not in CATEGORY_TO_API:
+        return JsonResponse(INVALID_CATEGORY_RESPONSE)
+    try:
+        review_item = ReviewItem.objects.get(item_id=item_id)
+        review_item_json = review_item.to_review_json()
+        review_item_json["Response"] = "True"
+        return JsonResponse(review_item_json)
+    except ReviewItem.DoesNotExist:
+        pass
+    api_obj = CATEGORY_TO_API[category]
+    item_data = api_obj.get_details(item_id)
+    item_data["Category"] = category
+    if item_data["Response"] == "True":
+        review_item = ReviewItem.from_review_json(**item_data)
+        review_item.save()
+    return JsonResponse(item_data)
+
+def get_review_item_info_old(request, category, item_id):
     if not request.user.is_authenticated:
         return JsonResponse(INVALID_USER_RESPONSE)
     if category not in CATEGORIES:

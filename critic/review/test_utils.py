@@ -33,8 +33,8 @@ class APITest(TestCase):
         self.assertTrue(all(param in review_search_result for param in review_search_params))
 
     def test_details(self):
-        self._test_details_api(self.omdb_api, 'tt3896198')
-        self._test_details_api(self.rawg_api, '19590')
+        self._test_details_api(self.omdb_api, 'omdb_tt3896198')
+        self._test_details_api(self.rawg_api, 'rawg_19590')
 
     def _test_details_api(self, api_obj: api_utils.ReviewItemAPIBase, success_id: str):
         details_json = api_obj.get_details(success_id)

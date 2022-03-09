@@ -41,8 +41,8 @@ class ReviewItemAPITest(TestCase):
         json_data = self.client.get(endpoint+'/invalid/test').json()
         self._check_invalid_response(json_data)
 
-        self._test_item_info_for_category(endpoint, 'movie', 'tt3896198')
-        self._test_item_info_for_category(endpoint, 'game', '19590')
+        self._test_item_info_for_category(endpoint, 'movie', 'omdb_tt3896198')
+        self._test_item_info_for_category(endpoint, 'game', 'rawg_19590')
 
     def _test_item_info_for_category(self, endpoint, category, valid_id):
         json_response = self.client.get('{}/{}/{}'.format(endpoint, category, valid_id))
