@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 
 from model_bakery import baker
 from .models import Review, ReviewItem
+from .serializers import ReviewItemSerializer
 
 _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
@@ -15,8 +16,8 @@ class ReviewItemAPITest(TestCase):
         self.user.delete()
 
     def _check_invalid_response(self, json_data):
-        self.assertEqual(json_data["Response"], "False")
-        self.assertTrue("Error" in json_data)
+        self.assertEqual(json_data["response"], "False")
+        self.assertTrue("error" in json_data)
 
     def test_search_review_item(self):
         endpoint = '/search_item'
@@ -33,8 +34,8 @@ class ReviewItemAPITest(TestCase):
         self._check_invalid_response(json_response.json())
 
     def _check_valid_search_response(self, json_data):
-        self.assertEqual(json_data["Response"], "True")
-        self.assertTrue(len(json_data["Results"]) > 0)
+        self.assertEqual(json_data["response"], "True")
+        self.assertTrue(len(json_data["results"]) > 0)
 
     def test_get_item_info(self):
         endpoint = '/get_item_info'
@@ -51,30 +52,31 @@ class ReviewItemAPITest(TestCase):
         self._check_invalid_response(json_response.json())
 
     def _check_valid_item_info_response(self, json_data):
-        self.assertEqual(json_data["Response"], "True")
-        self.assertTrue("Title" in json_data)
+        self.assertEqual(json_data["response"], "True")
+        self.assertTrue("title" in json_data)
         # Detailed data test done in utils testing
 
 SAMPLE_REVIEW_ITEM_JSON = {
-    "Category": "movie",
-    "ItemID": "test1",
-    "Title": "Cool title",
-    "ImageURL": "http://fakeurl.com",
-    "Year": "2021",
-    "Attr1": "Attr1",
-    "Attr2": "Attr2",
-    "Attr3": "Attr3",
-    "Description": "Sample desc",
-    "Rating": "10",
-    "Response": "True",
+    "category": "movie",
+    "item_id": "test1",
+    "title": "Cool title",
+    "image_url": "http://fakeurl.com",
+    "year": "2021",
+    "attr1": "Attr1",
+    "attr2": "Attr2",
+    "attr3": "Attr3",
+    "description": "Sample desc",
+    "rating": "10",
+    "response": "True",
 }
 
 class ReviewAPITest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
-        self.review_item1 = ReviewItem.from_review_json(**SAMPLE_REVIEW_ITEM_JSON)
-        self.review_item1.save()
+        item_serializer = ReviewItemSerializer(data=SAMPLE_REVIEW_ITEM_JSON)
+        item_serializer.is_valid()
+        self.review_item1 = item_serializer.save()
 
     def tearDown(self):
         self.user.delete()

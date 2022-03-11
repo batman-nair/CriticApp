@@ -1,8 +1,10 @@
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 
 from .forms import ReviewForm
+from .serializers import ReviewItemSerializer
 
 from .utils import api_utils, review_utils
 from .models import ReviewItem, Review
@@ -12,9 +14,9 @@ CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'game': api_utils.RAWGItemAPI(),
 }
 
-INVALID_USER_RESPONSE = {"Response": "False", "Error": "User not authenticated."}
-INVALID_CATEGORY_RESPONSE = {"Response": "False", "Error": "Invalid category."}
-NOT_OK_RESPONSE = {"Response": "False", "Error": "Bad reponse from API."}
+INVALID_USER_RESPONSE = {"response": "False", "error": "User not authenticated."}
+INVALID_CATEGORY_RESPONSE = {"response": "False", "error": "Invalid category."}
+NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
 
 def view_reviews(request):
     return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys()})
@@ -34,7 +36,7 @@ def add_review(request):
                     tags = form_data['tags']
                     review_obj = Review(user=user, review_item=review_item, review_rating=rating, review_data=review_data, review_tags=tags)
                     review_obj.save()
-                    return HttpResponseRedirect('/add')
+                    return HttpResponseRedirect(reverse('review:add_review'))
                 except ReviewItem.DoesNotExist:
                     print('ReviewItem does not exist', form_data)
         else:
@@ -58,17 +60,20 @@ def get_review_item_info(request, category, item_id):
         return JsonResponse(INVALID_CATEGORY_RESPONSE)
     try:
         review_item = ReviewItem.objects.get(item_id=item_id)
-        review_item_json = review_item.to_review_json()
-        review_item_json["Response"] = "True"
+        review_item_json = ReviewItemSerializer(review_item).data
+        review_item_json["response"] = "True"
         return JsonResponse(review_item_json)
     except ReviewItem.DoesNotExist:
         pass
     api_obj = CATEGORY_TO_API[category]
     item_data = api_obj.get_details(item_id)
-    item_data["Category"] = category
-    if item_data["Response"] == "True":
-        review_item = ReviewItem.from_review_json(**item_data)
-        review_item.save()
+    item_data["category"] = category
+    if item_data["response"] == "True":
+        serializer = ReviewItemSerializer(data=item_data)
+        if serializer.is_valid():
+            serializer.save()
+        else:
+            print('Error serializing data', category, item_id, serializer.errors)
     return JsonResponse(item_data)
 
 @login_required

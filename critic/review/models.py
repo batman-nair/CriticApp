@@ -14,25 +14,8 @@ class ReviewItem(models.Model):
     description = models.TextField()
     rating = models.CharField(max_length=5)
 
-    @classmethod
-    def from_review_json(cls, Category, ItemID, Title, ImageURL, Year, Attr1, Attr2, Attr3, Description, Rating, Response):
-        review_item = cls(item_id=ItemID, category=Category, title=Title, image_url=ImageURL, year=Year, attr1=Attr1, attr2=Attr2, attr3=Attr3, description=Description, rating=Rating)
-        return review_item
-
-    def to_review_json(self):
-        review_json = {
-            'ItemID': self.item_id,
-            'Category': self.category,
-            'Title': self.title,
-            'ImageURL': self.image_url,
-            'Year': self.year,
-            'Attr1': self.attr1,
-            'Attr2': self.attr2,
-            'Attr3': self.attr3,
-            'Description': self.description,
-            'Rating': self.rating,
-         }
-        return review_json
+    def __str__(self):
+        return '{}({})'.format(self.title, self.item_id)
 
 class Review(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -41,3 +24,6 @@ class Review(models.Model):
     review_data = models.TextField(null=True)
     review_tags = models.CharField(max_length=100, null=True)
     modified_date = models.DateField(auto_now=True)
+
+    def __str__(self):
+        return '{}'.format(self.review_item.title)
