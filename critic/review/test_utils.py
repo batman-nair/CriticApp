@@ -81,10 +81,10 @@ class ReviewQueryTest(TestCase):
         reviews = review_utils.get_filtered_review_objects()
         self.assertGreaterEqual(len(reviews), 10)
         json_data = review_utils.convert_reviews_to_json(reviews)
-        self.assertTrue("Results" in json_data)
-        self.assertGreaterEqual(len(json_data["Results"]), 10)
+        self.assertTrue("results" in json_data)
+        self.assertGreaterEqual(len(json_data["results"]), 10)
         review_json = json_data["results"][0]
-        self.assertTrue(all(field in review_json for field in ["ReviewData", "Rating", "ModifiedDate", "ReviewItem"]))
+        self.assertTrue(all(field in review_json for field in ["review_data", "review_rating", "modified_date", "review_item"]))
 
     def test_query_filter(self):
         reviews = review_utils.get_filtered_review_objects(query='Cool')

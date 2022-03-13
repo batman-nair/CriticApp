@@ -1,3 +1,4 @@
+from review.serializers import ReviewSerializer
 from review.models import Review
 
 ORDERING_DICT = {
@@ -20,17 +21,7 @@ def get_filtered_review_objects(query: str='', username: str='', filter_categori
     return reviews
 
 def convert_reviews_to_json(reviews: list) -> dict:
-    json_data = {'Results': []}
+    json_data = {'results': []}
     for review in reviews:
-        json_data['Results'].append(_convert_review_to_json(review))
+        json_data['results'].append(ReviewSerializer(review).data)
     return json_data
-
-def _convert_review_to_json(review: Review) -> dict:
-    review_item_json = review.review_item.to_review_json()
-    review_json = {
-        'ReviewData': review.review_data,
-        'Rating': review.review_rating,
-        'ModifiedDate': review.modified_date,
-        'ReviewItem': review_item_json
-    }
-    return review_json

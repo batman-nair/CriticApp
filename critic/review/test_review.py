@@ -93,11 +93,11 @@ class ReviewAPITest(TestCase):
         self._check_valid_reviews_response(json_response.json())
 
         json_response = self.client.get('/reviews', {'query': _JUNK_DATA})
-        self.assertEqual(len(json_response.json()["Results"]), 0)
+        self.assertEqual(len(json_response.json()["results"]), 0)
 
     def _check_valid_reviews_response(self, json_data):
-        self.assertTrue("Results" in json_data)
-        self.assertGreater(len(json_data["Results"]), 0)
+        self.assertTrue("results" in json_data)
+        self.assertGreater(len(json_data["results"]), 0)
 
     def test_add_review(self):
         self.client.post('/add', {
@@ -118,5 +118,5 @@ class AuthTest(TestCase):
         self._check_invalid_response(json_response.json())
 
     def _check_invalid_response(self, json_data):
-        self.assertEqual(json_data["Response"], "False")
-        self.assertTrue("Error" in json_data)
+        self.assertEqual(json_data["response"], "False")
+        self.assertTrue("error" in json_data)

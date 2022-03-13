@@ -2,9 +2,10 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from rest_framework import generics
 
 from .forms import ReviewForm
-from .serializers import ReviewItemSerializer
+from .serializers import ReviewItemSerializer, ReviewSerializer
 
 from .utils import api_utils, review_utils
 from .models import ReviewItem, Review
@@ -89,5 +90,9 @@ def get_reviews(request):
     filter_categories = request.GET.getlist('filter_categories')
     ordering = request.GET.get('ordering', '')
     reviews = review_utils.get_filtered_review_objects(query, username, filter_categories, ordering)
-    json_data = review_utils.convert_reviews_to_json(reviews)
+    json_data = {'results': ReviewSerializer(reviews, many=True).data}
     return JsonResponse(json_data)
+
+class ReviewList(generics.ListCreateAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
