@@ -52,13 +52,13 @@ async function updateReviewItem(category, itemID, reviewCard) {
 }
 
 function updateForm(category, itemID) {
-    document.querySelector("#id_item_id").value = itemID;
+    document.querySelector("#id_review_item").value = itemID;
     document.querySelector("#id_category").value = category;
     document.querySelector("#review-form").removeAttribute("disabled");
 }
 
 async function getReviews(query='', username='', filter_categories=[], ordering='') {
-    const reviewUrl = new URL(`${baseUrl}/reviews`);
+    const reviewUrl = new URL(`${baseUrl}/api/reviews`);
     if (query) {
         reviewUrl.searchParams.append('query', query);
     }
@@ -74,7 +74,7 @@ async function getReviews(query='', username='', filter_categories=[], ordering=
     const response = await fetch(reviewUrl);
     const data = await response.json();
     console.log('Got reviews', data);
-    return [...data["results"], ...data["results"]];
+    return [...data, ...data];
 }
 
 function buildReviewCard(review) {

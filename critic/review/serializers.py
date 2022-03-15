@@ -13,6 +13,14 @@ class ReviewItemSerializer(serializers.ModelSerializer):
         }
 
 class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.ReadOnlyField(source='user.username')
+
+    class Meta:
+        model = Review
+        fields = '__all__'
+
+
+class ReviewSerializer2(serializers.ModelSerializer):
     review_item = ReviewItemSerializer()
 
     class Meta:

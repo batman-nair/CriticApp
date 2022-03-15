@@ -2,13 +2,17 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from rest_framework import generics
+from rest_framework import permissions
+from rest_framework import serializers
 
 from .forms import ReviewForm
-from .serializers import ReviewItemSerializer, ReviewSerializer
-
+from .serializers import ReviewItemSerializer, ReviewSerializer, ReviewSerializer2
 from .utils import api_utils, review_utils
 from .models import ReviewItem, Review
+from .permissions import IsOwnerOrReadOnly
 
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'movie': api_utils.OMDBItemAPI(),
@@ -90,9 +94,37 @@ def get_reviews(request):
     filter_categories = request.GET.getlist('filter_categories')
     ordering = request.GET.get('ordering', '')
     reviews = review_utils.get_filtered_review_objects(query, username, filter_categories, ordering)
-    json_data = {'results': ReviewSerializer(reviews, many=True).data}
+    json_data = {'results': ReviewSerializer2(reviews, many=True).data}
     return JsonResponse(json_data)
 
-class ReviewList(generics.ListCreateAPIView):
+class ReviewList(APIView):
+    class OutputSerializer(serializers.ModelSerializer):
+        user = serializers.ReadOnlyField(source='user.username')
+        review_item = ReviewItemSerializer()
+        class Meta:
+            model = Review
+            fields = '__all__'
+
+    def get(self, request):
+        reviews = Review.objects.all()
+        query = request.GET.get('query', '')
+        username = request.GET.get('username', '')
+        filter_categories = request.GET.getlist('filter_categories')
+        ordering = request.GET.get('ordering', '')
+        reviews = review_utils.get_filtered_review_objects(query, username, filter_categories, ordering)
+        data = self.OutputSerializer(reviews, many=True).data
+
+        return Response(data)
+
+class ReviewCreate(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
