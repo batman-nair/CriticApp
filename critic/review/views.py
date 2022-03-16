@@ -2,11 +2,13 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import serializers
+from rest_framework import status
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer, ReviewSerializer2
@@ -120,6 +122,14 @@ class ReviewCreate(generics.CreateAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        if response.status_code == status.HTTP_201_CREATED:
+            messages.success(request, 'Created new review')
+            return redirect('review:add_review')
+        messages.error('Error creating review')
+        return redirect('review:add_review')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
