@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'review',
-    'crispy_forms',
     'users',
     'rest_framework',
 ]
@@ -148,8 +147,6 @@ prod_db  =  dj_database_url.config(conn_max_age=500)
 DATABASES['default'].update(prod_db)
 
 LOGIN_URL = 'users:login'
-
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 AUTH_USER_MODEL = 'users.User'
 LOGIN_REDIRECT_URL = '/u'

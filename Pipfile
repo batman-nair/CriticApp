@@ -13,7 +13,6 @@ python-dotenv = "*"
 requests = "*"
 pytest = "*"
 pytest-django = "*"
-django-crispy-forms = "*"
 model-bakery = "*"
 djangorestframework = "*"
 
