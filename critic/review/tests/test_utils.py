@@ -3,14 +3,14 @@ from django.contrib.auth import get_user_model
 
 from model_bakery import baker
 
-from .models import Review, ReviewItem
-from .serializers import ReviewItemSerializer
-from .utils import review_utils
-from .utils import api_utils
+from review.models import Review
+from review.serializers import ReviewItemSerializer
+from review.utils import review_utils
+from review.utils import api_utils
 
 _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
-class APITest(TestCase):
+class UtilAPITest(TestCase):
     def setUp(self):
         self.omdb_api = api_utils.OMDBItemAPI()
         self.rawg_api = api_utils.RAWGItemAPI()
