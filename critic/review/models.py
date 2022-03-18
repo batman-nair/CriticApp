@@ -25,5 +25,10 @@ class Review(models.Model):
     review_tags = models.CharField(max_length=100, null=True)
     modified_date = models.DateField(auto_now=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'review_item'], name='unique review')
+            ]
+
     def __str__(self):
         return '{}'.format(self.review_item.title)

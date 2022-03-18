@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -124,11 +125,14 @@ class ReviewCreate(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
+        try:
+            response = super().create(request, *args, **kwargs)
+        except IntegrityError:
+            response = Response({'error': 'Possible duplicate review'}, status=status.HTTP_400_BAD_REQUEST)
         if response.status_code == status.HTTP_201_CREATED:
             messages.success(request, 'Created new review')
             return redirect('review:add_review')
-        messages.error('Error creating review')
+        messages.error(request, 'Error creating review')
         return redirect('review:add_review')
 
     def perform_create(self, serializer):
