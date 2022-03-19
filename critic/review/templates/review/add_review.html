@@ -47,7 +47,7 @@
 </div>
 
 
-<form method="post" action="/api/reviews/create/">
+<form method="post" action="{% url 'review:reviews:create' %}">
   <fieldset id="review-form" disabled>
   {% csrf_token %}
 
