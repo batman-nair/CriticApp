@@ -5,6 +5,7 @@ from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 
 load_dotenv(find_dotenv())
+MISSING_PREFIX_RESPONSE = {"response": "False", "error": "Missing prefix in item id."}
 NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
 
 class ReviewItemAPIBase(ABC):
@@ -45,8 +46,9 @@ class OMDBItemAPI(ReviewItemAPIBase):
         return self._convert_to_review(omdb_json)
 
     def get_details(self, item_id: str) -> dict:
-        if item_id.startswith(self.prefix):
-            item_id = item_id[len(self.prefix):]
+        if not item_id.startswith(self.prefix):
+            return MISSING_PREFIX_RESPONSE.copy()
+        item_id = item_id[len(self.prefix):]
         info_url = '{base_url}&i={imdb_id}'.format(base_url=self._base_url, imdb_id=item_id)
         r = requests.get(info_url)
         if r.status_code == 200:
@@ -120,8 +122,9 @@ class RAWGItemAPI(ReviewItemAPIBase):
         return self._convert_rawg_to_review(rawg_json)
 
     def get_details(self, item_id: str) -> dict:
-        if item_id.startswith(self.prefix):
-            item_id = item_id[len(self.prefix):]
+        if not item_id.startswith(self.prefix):
+            return MISSING_PREFIX_RESPONSE.copy()
+        item_id = item_id[len(self.prefix):]
         info_url = '{base_url}/games/{game_id}?key={api_key}'.format(
             base_url=self._base_url, api_key=self._api_key, game_id=item_id)
         r = requests.get(info_url)
