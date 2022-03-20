@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -90,7 +91,7 @@ class ReviewAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         new_review = Review.objects.get(id=review.id)
         self.assertEqual(new_review.review_data, 'new_data')
-        self.assertEqual(new_review.review_rating, 4.1)
+        self.assertEqual(new_review.review_rating, Decimal('4.1'))
 
         response = self.client.delete(DETAIL_ENDPOINT.format(id=review.id))
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
