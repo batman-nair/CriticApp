@@ -1,8 +1,12 @@
 :root {
-    --background-color: #EEEEEE;
-    --primary-color: #00ADB5;
+    --color1: #222831;
+    --color2: #393E46;
+    --color3: #00ADB5;
+    --color4: #EEEEEE;
+    --background-color: var(--color4);
+    --primary-color: var(--color3);
     --primary-shadow-color: #00acb559;
-    --secondary-color: #393E46;
-    --foreground-color: #222831;
+    --secondary-color: var(--color2);
+    --foreground-color: var(--color1);
     --foreground-shadow-color: #22283113;
 }
