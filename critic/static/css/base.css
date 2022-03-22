@@ -1,10 +1,70 @@
 body {
-    background: aliceblue;
+    background: var(--background-color);
+    color: var(--foreground-color);
+}
+a {
+    transition: color 0.2s;
+}
+.flex-wrapper {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: flex-start;
 }
 
+/* Bootstrap overrides */
+.btn-primary {
+    color: var(--primary-color);
+    background-color: var(--foreground-color);
+    border-color: var(--foreground-color);
+}
+.btn-primary:disabled {
+    color: var(--primary-color);
+    background-color: var(--foreground-color);
+    border-color: var(--foreground-color);
+}
+.btn-primary:hover {
+    color: var(--foreground-color);
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem var(--primary-shadow-color);
+}
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem var(--primary-shadow-color);
+}
+
+/* Header */
+.navbar {
+    background-color: var(--secondary-color);
+    color: var(--background-color);
+}
+.navbar-brand {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+.navbar-brand:hover {
+    color: var(--primary-color);
+}
+.nav-link {
+    color: var(--background-color);
+}
+.nav-link:hover {
+    color: var(--primary-color);
+}
+
+/* Footer */
 footer {
-    background-color: #3f51b5;
-    color: rgb(243, 243, 243);
+    margin-top: auto;
+    background-color: var(--secondary-color);
+    color: var(--background-color);
 }
 footer a {
     text-decoration: none;
@@ -12,8 +72,9 @@ footer a {
     font-weight: bold;
 }
 footer a:hover {
-    color: rgb(255, 255, 255);
+    color: var(--primary-color);
 }
 .footer-bottom {
     background-color: rgba(0, 0, 0, 0.2);
+    font-size: 0.9em;
 }

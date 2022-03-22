@@ -74,7 +74,7 @@ async function getReviews(query='', username='', filter_categories=[], ordering=
     const response = await fetch(reviewUrl);
     const data = await response.json();
     console.log('Got reviews', data);
-    return [...data, ...data];
+    return [...data];
 }
 
 function buildReviewCard(review) {
