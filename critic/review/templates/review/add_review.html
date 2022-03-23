@@ -126,6 +126,12 @@
   }
   const autoCompleteJS = new autoComplete(config);
 
+  function updateForm(category, itemID) {
+      document.querySelector("#id_review_item").value = itemID;
+      document.querySelector("#id_category").value = category;
+      document.querySelector("#review-form").removeAttribute("disabled");
+  }
+
   const reviewCard = document.querySelector("#review-card");
   document.querySelector("#autoComplete").addEventListener("selection", function (event) {
     const category = document.querySelector("#review-category").value;

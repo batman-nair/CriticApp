@@ -51,12 +51,6 @@ async function updateReviewItem(category, itemID, reviewCard) {
     reviewCard.removeAttribute("hidden");
 }
 
-function updateForm(category, itemID) {
-    document.querySelector("#id_review_item").value = itemID;
-    document.querySelector("#id_category").value = category;
-    document.querySelector("#review-form").removeAttribute("disabled");
-}
-
 async function getReviews(query='', username='', filter_categories=[], ordering='') {
     const reviewUrl = new URL(`${baseUrl}/api/reviews`);
     if (query) {

@@ -44,6 +44,10 @@
     </div>
 </div>
 
+<div class="text-center my-4" id="review-loading-message">
+    <h3 class="display-6">Loading reviews...</h3>
+</div>
+
 <div class="row justify-content-evenly" id="review-container" >
 {% for review in reviews %}
     {% if review.review_item.category == 'movie' %}
@@ -89,12 +93,22 @@
             }
         }
     }
+    function showReviewLoading() {
+        document.querySelector("#review-container").setAttribute("hidden", "");
+        document.querySelector("#review-loading-message").removeAttribute("hidden");
+    }
+    function hideReviewLoading() {
+        document.querySelector("#review-loading-message").setAttribute("hidden", "");
+        document.querySelector("#review-container").removeAttribute("hidden");
+    }
     function updateReviewsImpl() {
         populateFilterCategories();
         getReviews(queryString, username, filterCategories, ordering)
           .then((reviews) => {
+              showReviewLoading();
               populateReviewCards('#review-container', reviews);
               imagesLoaded('#review-container', () => {
+                hideReviewLoading();
                 masonry.reloadItems();
                 masonry.layout();
               })
