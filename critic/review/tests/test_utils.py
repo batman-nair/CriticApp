@@ -92,6 +92,18 @@ class ReviewQueryTest(TestCase):
         reviews = review_utils.get_filtered_review_objects(query='This should not hopefull match any random string')
         self.assertFalse(len(reviews))
 
+    def test_advanced_query_filter(self):
+        reviews = review_utils.get_filtered_review_objects(query='title cool attr1 attr2')
+        self.assertTrue(len(reviews), 'Multiple field matching doesnt work')
+        reviews = review_utils.get_filtered_review_objects(query='attr1')
+        self.assertTrue(len(reviews), 'Meta data matching doesnt work')
+        reviews = review_utils.get_filtered_review_objects(query='attr2')
+        self.assertTrue(len(reviews), 'Meta data matching doesnt work')
+        reviews = review_utils.get_filtered_review_objects(query='desc')
+        self.assertTrue(len(reviews), 'Meta data matching doesnt work')
+        reviews = review_utils.get_filtered_review_objects(query='Cool but not title')
+        self.assertFalse(len(reviews), 'Partial match shouldnt show up')
+
     def test_username_filter(self):
         reviews = review_utils.get_filtered_review_objects(username='testuser')
         self.assertTrue(len(reviews))
