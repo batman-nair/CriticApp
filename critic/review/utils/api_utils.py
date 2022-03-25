@@ -172,5 +172,5 @@ class RAWGItemAPI(ReviewItemAPIBase):
         platforms = set(entry["platform"]["name"] for entry in rawg_json["platforms"])
         json_data["attr3"] = ', '.join(platforms)
         json_data["description"] = rawg_json["description"]
-        json_data["rating"] = rawg_json["rating"]
+        json_data["rating"] = rawg_json["rating"] * 2
         return json_data
