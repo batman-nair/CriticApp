@@ -1,3 +1,4 @@
+/* View reviews page */
 /* Review search bar */
 .filter-category-label {
     text-transform: capitalize;
@@ -7,6 +8,18 @@
 }
 .dropdown-item > * {
     cursor: pointer;
+}
+
+.review-card:hover {
+    cursor: pointer;
+}
+
+#review-detail-modal img {
+    max-width: 60%;
+    max-height: 20em;
+}
+#review-detail-model .btn {
+    margin: -0.5rem;
 }
 
 

@@ -71,7 +71,26 @@ async function getReviews(query='', username='', filter_categories=[], ordering=
     return [...data];
 }
 
-function buildReviewCard(review) {
+function createReviewCardContent(review) {
+    return `
+        <div class="card review-card" data-bs-toggle="modal" data-bs-target="#review-detail-modal">
+            <img src="${review.review_item.image_url}" class="card-img-top" alt="Poster Image">
+            <div class="card-body">
+                <h5 class="review-title card-title">${review.review_item.title}</h5>
+                <p class="card-text"><small class="attr1 text-muted">${review.review_item.attr1}</small></p>
+                <p class="review-data card-text">${review.review_data}</p>
+                <p class="review-rating card-text">${review.review_rating}⭐</p>
+            </div>
+            <span class="year" hidden>${review.review_item.year}</span>
+            <div class="description" hidden>${review.review_item.description}</div>
+            <span class="attr2" hidden>${review.review_item.attr2}</span>
+            <span class="attr3" hidden>${review.review_item.attr3}</span>
+            <span class="review-tags" hidden>${review.review_tags}</span>
+        </div>
+    `;
+}
+
+function buildReviewCardObject(review) {
     const reviewCardWrapper = document.createElement("div");
     reviewCardWrapper.classList.add('mb-4');
     if (review.review_item.category == 'game') {
@@ -80,26 +99,53 @@ function buildReviewCard(review) {
     else {
         reviewCardWrapper.classList.add('col-6', 'col-lg-3');
     }
-    const content = `
-        <div class="card review-card">
-            <img src="${review.review_item.image_url}" class="card-img-top" alt="Poster Image">
-            <div class="card-body">
-                <h5 class="card-title">${review.review_item.title}</h5>
-                <p class="card-text"><small class="attr1 text-muted">${review.review_item.attr1}</small></p>
-                <p class="description card-text">${review.review_data}</p>
-                <p class="rating card-text">${review.review_rating}⭐</p>
-            </div>
-        </div>
-    `;
+    const content = createReviewCardContent(review);
     reviewCardWrapper.innerHTML = content;
+
     return reviewCardWrapper;
+}
+
+function getReviewDataFromCard(reviewObject) {
+    const review = {
+        title: reviewObject.querySelector(".review-title").innerText,
+        image_url: reviewObject.querySelector("img").src,
+        description: reviewObject.querySelector(".description").innerHTML,
+        year: reviewObject.querySelector(".year").innerText,
+        attr1: reviewObject.querySelector(".attr1").innerText,
+        attr2: reviewObject.querySelector(".attr2").innerText,
+        attr3: reviewObject.querySelector(".attr3").innerText,
+        review_tags: reviewObject.querySelector(".review-tags").innerText,
+        review_data: reviewObject.querySelector(".review-data").innerText,
+        review_rating: reviewObject.querySelector(".review-rating").innerText,
+    };
+    return review;
+}
+function populateModalFromReviewData(modalObj, reviewData) {
+    const yearObj = modalObj.querySelector(".review-year");
+    yearObj.innerHTML = reviewData.year;
+    modalObj.querySelector(".review-title").innerHTML = reviewData.title + " " + yearObj.outerHTML;
+    modalObj.querySelector("img").src = reviewData.image_url;
+    modalObj.querySelector(".attr1").innerHTML = reviewData.attr1;
+    modalObj.querySelector(".attr2").innerHTML = reviewData.attr2;
+    modalObj.querySelector(".attr3").innerHTML = reviewData.attr3;
+    modalObj.querySelector(".review-data").innerHTML = reviewData.review_data;
+    modalObj.querySelector(".review-rating").innerHTML = reviewData.review_rating;
+    modalObj.querySelector(".description").innerHTML = reviewData.description;
+}
+
+function reviewDetailModalListener(event) {
+    const modalObj = event.target;
+    const reviewCard = event.relatedTarget;
+    const reviewData = getReviewDataFromCard(reviewCard);
+    console.log(reviewData)
+    populateModalFromReviewData(modalObj, reviewData);
 }
 
 function populateReviewCards(parentSelector, reviews) {
     const container = document.querySelector(parentSelector);
     container.innerHTML = "";
     for (var review of reviews) {
-        const reviewCard = buildReviewCard(review);
+        const reviewCard = buildReviewCardObject(review);
         container.appendChild(reviewCard);
     }
 }
