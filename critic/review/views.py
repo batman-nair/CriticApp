@@ -1,6 +1,6 @@
 from django.db import IntegrityError
 from django.http import JsonResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -29,7 +29,7 @@ NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
 def view_reviews(request):
     return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys()})
 
-@login_required()
+@login_required
 def add_review(request):
     form = ReviewForm()
     return render(request, 'review/add_review.html', {'form': form})
@@ -120,3 +120,21 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+
+
+class ReviewPost(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def post(self, request):
+        review_data = request.data
+        review_obj = Review.objects.get(id=review_data['id']) if review_data['id'] else None
+        serializer = ReviewSerializer(review_obj, review_data)
+        serializer.is_valid()
+        serializer.save(user=request.user)
+        return redirect('review:add_review')
+
+@login_required
+def get_user_review(request, item_id):
+    review = get_object_or_404(Review, user=request.user, review_item__item_id=item_id)
+    json_data = ReviewSerializer(review).data
+    return JsonResponse(json_data)
+

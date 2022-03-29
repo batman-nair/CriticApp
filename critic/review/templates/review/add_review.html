@@ -47,7 +47,7 @@
 </div>
 
 
-<form method="post" action="{% url 'review:reviews:create' %}" class="mb-5">
+<form method="post" action="{% url 'review:reviews:post_review' %}" class="mb-5">
   <fieldset id="review-form" disabled>
   {% csrf_token %}
 
@@ -66,7 +66,7 @@
     <div class="col">
       <div class="input-group">
         <label for="{{ form.review_tags.id_for_label }}" class="pe-4 col-form-label">Tags</label>
-        <input type="text" name="{{ form.review_tags.html_name }}" class="form-control" id="{{ form.tags.id_for_label }}" placeholder="Extra info to search items" aria-label="Review tags">
+        <input type="text" name="{{ form.review_tags.html_name }}" class="form-control" id="{{ form.review_tags.id_for_label }}" placeholder="Extra info to search items" aria-label="Review tags">
       </div>
     </div>
   </div>
@@ -75,7 +75,7 @@
     <label for="{{ form.review_data.id_for_label }}">{{ form.review_data.label }}</label>
   </div>
 
-  <button type="submit" class="btn btn-primary mt-2" value="Submit">Add Review</button>
+  <button type="submit" id="post-review-button" class="btn btn-primary mt-2" value="Submit">Add Review</button>
   </fieldset>
 </form>
 
@@ -125,12 +125,6 @@
     submit: false,
   }
   const autoCompleteJS = new autoComplete(config);
-
-  function updateForm(category, itemID) {
-      document.querySelector("#id_review_item").value = itemID;
-      document.querySelector("#id_category").value = category;
-      document.querySelector("#review-form").removeAttribute("disabled");
-  }
 
   const reviewCard = document.querySelector("#review-card");
   document.querySelector("#autoComplete").addEventListener("selection", function (event) {

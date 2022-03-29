@@ -12,6 +12,39 @@ async function getSearchItems(category, query) {
     return data["results"];
 }
 
+async function getReviewData(itemID) {
+    const fetchUrl = `${baseUrl}/api/reviews/get_user_review/${itemID}`;
+    const response = await fetch(fetchUrl);
+    console.log('got reponse ', itemID, response);
+    if (response.ok) {
+        const data = await response.json();
+        console.log('Got previous review data ', response, itemID, data);
+        return data;
+    }
+    return null;
+}
+
+async function updateForm(category, itemID) {
+    document.querySelector("#id_review_item").value = itemID;
+    document.querySelector("#id_category").value = category;
+    data = await getReviewData(itemID);
+    if (data != null) {
+        document.querySelector("#id_id").value = data["id"];
+        document.querySelector("#id_review_data").value = data["review_data"];
+        document.querySelector("#id_review_rating").value = data["review_rating"];
+        document.querySelector("#id_review_tags").value = data["review_tags"];
+        document.querySelector("#post-review-button").innerText = "Update Review";
+    }
+    else {
+        document.querySelector("#id_id").value = "";
+        document.querySelector("#id_review_data").value = "";
+        document.querySelector("#id_review_rating").value = "";
+        document.querySelector("#id_review_tags").value = "";
+        document.querySelector("#post-review-button").innerText = "Add Review";
+    }
+    document.querySelector("#review-form").removeAttribute("disabled");
+}
+
 async function getReviewItem(category, itemID) {
     const response = await fetch(`${baseUrl}/get_item_info/${category}/${itemID}`);
     const data = await response.json();
@@ -73,7 +106,7 @@ async function getReviews(query='', username='', filter_categories=[], ordering=
 
 function createReviewCardContent(review) {
     return `
-        <div class="card review-card" data-bs-toggle="modal" data-bs-target="#review-detail-modal">
+        <div class="card review-card review-card-expandable" data-bs-toggle="modal" data-bs-target="#review-detail-modal">
             <img src="${review.review_item.image_url}" class="card-img-top" alt="Poster Image">
             <div class="card-body">
                 <h5 class="review-title card-title">${review.review_item.title}</h5>

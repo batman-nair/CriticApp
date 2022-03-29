@@ -8,6 +8,8 @@ review_patterns = [
     path('', views.ReviewList.as_view(), name='list'),
     path('create/', views.ReviewCreate.as_view(), name='create'),
     path('<int:pk>/', views.ReviewDetail.as_view(), name='detail'),
+    path('get_user_review/<str:item_id>/', views.get_user_review, name='get_user_review'),
+    path('post_review/', views.ReviewPost.as_view(), name='post_review')
 ]
 
 urlpatterns = [
