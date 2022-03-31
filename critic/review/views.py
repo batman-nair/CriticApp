@@ -125,11 +125,30 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
 class ReviewPost(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
+        error_code = None
+        is_update = False
         review_data = request.data
-        review_obj = Review.objects.get(id=review_data['id']) if review_data['id'] else None
-        serializer = ReviewSerializer(review_obj, review_data)
-        serializer.is_valid()
-        serializer.save(user=request.user)
+        try:
+            review_obj = None
+            if review_data['id']:
+                is_update = True
+                review_obj = Review.objects.get(id=review_data['id'])
+            serializer = ReviewSerializer(review_obj, review_data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+        except Review.DoesNotExist:
+            error_code = 101
+        except serializers.ValidationError:
+            error_code = 102
+        except IntegrityError:
+            error_code = 103
+
+        action_word = 'Updat' if is_update else 'Add'
+        if error_code:
+            messages.error(request, 'Error {}ing review {}'.format(action_word, error_code))
+        else:
+            messages.success(request, '{}ed review'.format(action_word))
+
         return redirect('review:add_review')
 
 @login_required
