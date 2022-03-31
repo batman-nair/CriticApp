@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 
@@ -26,6 +27,7 @@ SAMPLE_REVIEW_ITEM_JSON = {
 GET_ENDPOINT = '/api/reviews/'
 POST_ENDPOINT = '/api/reviews/create/'
 DETAIL_ENDPOINT = '/api/reviews/{id}/'
+ADD_OR_EDIT_ENDPOINT = '/api/reviews/post_review/'
 
 class ReviewAPITest(APITestCase):
     def setUp(self):
@@ -39,7 +41,9 @@ class ReviewAPITest(APITestCase):
         self.user.delete()
 
     def test_get_reviews(self):
-        self._populate_review_data()
+        self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=9.5)
+        self.review1.save()
+        self._populate_review_data(num_items=10)
 
         json_response = self.client.get(GET_ENDPOINT)
         self._check_valid_reviews_response(json_response.json())
@@ -49,16 +53,14 @@ class ReviewAPITest(APITestCase):
         json_response = self.client.get(GET_ENDPOINT, {'query': _JUNK_DATA})
         self.assertEqual(len(json_response.json()), 0)
 
-    def _populate_review_data(self):
-        self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=9.5)
-        self.review1.save()
-        for _ in range(10):
+    def _populate_review_data(self, num_items):
+        for _ in range(num_items):
             baker.make(Review)
 
     def _check_valid_reviews_response(self, json_data):
         self.assertGreater(len(json_data), 0)
 
-    def test_add_review(self):
+    def test_post_review(self):
         response = self.client.post(POST_ENDPOINT, {
             'review_item': self.review_item1.item_id,
             'category': self.review_item1.category,
@@ -96,6 +98,33 @@ class ReviewAPITest(APITestCase):
         response = self.client.delete(DETAIL_ENDPOINT.format(id=review.id))
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(len(Review.objects.all()), 0)
+
+    def test_add_or_edit_review(self):
+        response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
+            'id': '',
+            'review_item': self.review_item1.item_id,
+            'category': self.review_item1.category,
+            'review_rating': 8.3,
+            'review_tags': 'test',
+            'review_data': 'test review'})
+        self.assertRedirects(response, reverse('review:add_review'), fetch_redirect_response=False)
+        self.assertGreater(Review.objects.count(), 0, msg="Error creating review "+str(response))
+        review_query = Review.objects.filter(review_item__item_id=self.review_item1.item_id)
+        self.assertGreater(len(review_query), 0)
+
+        self._populate_review_data(num_items=10)
+        num_reviews = len(Review.objects.all())
+        review_id = Review.objects.get(review_item=self.review_item1.item_id).id
+        response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
+            'id': review_id,
+            'review_item': self.review_item1.item_id,
+            'category': self.review_item1.category,
+            'review_rating': 8.3,
+            'review_tags': 'test',
+            'review_data': 'test review changed'})
+        self.assertRedirects(response, reverse('review:add_review'), fetch_redirect_response=False)
+        self.assertEqual(len(Review.objects.all()), num_reviews, msg="Review got created, not editted")
+        self.assertEqual(Review.objects.get(pk=review_id).review_data, 'test review changed')
 
 
 class ReviewAPIAuthTest(APITestCase):
