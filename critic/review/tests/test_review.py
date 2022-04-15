@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APITransactionTestCase
 from rest_framework import status
 
 from model_bakery import baker
@@ -29,7 +29,7 @@ POST_ENDPOINT = '/api/reviews/create/'
 DETAIL_ENDPOINT = '/api/reviews/{id}/'
 ADD_OR_EDIT_ENDPOINT = '/api/reviews/post_review/'
 
-class ReviewAPITest(APITestCase):
+class ReviewAPITest(APITransactionTestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
@@ -125,6 +125,42 @@ class ReviewAPITest(APITestCase):
         self.assertRedirects(response, reverse('review:add_review'), fetch_redirect_response=False)
         self.assertEqual(len(Review.objects.all()), num_reviews, msg="Review got created, not editted")
         self.assertEqual(Review.objects.get(pk=review_id).review_data, 'test review changed')
+
+    def test_add_or_edit_review_errors(self):
+        invalid_id_response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
+            'id': 101,
+            'review_item': self.review_item1.item_id,
+            'category': self.review_item1.category,
+            'review_rating': 8.3,
+            'review_tags': 'test',
+            'review_data': 'test review changed'})
+        self.assertRedirects(invalid_id_response, reverse('review:add_review'), fetch_redirect_response=False)
+        self.assertEqual(len(Review.objects.all()), 0)
+        invalid_review_response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
+            'id': '',
+            'review_item': _JUNK_DATA,
+            'category': self.review_item1.category,
+            'review_rating': 8.3,
+            'review_tags': 'test',
+            'review_data': 'test review changed'})
+        self.assertRedirects(invalid_review_response, reverse('review:add_review'), fetch_redirect_response=False)
+        self.assertEqual(len(Review.objects.all()), 0)
+
+        review = Review.objects.create(
+            user = self.user,
+            review_item = self.review_item1,
+            review_data = 'test_data',
+            review_rating = 8.1
+        )
+        duplicate_review_response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
+            'id': '',
+            'review_item': review.review_item.item_id,
+            'category': self.review_item1.category,
+            'review_rating': 8.3,
+            'review_tags': 'test',
+            'review_data': 'test review changed'})
+        self.assertRedirects(duplicate_review_response, reverse('review:add_review'), fetch_redirect_response=False)
+        self.assertEqual(len(Review.objects.all()), 1)
 
 
 class ReviewAPIAuthTest(APITestCase):
