@@ -45,6 +45,20 @@ async function updateForm(category, itemID) {
     document.querySelector("#review-form").removeAttribute("disabled");
 }
 
+function populateReviewItemData(category, itemID) {
+    updateReviewItem(category, itemID, reviewCard);
+    updateForm(category, itemID);
+}
+
+async function validateAndPopulateReviewItemData(category, itemID) {
+    data = await getReviewData(itemID);
+    console.log('testing data ', data, category, itemID)
+    if (data["category"] != category) {
+        return;
+    }
+    populateReviewItemData(category, itemID);
+}
+
 async function getReviewItem(category, itemID) {
     const response = await fetch(`${baseUrl}/get_item_info/${category}/${itemID}`);
     const data = await response.json();
@@ -114,6 +128,8 @@ function createReviewCardContent(review) {
                 <p class="review-data card-text">${review.review_data}</p>
                 <p class="review-rating card-text">${review.review_rating}⭐</p>
             </div>
+            <span class="item-id" hidden>${review.review_item.item_id}</span>
+            <span class="category" hidden>${review.review_item.category}</span>
             <span class="year" hidden>${review.review_item.year}</span>
             <div class="description" hidden>${review.review_item.description}</div>
             <span class="attr2" hidden>${review.review_item.attr2}</span>
@@ -147,6 +163,8 @@ function getReviewDataFromCard(reviewObject) {
         attr1: reviewObject.querySelector(".attr1").innerText,
         attr2: reviewObject.querySelector(".attr2").innerText,
         attr3: reviewObject.querySelector(".attr3").innerText,
+        item_id: reviewObject.querySelector(".item-id").innerText,
+        category: reviewObject.querySelector(".category").innerText,
         review_tags: reviewObject.querySelector(".review-tags").innerText,
         review_data: reviewObject.querySelector(".review-data").innerText,
         review_rating: reviewObject.querySelector(".review-rating").innerText,
@@ -164,6 +182,8 @@ function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".review-data").innerHTML = reviewData.review_data;
     modalObj.querySelector(".review-rating").innerHTML = reviewData.review_rating;
     modalObj.querySelector(".description").innerHTML = reviewData.description;
+    modalObj.querySelector(".edit-button").setAttribute("onclick", `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
+    console.log("Setting onclick to " + `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
 }
 
 function reviewDetailModalListener(event) {

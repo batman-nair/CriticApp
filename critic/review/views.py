@@ -155,5 +155,6 @@ class ReviewPost(APIView):
 def get_user_review(request, item_id):
     review = get_object_or_404(Review, user=request.user, review_item__item_id=item_id)
     json_data = ReviewSerializer(review).data
+    json_data["category"] = review.review_item.category  # Have a custom serializer instead?
     return JsonResponse(json_data)
 

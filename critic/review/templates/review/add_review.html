@@ -131,9 +131,15 @@
     const category = document.querySelector("#review-category").value;
     const selection = event.detail.selection.value;
     const itemID = selection["item_id"];
-    updateReviewItem(category, itemID, reviewCard);
-    updateForm(category, itemID);
+    populateReviewItemData(category, itemID);
     console.log('Selected: ', selection, event.detail);
   });
+
+  let params = new URLSearchParams(location.search);
+  const item_id = params.get('item_id');
+  const category = params.get('category');
+  if (item_id && category) {
+    validateAndPopulateReviewItemData(category, item_id);
+  }
 </script>
 {% endblock content %}
