@@ -74,11 +74,10 @@
             <span class="visually-hidden">Sort Reviews</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sort-dropdown">
-                <li><a class="dropdown-item">Relevance</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('alpha')">A-Z</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('modified-date')">Modified Date</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('-rating')">Rating: High to Low</a></li>
-                <li><a class="dropdown-item" onclick="updateOrder('rating')">Rating: Low to High</a></li>
+                <li><a class="dropdown-item active" id="sort-date" onclick="updateOrder('sort-date')">Modified Date</a></li>
+                <li><a class="dropdown-item" id="sort-alpha" onclick="updateOrder('sort-alpha')">A-Z</a></li>
+                <li><a class="dropdown-item" id="sort-rating-high" onclick="updateOrder('sort-rating-high')">Rating: High to Low</a></li>
+                <li><a class="dropdown-item" id="sort-rating-low" onclick="updateOrder('sort-rating-low')">Rating: Low to High</a></li>
         </ul>
     </div>
 </div>
@@ -96,14 +95,23 @@
 
 <script>
     var reviewsData;
-    var queryString='', username='{{ username }}', filterCategories=[], ordering='';
+    var queryString='', username='{{ username }}', filterCategories=[], orderName='sort-date';
     const masonry = new Masonry('#review-container', options={
         percentPosition: true,
         horizontalOrder: false,
     });
 
-    function updateOrder(order) {
-        ordering = order;
+
+    ORDERING_STRING_MAP = {
+        "sort-date": "modified-date",
+        "sort-alpha": "alpha",
+        "sort-rating-high": "-rating",
+        "sort-rating-low": "rating"
+    }
+    function updateOrder(newOrderName) {
+        document.querySelector("#"+orderName).classList.remove("active");
+        document.querySelector("#"+newOrderName).classList.add("active");
+        orderName = newOrderName;
         updateReviews();
     }
 
@@ -125,6 +133,7 @@
     }
     function updateReviewsImpl() {
         populateFilterCategories();
+        ordering = ORDERING_STRING_MAP[orderName];
         getReviews(queryString, username, filterCategories, ordering)
           .then((reviews) => {
               showReviewLoading();
