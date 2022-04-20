@@ -50,6 +50,7 @@ a {
     color: var(--background-color);
 }
 .navbar-dark .navbar-brand {
+    font-family: 'Sora', sans-serif;
     color: var(--primary-color);
     font-weight: bold;
 }
