@@ -45,21 +45,21 @@ a {
 }
 
 /* Header */
-.navbar {
+.navbar-dark {
     background-color: var(--secondary-color);
     color: var(--background-color);
 }
-.navbar-brand {
+.navbar-dark .navbar-brand {
     color: var(--primary-color);
     font-weight: bold;
 }
-.navbar-brand:hover {
+.navbar-dark .navbar-brand:hover {
     color: var(--primary-color);
 }
-.nav-link {
+.navbar-dark .navbar-nav .nav-link {
     color: var(--background-color);
 }
-.nav-link:hover {
+.navbar-dark .navbar-nav .nav-link:hover {
     color: var(--primary-color);
 }
 
