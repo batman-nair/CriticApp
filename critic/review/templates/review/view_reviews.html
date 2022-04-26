@@ -90,11 +90,17 @@
 </div>
 
 <script src="{% static 'review/js/review.js' %}"></script>
+<script src="{% static 'js/masonry.pkgd.min.js' %}"></script>
 <script src="{% static 'js/imagesloaded.pkgd.min.js' %}"></script>
 
 <script>
     var reviewsData;
     var queryString='', username='{{ username }}', filterCategories=[], orderName='sort-date';
+    const masonry = new Masonry('#review-container', options={
+        percentPosition: true,
+        horizontalOrder: false,
+    });
+
 
     ORDERING_STRING_MAP = {
         "sort-date": "modified-date",
@@ -134,6 +140,8 @@
               populateReviewCards('#review-container', reviews);
               imagesLoaded('#review-container', () => {
                 hideReviewLoading();
+                masonry.reloadItems();
+                masonry.layout();
               })
           })
     }
