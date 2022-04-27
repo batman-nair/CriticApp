@@ -37,7 +37,11 @@
     box-shadow: 2px 2px 3px var(--primary-shadow-color);
     z-index: 100;
 }
-.fab-container:focus {
+.fab-container:link,
+.fab-container:visited,
+.fab-container:hover,
+.fab-container:focus,
+.fab-container:active {
     color: var(--background-color);
 }
 .fab-container span {
