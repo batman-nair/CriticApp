@@ -5,6 +5,10 @@
 
 <link rel="stylesheet" href="{% static 'review/css/review.css' %}">
 
+<a href="{% url 'review:add_review' %}" class="fab-container d-block d-lg-none" target="_blank">
+    <span>+<span>
+</a>
+
 <div class="modal fade" id="review-detail-modal" tabindex="-1" aria-labelledby="review-title" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
