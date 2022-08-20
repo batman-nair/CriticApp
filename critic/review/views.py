@@ -20,6 +20,8 @@ from .permissions import IsOwnerOrReadOnly
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'movie': api_utils.OMDBItemAPI(),
     'game': api_utils.RAWGItemAPI(),
+    'anime': api_utils.JikanItemAPI('anime'),
+    'manga': api_utils.JikanItemAPI('manga'),
 }
 
 INVALID_USER_RESPONSE = {"response": "False", "error": "User not authenticated."}

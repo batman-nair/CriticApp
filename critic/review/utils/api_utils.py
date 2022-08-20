@@ -174,3 +174,88 @@ class RAWGItemAPI(ReviewItemAPIBase):
         json_data["description"] = rawg_json["description"]
         json_data["rating"] = rawg_json["rating"] * 2
         return json_data
+
+
+class JikanItemAPI(ReviewItemAPIBase):
+    def __init__(self, type: str):
+        self.type_ = type
+        if type not in ['anime', 'manga']:
+            raise RuntimeError('Jikan API should be of type "anime" or "manga".')
+        self.prefix = 'jikan_{}_'.format(self.type_)
+        self._base_url = 'https://api.jikan.moe/v4/{type}'.format(type=type)
+
+    def search(self, query) -> dict:
+        search_url = '{base_url}?q={search_term}'.format(base_url=self._base_url, search_term=query)
+        r = requests.get(search_url)
+        if r.status_code == 200:
+            jikan_json = r.json()
+        else:
+            response = NOT_OK_RESPONSE.copy()
+            response["status_code"] = r.status_code
+            response["query"] = query
+            return response
+        return self._convert_to_review(jikan_json)
+
+    def get_details(self, item_id: str) -> dict:
+        if not item_id.startswith(self.prefix):
+            return MISSING_PREFIX_RESPONSE.copy()
+        item_id = item_id[len(self.prefix):]
+        info_url = '{base_url}/{item_id}'.format(base_url=self._base_url, item_id=item_id)
+        r = requests.get(info_url)
+        if r.status_code == 200:
+            jikan_json = r.json()
+        else:
+            response = NOT_OK_RESPONSE.copy()
+            response["status_code"] = r.status_code
+            response["item_id"] = item_id
+            return response
+        return self._convert_to_review(jikan_json)
+
+    def _convert_to_review(self, jikan_json: dict) -> dict:
+        json_data = dict()
+        if isinstance(jikan_json["data"], list):
+            json_data["results"] = []
+            count = 0
+            for item in jikan_json["data"]:
+                if not item["score"]:
+                    continue
+                count += 1
+                if count >= 10:
+                    break
+                json_data["results"].append(self._convert_jikan_item_to_review(item))
+        else:
+            json_data = self._convert_jikan_item_to_review(jikan_json["data"], detailed=True)
+        json_data["response"] = "True"
+        return json_data
+
+    def _convert_jikan_item_to_review(self, jikan_json: dict, detailed: bool=False) -> dict:
+        json_data = dict()
+        json_data["item_id"] = self.prefix + str(jikan_json["mal_id"])
+        json_data["title"] = jikan_json["title"]
+        json_data["image_url"] = jikan_json["images"]["jpg"]["image_url"]
+        if self.type_ == 'anime':
+            time_data = jikan_json["aired"]["prop"]
+        else:
+            time_data = jikan_json["published"]["prop"]
+        json_data["year"] = str(time_data["from"]["year"])
+        if time_data["to"]["year"]:
+            json_data["year"] += '-{}'.format(time_data["to"]["year"])
+        if not json_data["year"]:
+            json_data["year"] = "N/A"
+        if not detailed:
+            return json_data
+        genres = set(entry["name"] for entry in jikan_json["genres"])
+        json_data["attr1"] = ', '.join(genres)
+        crew = set()
+        if self.type_ == 'manga':
+            roles = ["authors"]
+        else:
+            roles = ["studios"]
+        for role in roles:
+            crew.update(set(entry["name"] for entry in jikan_json[role]))
+        json_data["attr2"] = ', '.join(crew)
+        json_data["attr3"] = jikan_json["type"]
+        json_data["description"] = jikan_json["synopsis"]
+        json_data["rating"] = jikan_json["score"]
+        return json_data
+
