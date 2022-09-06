@@ -172,9 +172,8 @@ function getReviewDataFromCard(reviewObject) {
     return review;
 }
 function populateModalFromReviewData(modalObj, reviewData) {
-    const yearObj = modalObj.querySelector(".review-year");
-    yearObj.innerHTML = reviewData.year;
-    modalObj.querySelector(".review-title").innerHTML = reviewData.title + " " + yearObj.outerHTML;
+    modalObj.querySelector(".review-title").innerHTML = reviewData.title;
+    modalObj.querySelector(".year").innerHTML = reviewData.year;
     modalObj.querySelector("img").src = reviewData.image_url;
     modalObj.querySelector(".attr1").innerHTML = reviewData.attr1;
     modalObj.querySelector(".attr2").innerHTML = reviewData.attr2;
