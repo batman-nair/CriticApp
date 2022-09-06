@@ -18,8 +18,8 @@
     max-width: 60%;
     max-height: 20em;
 }
-#review-detail-model .btn {
-    margin: -0.5rem;
+#review-detail-modal .delete-button {
+    color: var(--danger-color);
 }
 
 /* FAB */

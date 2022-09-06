@@ -18,6 +18,11 @@ a {
     background-color: var(--foreground-color);
     border-color: var(--foreground-color);
 }
+.btn-danger {
+    color: var(--danger-color);
+    background-color: var(--foreground-color);
+    border-color: var(--foreground-color);
+}
 .btn-primary:disabled {
     color: var(--primary-color);
     background-color: var(--foreground-color);

@@ -182,7 +182,20 @@ function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".review-rating").innerHTML = reviewData.review_rating;
     modalObj.querySelector(".description").innerHTML = reviewData.description;
     modalObj.querySelector(".edit-button").setAttribute("onclick", `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
-    console.log("Setting onclick to " + `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
+    // console.log("Setting onclick to " + `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
+    modalObj.querySelector(".item-id").innerHTML = reviewData.item_id;
+    modalObj.querySelector(".category").innerHTML = reviewData.category;
+    modalObj.querySelector(".review-tags").innerHTML = reviewData.review_tags;
+}
+
+function deleteModalListener(event) {
+    const modalObj = event.target;
+    const deleteButton = event.relatedTarget;
+    const reviewModal = deleteButton.parentElement.parentElement.parentElement;
+    const title = reviewModal.querySelector(".review-title").innerHTML;
+    const item_id = reviewModal.querySelector(".item-id").innerHTML;
+    modalObj.querySelector(".review-title").innerHTML = title;
+    console.log("delete listener", modalObj, reviewModal, title, item_id);
 }
 
 function reviewDetailModalListener(event) {

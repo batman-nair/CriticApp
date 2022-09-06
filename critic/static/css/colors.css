@@ -3,10 +3,12 @@
     --color2: #393E46;
     --color3: #00ADB5;
     --color4: #EEEEEE;
+    --color5: #D62839;
     --background-color: var(--color4);
     --primary-color: var(--color3);
     --primary-shadow-color: #00acb559;
     --secondary-color: var(--color2);
     --foreground-color: var(--color1);
     --foreground-shadow-color: #22283113;
+    --danger-color: var(--color5);
 }
