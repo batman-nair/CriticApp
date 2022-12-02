@@ -19,3 +19,4 @@ These API keys need to be set for fetching details in their category
 
 The above API keys need to be set as environment variables either by creating a `.env` file or by setting configs like what heroku provides.
 You can use the `.env.example` as reference if needed.
+
