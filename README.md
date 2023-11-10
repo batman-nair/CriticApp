@@ -24,3 +24,13 @@ These API keys need to be set for fetching details in their category
 The above API keys need to be set as environment variables either by creating a `.env` file or by setting configs like what heroku provides.
 You can use the `.env.example` as reference if needed.
 
+## Screenshots
+
+While not so great, this is how the current version looks like this. Would probably change
+
+![Main view](screenshots/2023-11-11_laptop.png)
+![Review info](screenshots/2023-11-11_laptop_info.png)
+![Add review page](screenshots/2023-11-11_laptop_add_review.png)
+
+
+
