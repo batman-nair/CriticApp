@@ -12,7 +12,7 @@ Ever had a brain fart moment when someone asked you for your top horror movies o
 
 ## How to host
 
-This is a django app with pipenv for dependencies. ~This is hosted on heroku but you can setup your own.~ (Well it was a good run)
+You can follow the instructions from Digital Ocean for setting up a django server. (https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu-16-04) 
 
 
 These API keys need to be set for fetching details in their category
@@ -21,7 +21,7 @@ These API keys need to be set for fetching details in their category
 
 `RAWG_API_KEY` for games - get from [RAWG](https://rawg.io/)
 
-The above API keys need to be set as environment variables either by creating a `.env` file or by setting configs like what heroku provides.
+The above API keys need to be set as environment variables either by creating a `.env` file in the repo root.
 You can use the `.env.example` as reference if needed.
 
 ## Screenshots
