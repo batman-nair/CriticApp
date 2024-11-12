@@ -5,13 +5,13 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class ReviewItem(models.Model):
     item_id = models.CharField(max_length=20, primary_key=True)
-    category = models.CharField(max_length=10)
+    category = models.CharField(max_length=20)
     title = models.CharField(max_length=100)
     image_url = models.URLField()
     year = models.CharField(max_length=10)
-    attr1 = models.CharField(max_length=120)
-    attr2 = models.CharField(max_length=120)
-    attr3 = models.CharField(max_length=120)
+    attr1 = models.CharField(max_length=300)
+    attr2 = models.CharField(max_length=300)
+    attr3 = models.CharField(max_length=300)
     description = models.TextField()
     rating = models.CharField(max_length=5)
 
