@@ -8,6 +8,7 @@ ORDERING_DICT = {
     'rating': 'review_rating',
     '-rating': '-review_rating',
     'date': 'modified_date',
+    '-date': '-modified_date',
     'relevance': '',
 }
 def get_filtered_review_objects(query: str='', username: str='', filter_categories: list=None, ordering: str='') -> list[Review]:
