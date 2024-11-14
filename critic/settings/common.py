@@ -17,7 +17,7 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 # Quick-start development settings - unsuitable for production
@@ -26,11 +26,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(find_dotenv())
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ['SECRET_KEY']
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -77,22 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'critic.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.environ['DB_NAME'],
-        'USER': os.environ['DB_USER'],
-        'PASSWORD': os.environ['DB_PASS'],
-        'HOST': 'localhost',
-        'PORT': '',
-    }
-}
-
-
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
 
@@ -128,11 +107,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'static/'
-# Extra lookup directories for collectstatic to find static files
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'web', 'static'),
-)
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field

@@ -9,7 +9,6 @@ iniconfig==2.0.0
 model-bakery==1.17.0
 packaging==23.2
 pluggy==1.3.0
-psycopg2==2.9.9
 pytest==7.4.3
 pytest-django==4.7.0
 python-dotenv==1.0.0
