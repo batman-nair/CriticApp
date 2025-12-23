@@ -98,7 +98,7 @@ async function updateReviewItem(category, itemID, reviewCard) {
     reviewCard.removeAttribute("hidden");
 }
 
-async function getReviews(query='', username='', filter_categories=[], ordering='') {
+async function getReviews(query = '', username = '', filter_categories = [], ordering = '') {
     const reviewUrl = new URL(`${baseUrl}/api/reviews`);
     if (query) {
         reviewUrl.searchParams.append('query', query);
@@ -128,6 +128,8 @@ function createReviewCardContent(review) {
                 <p class="review-data card-text">${review.review_data}</p>
                 <p class="review-rating card-text">${review.review_rating}⭐</p>
             </div>
+            <span class="review-id" hidden>${review.id}</span>
+            <span class="review-user" hidden>${review.user}</span>
             <span class="item-id" hidden>${review.review_item.item_id}</span>
             <span class="category" hidden>${review.review_item.category}</span>
             <span class="year" hidden>${review.review_item.year}</span>
@@ -142,6 +144,7 @@ function createReviewCardContent(review) {
 function buildReviewCardObject(review) {
     const reviewCardWrapper = document.createElement("div");
     reviewCardWrapper.classList.add('mb-4');
+    reviewCardWrapper.setAttribute('data-review-id', review.id);
     if (review.review_item.category == 'game') {
         reviewCardWrapper.classList.add('col-6', 'col-lg-6');
     }
@@ -168,6 +171,8 @@ function getReviewDataFromCard(reviewObject) {
         review_tags: reviewObject.querySelector(".review-tags").innerText,
         review_data: reviewObject.querySelector(".review-data").innerText,
         review_rating: reviewObject.querySelector(".review-rating").innerText,
+        id: reviewObject.querySelector(".review-id").innerText,
+        user: reviewObject.querySelector(".review-user").innerText,
     };
     return review;
 }
@@ -186,17 +191,18 @@ function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".item-id").innerHTML = reviewData.item_id;
     modalObj.querySelector(".category").innerHTML = reviewData.category;
     modalObj.querySelector(".review-tags").innerHTML = reviewData.review_tags;
+    modalObj.querySelector(".review-data").setAttribute("data-review-id", reviewData.id);
+
+    // Toggle delete button visibility
+    const deleteBtn = modalObj.querySelector(".delete-button");
+    if (reviewData.user === currentUsername) {
+        deleteBtn.removeAttribute("hidden");
+    } else {
+        deleteBtn.setAttribute("hidden", "");
+    }
 }
 
-function deleteModalListener(event) {
-    const modalObj = event.target;
-    const deleteButton = event.relatedTarget;
-    const reviewModal = deleteButton.parentElement.parentElement.parentElement;
-    const title = reviewModal.querySelector(".review-title").innerHTML;
-    const item_id = reviewModal.querySelector(".item-id").innerHTML;
-    modalObj.querySelector(".review-title").innerHTML = title;
-    console.log("delete listener", modalObj, reviewModal, title, item_id);
-}
+
 
 function reviewDetailModalListener(event) {
     const modalObj = event.target;
@@ -216,10 +222,92 @@ function populateReviewCards(parentSelector, reviews) {
 }
 
 // From freecodecamp
-function debounce(func, timeout=300) {
+function debounce(func, timeout = 300) {
     let timer;
     return (...args) => {
         clearTimeout(timer);
         timer = setTimeout(() => { func.apply(this, args); }, timeout);
     }
+}
+function deleteModalListener(event) {
+    const deleteModal = document.querySelector("#delete-modal");
+    deleteModal.querySelector(".review-title").innerText = reviewTitle.innerText;
+    deleteModal.querySelector(".btn-danger").addEventListener('click', () => {
+        const reviewId = reviewDetailModal.querySelector(".review-data").getAttribute("data-review-id");
+        deleteReview(reviewId);
+    });
+}
+
+
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function deleteReview(reviewId) {
+    const url = `/api/reviews/${reviewId}/`;
+
+    // Try getting from cookie first, then DOM
+    let csrfToken = getCookie('csrftoken');
+    if (!csrfToken) {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input) csrfToken = input.value;
+    }
+
+    fetch(url, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+        .then(async response => {
+            if (response.ok) {
+                // Remove the element from the DOM
+                const reviewCardWrapper = document.querySelector(`div[data-review-id="${reviewId}"]`);
+                if (reviewCardWrapper) {
+                    // Start masonry removal animation if available or just remove
+                    masonry.remove(reviewCardWrapper);
+                    masonry.layout();
+                }
+
+                // Close the modals
+                const deleteModalEl = document.querySelector('#delete-modal');
+                const deleteModal = bootstrap.Modal.getInstance(deleteModalEl);
+                if (deleteModal) {
+                    deleteModal.hide();
+                }
+
+                const detailModalEl = document.querySelector('#review-detail-modal');
+                const detailModal = bootstrap.Modal.getInstance(detailModalEl);
+                if (detailModal) {
+                    detailModal.hide();
+                }
+            } else {
+                // Retrieve error message if available
+                // Note: 204 No Content won't have JSON, but response.ok covers it.
+                // If not ok, there might be JSON.
+                try {
+                    const data = await response.json();
+                    alert("Error deleting review: " + (data.detail || data.error || response.statusText));
+                    console.error('Delete error:', data);
+                } catch (e) {
+                    alert("Error deleting review: " + response.statusText);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert("Network error occurred");
+        });
 }

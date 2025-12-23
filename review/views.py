@@ -153,6 +153,9 @@ class ReviewPost(APIView):
 
         return redirect('review:add_review')
 
+
+
+
 @login_required
 def get_user_review(request, item_id):
     review = get_object_or_404(Review, user=request.user, review_item__item_id=item_id)

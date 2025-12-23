@@ -8,6 +8,8 @@ from review.serializers import ReviewItemSerializer
 from review.utils import review_utils
 from review.utils import api_utils
 
+import time
+
 _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
 class UtilAPITest(TestCase):
@@ -21,6 +23,8 @@ class UtilAPITest(TestCase):
         self._test_search_api(self.omdb_api, 'Breaking Bad')
         self._test_search_api(self.rawg_api, 'Ori and the Blind Forest')
         self._test_search_api(self.jikan_anime_api, 'Kimetsu no Yaiba')
+        # Sleep to avoid rate limiting
+        time.sleep(1)
         self._test_search_api(self.jikan_manga_api, 'Berserk')
 
     def _test_search_api(self, api_obj: api_utils.ReviewItemAPIBase, success_query: str):

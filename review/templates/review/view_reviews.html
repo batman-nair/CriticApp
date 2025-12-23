@@ -10,85 +10,100 @@
 </a>
 
 <!-- Delete Modal -->
-<div class="modal fade" id="delete-modal" tabindex="-1" role="dialog" aria-labelledby="delete-modal-label" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="delete-modal-label">Delete Review?</h5>
-        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        Are you sure you want to delete the review for <span class="review-title"></span>?
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-danger">Delete Review</button>
-      </div>
+<div class="modal fade" id="delete-modal" tabindex="-1" role="dialog" aria-labelledby="delete-modal-label"
+    aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="delete-modal-label">Delete Review?</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the review for <span class="review-title"></span>?
+            </div>
+            <div class="modal-footer">
+                {% csrf_token %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger">Delete Review</button>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
 <div class="modal fade" id="review-detail-modal" tabindex="-1" aria-labelledby="review-title" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
-                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
-            </svg>
-        </button>
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-arrow-left" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd"
+                            d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                    </svg>
+                </button>
 
-        <h5 class="review-title-group modal-title text-center"><span class="review-title">Review Title</span> <small class="year text-muted text-end">year</small></h5>
+                <h5 class="review-title-group modal-title text-center"><span class="review-title">Review Title</span>
+                    <small class="year text-muted text-end">year</small></h5>
 
-        <div>
-            <button type="button" class="edit-button btn" onclick="window.location.href='/add'">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil" viewBox="0 0 16 16">
-                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                </svg>
-            </button>
-            <button type="button" class="delete-button btn" data-bs-toggle="modal" data-bs-target="#delete-modal">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
-                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                </svg>
-            </button>
-        </div>
+                <div>
+                    <button type="button" class="edit-button btn" onclick="window.location.href='/add'">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-pencil" viewBox="0 0 16 16">
+                            <path
+                                d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z" />
+                        </svg>
+                    </button>
+                    <button type="button" class="delete-button btn" data-bs-toggle="modal"
+                        data-bs-target="#delete-modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                            class="bi bi-trash" viewBox="0 0 16 16">
+                            <path
+                                d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                            <path fill-rule="evenodd"
+                                d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                        </svg>
+                    </button>
+                </div>
 
-      </div>
-      <div class="modal-body">
-        <div class="text-center">
-            <img class="review-image" alt="Poster Image">
-            <div class="review-item-attributes mb-3">
-                <div><small class="attr1">attr1</small></div>
-                <div><small class="attr2">attr2</small></div>
-                <div><small class="attr3">attr3</small></div>
             </div>
-            <p class="review-rating">5.1⭐</p>
-            <p class="review-data">Review data</p>
+            <div class="modal-body">
+                <div class="text-center">
+                    <img class="review-image" alt="Poster Image">
+                    <div class="review-item-attributes mb-3">
+                        <div><small class="attr1">attr1</small></div>
+                        <div><small class="attr2">attr2</small></div>
+                        <div><small class="attr3">attr3</small></div>
+                    </div>
+                    <p class="review-rating">5.1⭐</p>
+                    <p class="review-data">Review data</p>
+                </div>
+                <h5 class="mt-4">Info:</h5>
+                <div class="description">
+                    Description
+                </div>
+                <div class="extra-data" hidden>
+                    <span class="item-id"></span>
+                    <span class="category"></span>
+                    <span class="review-tags"></span>
+                </div>
+            </div>
         </div>
-        <h5 class="mt-4">Info:</h5>
-        <div class="description">
-            Description
-        </div>
-        <div class="extra-data" hidden>
-            <span class="item-id"></span>
-            <span class="category"></span>
-            <span class="review-tags"></span>
-        </div>
-      </div>
     </div>
-  </div>
 </div>
 
 
 <div class="filter-bar input-group my-3">
-    <input type="search" id="filter-text" class="form-control" placeholder="Type to filter reviews" aria-label="Filter Reviews"/>
+    <input type="search" id="filter-text" class="form-control" placeholder="Type to filter reviews"
+        aria-label="Filter Reviews" />
     <div class="btn-group">
-        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="category-filter-dropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filter" viewBox="0 0 16 16">
-                <path d="M6 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/>
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="category-filter-dropdown"
+            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filter"
+                viewBox="0 0 16 16">
+                <path
+                    d="M6 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
             </svg>
             <span class="visually-hidden">Categories</span>
         </button>
@@ -96,7 +111,8 @@
             {% for category in categories %}
             <li>
                 <div class="dropdown-item">
-                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ category }}" onchange="updateReviews()" id="filter-{{ category }}">
+                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ category }}"
+                        onchange="updateReviews()" id="filter-{{ category }}">
                     <label class="form-check-label filter-category-label w-100" for="filter-{{ category }}">
                         {{ category }}
                     </label>
@@ -106,17 +122,22 @@
         </ul>
     </div>
     <div class="btn-group">
-        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="sort-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sort-down" viewBox="0 0 16 16">
-                <path d="M3.5 2.5a.5.5 0 0 0-1 0v8.793l-1.146-1.147a.5.5 0 0 0-.708.708l2 1.999.007.007a.497.497 0 0 0 .7-.006l2-2a.5.5 0 0 0-.707-.708L3.5 11.293V2.5zm3.5 1a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zM7.5 6a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0 3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3zm0 3a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1z"/>
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="sort-dropdown"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sort-down"
+                viewBox="0 0 16 16">
+                <path
+                    d="M3.5 2.5a.5.5 0 0 0-1 0v8.793l-1.146-1.147a.5.5 0 0 0-.708.708l2 1.999.007.007a.497.497 0 0 0 .7-.006l2-2a.5.5 0 0 0-.707-.708L3.5 11.293V2.5zm3.5 1a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zM7.5 6a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0 3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3zm0 3a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1z" />
             </svg>
             <span class="visually-hidden">Sort Reviews</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sort-dropdown">
-                <li><a class="dropdown-item active" id="sort-date" onclick="updateOrder('sort-date')">Modified Date</a></li>
-                <li><a class="dropdown-item" id="sort-alpha" onclick="updateOrder('sort-alpha')">A-Z</a></li>
-                <li><a class="dropdown-item" id="sort-rating-high" onclick="updateOrder('sort-rating-high')">Rating: High to Low</a></li>
-                <li><a class="dropdown-item" id="sort-rating-low" onclick="updateOrder('sort-rating-low')">Rating: Low to High</a></li>
+            <li><a class="dropdown-item active" id="sort-date" onclick="updateOrder('sort-date')">Modified Date</a></li>
+            <li><a class="dropdown-item" id="sort-alpha" onclick="updateOrder('sort-alpha')">A-Z</a></li>
+            <li><a class="dropdown-item" id="sort-rating-high" onclick="updateOrder('sort-rating-high')">Rating: High to
+                    Low</a></li>
+            <li><a class="dropdown-item" id="sort-rating-low" onclick="updateOrder('sort-rating-low')">Rating: Low to
+                    High</a></li>
         </ul>
     </div>
 </div>
@@ -125,7 +146,7 @@
     <h3 class="display-6">Loading reviews...</h3>
 </div>
 
-<div class="row justify-content-evenly" id="review-container" >
+<div class="row justify-content-evenly" id="review-container">
 </div>
 
 <script src="{% static 'review/js/review.js' %}"></script>
@@ -134,8 +155,9 @@
 
 <script>
     var reviewsData;
-    var queryString='', username='{{ username }}', filterCategories=[], orderName='sort-date';
-    const masonry = new Masonry('#review-container', options={
+    var queryString = '', username = '{{ username }}', filterCategories = [], orderName = 'sort-date';
+    const currentUsername = "{{ user.username }}";
+    const masonry = new Masonry('#review-container', options = {
         percentPosition: true,
         horizontalOrder: false,
     });
@@ -148,8 +170,8 @@
         "sort-rating-low": "rating"
     }
     function updateOrder(newOrderName) {
-        document.querySelector("#"+orderName).classList.remove("active");
-        document.querySelector("#"+newOrderName).classList.add("active");
+        document.querySelector("#" + orderName).classList.remove("active");
+        document.querySelector("#" + newOrderName).classList.add("active");
         orderName = newOrderName;
         updateReviews();
     }
@@ -174,15 +196,15 @@
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
         getReviews(queryString, username, filterCategories, ordering)
-          .then((reviews) => {
-              showReviewLoading();
-              populateReviewCards('#review-container', reviews);
-              imagesLoaded('#review-container', () => {
-                hideReviewLoading();
-                masonry.reloadItems();
-                masonry.layout();
-              })
-          })
+            .then((reviews) => {
+                showReviewLoading();
+                populateReviewCards('#review-container', reviews);
+                imagesLoaded('#review-container', () => {
+                    hideReviewLoading();
+                    masonry.reloadItems();
+                    masonry.layout();
+                })
+            })
     }
     const updateReviews = debounce(updateReviewsImpl);
 

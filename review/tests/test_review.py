@@ -163,6 +163,8 @@ class ReviewAPITest(APITransactionTestCase):
         self.assertEqual(len(Review.objects.all()), 1)
 
 
+
+
 class ReviewAPIAuthTest(APITestCase):
     def setUp(self):
         item_serializer = ReviewItemSerializer(data=SAMPLE_REVIEW_ITEM_JSON)
@@ -196,6 +198,8 @@ class ReviewAPIAuthTest(APITestCase):
             'review_rating': 7.1
         })
         self._check_forbidden_response(response)
+
+
 
     def _check_forbidden_response(self, response):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
