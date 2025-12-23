@@ -135,6 +135,9 @@ class ReviewPost(APIView):
             if review_data['id']:
                 is_update = True
                 review_obj = Review.objects.get(id=review_data['id'])
+                if review_obj.user != request.user:
+                    messages.error(request, 'You do not have permission to edit this review.')
+                    return redirect('review:add_review')
             serializer = ReviewSerializer(review_obj, review_data)
             serializer.is_valid(raise_exception=True)
             serializer.save(user=request.user)

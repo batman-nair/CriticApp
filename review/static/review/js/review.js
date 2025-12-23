@@ -72,27 +72,30 @@ async function updateReviewItem(category, itemID, reviewCard) {
     let titleDOM = reviewCard.querySelector(".review-title");
     let yearDOM = reviewCard.querySelector(".review-year");
     let imageDOM = reviewCard.querySelector("img");
-    titleDOM.innerHTML = data["title"] + " " + yearDOM.outerHTML;
+    titleDOM.innerText = data["title"];
+    titleDOM.textContent = data["title"] + " ";
+    titleDOM.appendChild(yearDOM);
+
     if (data["image_url"] != "N/A") {
         imageDOM.src = data["image_url"];
     } else {
         imageDOM.src = "";
     }
-    reviewCard.querySelector(".review-year").innerText = data["year"];
+    yearDOM.innerText = data["year"];
     reviewCard.querySelector(".review-attr1").innerText = data["attr1"];
     console.log(reviewCard.querySelector("img").height, reviewCard.querySelector("img").width);
     let descriptionDOM = reviewCard.querySelector(".review-description");
     let descriptionDOMBelow = reviewCard.querySelector(".review-description-below");
     console.log('Details', imageDOM.width, imageDOM.height, data["description"].length);
     if (imageDOM.width > imageDOM.height || data["description"].length > 300) {
-        descriptionDOM.innerHTML = "";
+        descriptionDOM.innerText = "";
         descriptionDOM = descriptionDOMBelow;
         descriptionDOMBelow.removeAttribute("hidden");
     } else {
-        descriptionDOMBelow.innerHTML = "";
+        descriptionDOMBelow.innerText = "";
         descriptionDOMBelow.setAttribute("hidden", "");
     }
-    descriptionDOM.innerHTML = data["description"];
+    descriptionDOM.innerText = data["description"];
     reviewCard.querySelector(".review-attr2").innerText = data["attr2"];
     reviewCard.querySelector(".review-rating").innerText = data["rating"];
     reviewCard.removeAttribute("hidden");
@@ -118,27 +121,75 @@ async function getReviews(query = '', username = '', filter_categories = [], ord
     return [...data];
 }
 
-function createReviewCardContent(review) {
-    return `
-        <div class="card review-card review-card-expandable" data-bs-toggle="modal" data-bs-target="#review-detail-modal">
-            <img src="${review.review_item.image_url}" class="card-img-top" alt="Poster Image">
-            <div class="card-body">
-                <h5 class="review-title card-title">${review.review_item.title}</h5>
-                <p class="card-text"><small class="attr1 text-muted">${review.review_item.attr1}</small></p>
-                <p class="review-data card-text">${review.review_data}</p>
-                <p class="review-rating card-text">${review.review_rating}⭐</p>
-            </div>
-            <span class="review-id" hidden>${review.id}</span>
-            <span class="review-user" hidden>${review.user}</span>
-            <span class="item-id" hidden>${review.review_item.item_id}</span>
-            <span class="category" hidden>${review.review_item.category}</span>
-            <span class="year" hidden>${review.review_item.year}</span>
-            <div class="description" hidden>${review.review_item.description}</div>
-            <span class="attr2" hidden>${review.review_item.attr2}</span>
-            <span class="attr3" hidden>${review.review_item.attr3}</span>
-            <span class="review-tags" hidden>${review.review_tags}</span>
-        </div>
-    `;
+// Helper to safely create an element with text
+function createElement(tag, classes = [], text = null) {
+    const el = document.createElement(tag);
+    if (classes.length) el.classList.add(...classes);
+    if (text) el.innerText = text;
+    return el;
+}
+
+function buildReviewGridItem(review) {
+    // Structure:
+    // <div class="card review-card review-card-expandable" ...>
+    //   <img ...>
+    //   <div class="card-body">
+    //     <h5 class="review-title ...">title</h5>
+    //     ...
+    //   </div>
+    //   ... hidden spans ...
+    // </div>
+
+    // Create Main Card
+    const card = createElement('div', ['card', 'review-card', 'review-card-expandable']);
+    card.setAttribute('data-bs-toggle', 'modal');
+    card.setAttribute('data-bs-target', '#review-detail-modal');
+
+    // Image
+    const img = createElement('img', ['card-img-top']);
+    img.src = review.review_item.image_url;
+    img.alt = "Poster Image";
+    card.appendChild(img);
+
+    // Card Body
+    const body = createElement('div', ['card-body']);
+
+    const title = createElement('h5', ['review-title', 'card-title'], review.review_item.title);
+    body.appendChild(title);
+
+    const pAttr1 = createElement('p', ['card-text']);
+    const smallAttr1 = createElement('small', ['attr1', 'text-muted'], review.review_item.attr1);
+    pAttr1.appendChild(smallAttr1);
+    body.appendChild(pAttr1);
+
+    const pData = createElement('p', ['review-data', 'card-text'], review.review_data);
+    body.appendChild(pData);
+
+    const pRating = createElement('p', ['review-rating', 'card-text'], review.review_rating + "⭐");
+    body.appendChild(pRating);
+
+    card.appendChild(body);
+
+    // Hidden Spans
+    const hiddenFields = [
+        { cls: 'review-id', val: review.id },
+        { cls: 'review-user', val: review.user },
+        { cls: 'item-id', val: review.review_item.item_id },
+        { cls: 'category', val: review.review_item.category },
+        { cls: 'year', val: review.review_item.year },
+        { cls: 'description', val: review.review_item.description, isDiv: true },
+        { cls: 'attr2', val: review.review_item.attr2 },
+        { cls: 'attr3', val: review.review_item.attr3 },
+        { cls: 'review-tags', val: review.review_tags },
+    ];
+
+    hiddenFields.forEach(field => {
+        const el = createElement(field.isDiv ? 'div' : 'span', [field.cls], field.val);
+        el.setAttribute('hidden', '');
+        card.appendChild(el);
+    });
+
+    return card;
 }
 
 function buildReviewCardObject(review) {
@@ -151,8 +202,8 @@ function buildReviewCardObject(review) {
     else {
         reviewCardWrapper.classList.add('col-6', 'col-lg-3');
     }
-    const content = createReviewCardContent(review);
-    reviewCardWrapper.innerHTML = content;
+    const content = buildReviewGridItem(review);
+    reviewCardWrapper.appendChild(content);
 
     return reviewCardWrapper;
 }
@@ -161,7 +212,7 @@ function getReviewDataFromCard(reviewObject) {
     const review = {
         title: reviewObject.querySelector(".review-title").innerText,
         image_url: reviewObject.querySelector("img").src,
-        description: reviewObject.querySelector(".description").innerHTML,
+        description: reviewObject.querySelector(".description").innerText,
         year: reviewObject.querySelector(".year").innerText,
         attr1: reviewObject.querySelector(".attr1").innerText,
         attr2: reviewObject.querySelector(".attr2").innerText,
@@ -177,20 +228,20 @@ function getReviewDataFromCard(reviewObject) {
     return review;
 }
 function populateModalFromReviewData(modalObj, reviewData) {
-    modalObj.querySelector(".review-title").innerHTML = reviewData.title;
-    modalObj.querySelector(".year").innerHTML = reviewData.year;
+    modalObj.querySelector(".review-title").innerText = reviewData.title;
+    modalObj.querySelector(".year").innerText = reviewData.year;
     modalObj.querySelector("img").src = reviewData.image_url;
-    modalObj.querySelector(".attr1").innerHTML = reviewData.attr1;
-    modalObj.querySelector(".attr2").innerHTML = reviewData.attr2;
-    modalObj.querySelector(".attr3").innerHTML = reviewData.attr3;
-    modalObj.querySelector(".review-data").innerHTML = reviewData.review_data;
-    modalObj.querySelector(".review-rating").innerHTML = reviewData.review_rating;
-    modalObj.querySelector(".description").innerHTML = reviewData.description;
+    modalObj.querySelector(".attr1").innerText = reviewData.attr1;
+    modalObj.querySelector(".attr2").innerText = reviewData.attr2;
+    modalObj.querySelector(".attr3").innerText = reviewData.attr3;
+    modalObj.querySelector(".review-data").innerText = reviewData.review_data;
+    modalObj.querySelector(".review-rating").innerText = reviewData.review_rating;
+    modalObj.querySelector(".description").innerText = reviewData.description;
     modalObj.querySelector(".edit-button").setAttribute("onclick", `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
     // console.log("Setting onclick to " + `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
-    modalObj.querySelector(".item-id").innerHTML = reviewData.item_id;
-    modalObj.querySelector(".category").innerHTML = reviewData.category;
-    modalObj.querySelector(".review-tags").innerHTML = reviewData.review_tags;
+    modalObj.querySelector(".item-id").innerText = reviewData.item_id;
+    modalObj.querySelector(".category").innerText = reviewData.category;
+    modalObj.querySelector(".review-tags").innerText = reviewData.review_tags;
     modalObj.querySelector(".review-data").setAttribute("data-review-id", reviewData.id);
 
     // Toggle delete button visibility
