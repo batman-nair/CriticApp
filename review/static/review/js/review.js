@@ -125,7 +125,7 @@ async function getReviews(query = '', username = '', filter_categories = [], ord
 function createElement(tag, classes = [], text = null) {
     const el = document.createElement(tag);
     if (classes.length) el.classList.add(...classes);
-    if (text) el.innerText = text;
+    if (text) el.textContent = text;
     return el;
 }
 
@@ -210,20 +210,20 @@ function buildReviewCardObject(review) {
 
 function getReviewDataFromCard(reviewObject) {
     const review = {
-        title: reviewObject.querySelector(".review-title").innerText,
+        title: reviewObject.querySelector(".review-title").textContent,
         image_url: reviewObject.querySelector("img").src,
-        description: reviewObject.querySelector(".description").innerText,
-        year: reviewObject.querySelector(".year").innerText,
-        attr1: reviewObject.querySelector(".attr1").innerText,
-        attr2: reviewObject.querySelector(".attr2").innerText,
-        attr3: reviewObject.querySelector(".attr3").innerText,
-        item_id: reviewObject.querySelector(".item-id").innerText,
-        category: reviewObject.querySelector(".category").innerText,
-        review_tags: reviewObject.querySelector(".review-tags").innerText,
-        review_data: reviewObject.querySelector(".review-data").innerText,
-        review_rating: reviewObject.querySelector(".review-rating").innerText,
-        id: reviewObject.querySelector(".review-id").innerText,
-        user: reviewObject.querySelector(".review-user").innerText,
+        description: reviewObject.querySelector(".description").textContent,
+        year: reviewObject.querySelector(".year").textContent,
+        attr1: reviewObject.querySelector(".attr1").textContent,
+        attr2: reviewObject.querySelector(".attr2").textContent,
+        attr3: reviewObject.querySelector(".attr3").textContent,
+        item_id: reviewObject.querySelector(".item-id").textContent,
+        category: reviewObject.querySelector(".category").textContent,
+        review_tags: reviewObject.querySelector(".review-tags").textContent,
+        review_data: reviewObject.querySelector(".review-data").textContent,
+        review_rating: reviewObject.querySelector(".review-rating").textContent,
+        id: reviewObject.querySelector(".review-id").textContent,
+        user: reviewObject.querySelector(".review-user").textContent,
     };
     return review;
 }
@@ -282,11 +282,13 @@ function debounce(func, timeout = 300) {
 }
 function deleteModalListener(event) {
     const deleteModal = document.querySelector("#delete-modal");
-    deleteModal.querySelector(".review-title").innerText = reviewTitle.innerText;
-    deleteModal.querySelector(".btn-danger").addEventListener('click', () => {
-        const reviewId = reviewDetailModal.querySelector(".review-data").getAttribute("data-review-id");
+    const detailModal = document.querySelector("#review-detail-modal");
+    deleteModal.querySelector(".review-title").textContent = detailModal.querySelector(".review-title").textContent;
+
+    deleteModal.querySelector(".btn-danger").onclick = () => {
+        const reviewId = detailModal.querySelector(".review-data").getAttribute("data-review-id");
         deleteReview(reviewId);
-    });
+    };
 }
 
 
@@ -309,7 +311,6 @@ function getCookie(name) {
 function deleteReview(reviewId) {
     const url = `/api/reviews/${reviewId}/`;
 
-    // Try getting from cookie first, then DOM
     let csrfToken = getCookie('csrftoken');
     if (!csrfToken) {
         const input = document.querySelector('[name=csrfmiddlewaretoken]');
