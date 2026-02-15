@@ -13,11 +13,10 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/common.txt /critic/
-COPY requirements/production.txt /critic/
+COPY requirements.txt /critic/
 
 RUN pip install --upgrade pip
-RUN pip install -r production.txt
+RUN pip install -r requirements.txt
 
 COPY . /critic/
 
