@@ -12,10 +12,29 @@ Ever had a brain fart moment when someone asked you for your top horror movies o
 
 ## How to host
 
-You can follow the instructions from Digital Ocean for setting up a django server. (https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu-16-04) 
+### Docker Deployment (Recommended)
 
+For production deployment using Docker Compose with Postgres and Nginx, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-These API keys need to be set for fetching details in their category
+Quick start:
+```bash
+# Clone repo
+git clone <your-repo> criticapp && cd criticapp
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your settings
+
+# Start services
+docker compose up -d --build
+
+# Create superuser
+docker compose exec web python manage.py createsuperuser
+```
+
+## API Keys
+
+These API keys need to be set for fetching details in their category:
 
 `OMDB_API_KEY` for movies - get from [OMDb](https://www.omdbapi.com/)
 

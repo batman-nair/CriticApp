@@ -5,7 +5,7 @@ services:
     build: .
     command: gunicorn --bind 0.0.0.0:8000 critic.wsgi:application
     volumes:
-      - static_data:/critic/static
+      - ./static:/critic/static
     ports:
       - "8000:8000"
     env_file:
@@ -28,4 +28,3 @@ services:
 
 volumes:
   postgres_data:
-  static_data:
