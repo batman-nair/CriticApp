@@ -1,0 +1,317 @@
+[
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_001",
+    "fields": {
+      "category": "movie",
+      "title": "Midnight Signal",
+      "image_url": "https://placehold.co/215x300/png",
+      "year": "1997",
+      "attr1": "Director: A. Reyes",
+      "attr2": "Cast: K. Lin, J. Park",
+      "attr3": "Genre: Thriller",
+      "description": "A late-night broadcast reveals a hidden conspiracy.",
+      "rating": "8.5"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_001",
+    "fields": {
+      "category": "game",
+      "title": "Starforge Atlas",
+      "image_url": "https://placehold.co/455x256/png",
+      "year": "2020",
+      "attr1": "Studio: Emberworks",
+      "attr2": "Platforms: PC, PS5",
+      "attr3": "Genre: RPG",
+      "description": "An exploration RPG across a shifting star map.",
+      "rating": "9.0"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "anime_001",
+    "fields": {
+      "category": "anime",
+      "title": "Signal of the Tides",
+      "image_url": "https://placehold.co/215x300/webp",
+      "year": "2016",
+      "attr1": "Studio: Wavecrest",
+      "attr2": "Episodes: 12",
+      "attr3": "Genre: Adventure",
+      "description": "A lighthouse apprentice discovers a map to a lost archipelago.",
+      "rating": "8.0"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_002",
+    "fields": {
+      "category": "movie",
+      "title": "Glass Horizon",
+      "image_url": "https://placehold.co/215x300/jpg",
+      "year": "2004",
+      "attr1": "Director: M. Torres",
+      "attr2": "Cast: L. Ahmed, R. Patel",
+      "attr3": "Genre: Drama",
+      "description": "Two siblings rebuild their lives after a city-wide blackout.",
+      "rating": "7.8"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "manga_001",
+    "fields": {
+      "category": "manga",
+      "title": "Paper Castles",
+      "image_url": "https://placehold.co/215x300/jpg",
+      "year": "2015",
+      "attr1": "Author: N. Soto",
+      "attr2": "Volumes: 6",
+      "attr3": "Genre: Slice of Life",
+      "description": "A small-town artist starts an underground zine.",
+      "rating": "8.2"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_002",
+    "fields": {
+      "category": "game",
+      "title": "Harborlight Tactics",
+      "image_url": "https://placehold.co/455x256/png",
+      "year": "2018",
+      "attr1": "Studio: Northwind",
+      "attr2": "Platforms: PC, Switch",
+      "attr3": "Genre: Strategy",
+      "description": "Turn-based naval tactics with modular ship design.",
+      "rating": "8.3"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_003",
+    "fields": {
+      "category": "movie",
+      "title": "Neon Orchard",
+      "image_url": "https://placehold.co/215x300/webp",
+      "year": "2012",
+      "attr1": "Director: J. Kim",
+      "attr2": "Cast: H. Cruz, P. Nguyen",
+      "attr3": "Genre: Sci-Fi",
+      "description": "A botanist uncovers a synthetic ecosystem hidden in the city.",
+      "rating": "8.1"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "anime_002",
+    "fields": {
+      "category": "anime",
+      "title": "Cobalt Run",
+      "image_url": "https://placehold.co/215x300/png",
+      "year": "2019",
+      "attr1": "Studio: Vertex",
+      "attr2": "Episodes: 24",
+      "attr3": "Genre: Sports",
+      "description": "A rookie sprinter joins an elite track academy.",
+      "rating": "7.6"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_003",
+    "fields": {
+      "category": "game",
+      "title": "Frostline Relay",
+      "image_url": "https://placehold.co/455x256/jpg",
+      "year": "2022",
+      "attr1": "Studio: Polar Arcade",
+      "attr2": "Platforms: PC, Xbox",
+      "attr3": "Genre: Action",
+      "description": "A courier sprints across a frozen megacity to deliver a cure.",
+      "rating": "7.9"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "manga_002",
+    "fields": {
+      "category": "manga",
+      "title": "Iron Rivers",
+      "image_url": "https://placehold.co/215x300/webp",
+      "year": "2021",
+      "attr1": "Author: T. Okada",
+      "attr2": "Volumes: 3",
+      "attr3": "Genre: Mystery",
+      "description": "Detectives follow a pattern of disappearances along a canal.",
+      "rating": "7.7"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_004",
+    "fields": {
+      "category": "movie",
+      "title": "Orbiting City",
+      "image_url": "https://placehold.co/215x300/png",
+      "year": "2023",
+      "attr1": "Director: S. Whitaker",
+      "attr2": "Cast: M. Hale, D. Brooks",
+      "attr3": "Genre: Mystery",
+      "description": "A journalist investigates a city that moves overnight.",
+      "rating": "8.4"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "anime_003",
+    "fields": {
+      "category": "anime",
+      "title": "Crimson Pact",
+      "image_url": "https://placehold.co/215x300/jpg",
+      "year": "2020",
+      "attr1": "Studio: Crimson Works",
+      "attr2": "Episodes: 13",
+      "attr3": "Genre: Fantasy",
+      "description": "A knight forms a contract with a shape-shifting demon.",
+      "rating": "8.9"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_004",
+    "fields": {
+      "category": "game",
+      "title": "Quantum Garden",
+      "image_url": "https://placehold.co/455x256/webp",
+      "year": "2024",
+      "attr1": "Studio: Helix Studios",
+      "attr2": "Platforms: PS5, PC",
+      "attr3": "Genre: Puzzle",
+      "description": "Manipulate time to grow impossible plants.",
+      "rating": "8.7"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_005",
+    "fields": {
+      "category": "movie",
+      "title": "Silver Dawn",
+      "image_url": "https://placehold.co/215x300/jpg",
+      "year": "2009",
+      "attr1": "Director: R. Chen",
+      "attr2": "Cast: A. Foster, T. Yamada",
+      "attr3": "Genre: Romance",
+      "description": "Two strangers meet repeatedly during morning commutes.",
+      "rating": "7.2"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "manga_003",
+    "fields": {
+      "category": "manga",
+      "title": "Autumn Protocol",
+      "image_url": "https://placehold.co/215x300/png",
+      "year": "2019",
+      "attr1": "Author: K. Tanaka",
+      "attr2": "Volumes: 8",
+      "attr3": "Genre: Sci-Fi",
+      "description": "Agents protect a world where seasons are controlled by AI.",
+      "rating": "8.6"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_005",
+    "fields": {
+      "category": "game",
+      "title": "Neon Vanguard",
+      "image_url": "https://placehold.co/455x256/png",
+      "year": "2019",
+      "attr1": "Studio: Flashpoint Games",
+      "attr2": "Platforms: PC, Xbox",
+      "attr3": "Genre: Shooter",
+      "description": "Fast-paced cyber warfare with wall-running mechanics.",
+      "rating": "8.1"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "anime_004",
+    "fields": {
+      "category": "anime",
+      "title": "Lunar Café",
+      "image_url": "https://placehold.co/215x300/webp",
+      "year": "2017",
+      "attr1": "Studio: Moonbeam",
+      "attr2": "Episodes: 12",
+      "attr3": "Genre: Slice of Life",
+      "description": "A late-night café serves mysterious customers from different timelines.",
+      "rating": "7.4"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_006",
+    "fields": {
+      "category": "movie",
+      "title": "Echo Chamber",
+      "image_url": "https://placehold.co/215x300/webp",
+      "year": "2018",
+      "attr1": "Director: L. Santos",
+      "attr2": "Cast: B. Wilson, K. Okafor",
+      "attr3": "Genre: Horror",
+      "description": "A sound engineer records something impossible in an empty studio.",
+      "rating": "6.9"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "game_006",
+    "fields": {
+      "category": "game",
+      "title": "Beneath the Waves",
+      "image_url": "https://placehold.co/455x256/jpg",
+      "year": "2023",
+      "attr1": "Studio: Abyssal Interactive",
+      "attr2": "Platforms: PC, PS5, Switch",
+      "attr3": "Genre: Adventure",
+      "description": "Explore an underwater civilization with a hand-drawn art style.",
+      "rating": "9.2"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "manga_004",
+    "fields": {
+      "category": "manga",
+      "title": "Wild Card Diner",
+      "image_url": "https://placehold.co/215x300/jpg",
+      "year": "2022",
+      "attr1": "Author: H. Park",
+      "attr2": "Volumes: 4",
+      "attr3": "Genre: Comedy",
+      "description": "A chef serves dishes that alter customers' luck for 24 hours.",
+      "rating": "7.3"
+    }
+  },
+  {
+    "model": "review.reviewitem",
+    "pk": "movie_007",
+    "fields": {
+      "category": "movie",
+      "title": "Velvet Circuit",
+      "image_url": "https://placehold.co/215x300/png",
+      "year": "2021",
+      "attr1": "Director: F. Martinez",
+      "attr2": "Cast: E. Singh, N. Ross",
+      "attr3": "Genre: Comedy",
+      "description": "A DJ accidentally broadcasts into a parallel dimension.",
+      "rating": "7.5"
+    }
+  }
+]

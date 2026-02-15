@@ -6,6 +6,7 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=critic.settings.development
       - DJANGO_COLLECTSTATIC=0
+      - DJANGO_SEED=1
   db:
     ports:
       - "5432:5432"
