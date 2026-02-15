@@ -1,0 +1,7 @@
+services:
+  web:
+    command: pytest
+    environment:
+      - DJANGO_SETTINGS_MODULE=critic.settings.development
+      - DJANGO_MIGRATE=0
+      - DJANGO_COLLECTSTATIC=0

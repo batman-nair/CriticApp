@@ -3,7 +3,7 @@
 *.pot
 *.pyc
 __pycache__
-db.sqlite3
+db.*
 media
 /static
 
@@ -130,9 +130,5 @@ Control.system-ca-bundle
 GitHub.sublime-settings
 
 # Visual Studio Code #
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.vscode/
 .history

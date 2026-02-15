@@ -1,0 +1,11 @@
+services:
+  web:
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/critic
+    environment:
+      - DJANGO_SETTINGS_MODULE=critic.settings.development
+      - DJANGO_COLLECTSTATIC=0
+  db:
+    ports:
+      - "5432:5432"
