@@ -33,6 +33,10 @@ def get_filtered_review_objects(query: str='', username: str='', filter_categori
     if filter_categories:
         reviews = reviews.exclude(review_item__category__in=filter_categories)
     ordering = ORDERING_DICT.get(ordering, '')
+    if ordering in ('review_item__title', '-review_item__title'):
+        reviews = list(reviews.select_related('review_item'))
+        reviews.sort(key=lambda review: review.review_item.title, reverse=ordering.startswith('-'))
+        return reviews
     if ordering:
         reviews = reviews.order_by(ordering)
     return reviews

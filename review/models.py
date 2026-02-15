@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
@@ -21,7 +23,11 @@ class ReviewItem(models.Model):
 class Review(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     review_item = models.ForeignKey(ReviewItem, on_delete=models.CASCADE)
-    review_rating = models.DecimalField(max_digits=4, decimal_places=2, validators=[MinValueValidator(0.0), MaxValueValidator(10.0)])
+    review_rating = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.0")), MaxValueValidator(Decimal("10.0"))],
+    )
     review_data = models.TextField(null=True)
     review_tags = models.CharField(max_length=100, null=True)
     modified_date = models.DateField(auto_now=True)
