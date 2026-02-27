@@ -1,0 +1,108 @@
+name: Deploy to k3s
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: batman-nair/criticapp
+      KUBE_NAMESPACE: criticapp
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            DJANGO_SECRET_KEY=build-secret
+            DJANGO_SETTINGS_MODULE=critic.settings.production
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.1
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Apply base manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/deployment.yaml
+
+      - name: Apply runtime configmap
+        env:
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+          ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
+          CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
+        run: |
+          kubectl create configmap criticapp-config -n $KUBE_NAMESPACE \
+            --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
+            --from-literal=ALLOWED_HOSTS=${ALLOWED_HOSTS:-$APP_DOMAIN} \
+            --from-literal=CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply runtime ingress
+        env:
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: criticapp-web
+            namespace: $KUBE_NAMESPACE
+          spec:
+            ingressClassName: traefik
+            rules:
+              - host: ${APP_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: criticapp-web
+                          port:
+                            number: 80
+          EOF
+
+      - name: Run database migrations
+        run: |
+          kubectl delete job criticapp-migrate -n $KUBE_NAMESPACE --ignore-not-found
+          kubectl apply -f k8s/migration-job.yaml
+          kubectl set image job/criticapp-migrate migrate=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n $KUBE_NAMESPACE
+          kubectl wait --for=condition=complete job/criticapp-migrate -n $KUBE_NAMESPACE --timeout=300s
+
+      - name: Roll out web deployment
+        run: |
+          kubectl set image deployment/criticapp-web web=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n $KUBE_NAMESPACE
+          kubectl rollout status deployment/criticapp-web -n $KUBE_NAMESPACE --timeout=300s

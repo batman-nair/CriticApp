@@ -16,3 +16,6 @@ DATABASES = {
 }
 
 ALLOWED_HOSTS = ['*']
+
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+WHITENOISE_USE_FINDERS = True

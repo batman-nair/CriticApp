@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: criticapp-config
+  namespace: criticapp
+data:
+  DJANGO_SETTINGS_MODULE: critic.settings.production
+  SECURE_SSL_REDIRECT: "True"
+  SESSION_COOKIE_SECURE: "True"
+  CSRF_COOKIE_SECURE: "True"
+  WHITENOISE_MAX_AGE: "31536000"
