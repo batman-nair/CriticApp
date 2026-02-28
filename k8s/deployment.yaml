@@ -31,21 +31,23 @@ spec:
             - secretRef:
                 name: criticapp-secrets
           readinessProbe:
-            exec:
-              command:
-                - python
-                - -c
-                - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3).getcode()==200 else 1)
+            httpGet:
+              path: /health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            exec:
-              command:
-                - python
-                - -c
-                - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3).getcode()==200 else 1)
+            httpGet:
+              path: /health/
+              port: 8000
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 5
