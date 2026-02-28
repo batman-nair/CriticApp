@@ -47,7 +47,36 @@ jobs:
       - name: Configure kubeconfig
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          KUBE_CONFIG_CONTENT='${{ secrets.KUBE_CONFIG }}'
+          if [ -z "$KUBE_CONFIG_CONTENT" ]; then
+            echo "::error::KUBE_CONFIG secret is empty or missing"
+            exit 1
+          fi
+
+          if echo "$KUBE_CONFIG_CONTENT" | base64 -d > $HOME/.kube/config 2>/dev/null; then
+            if ! grep -q '^apiVersion:' $HOME/.kube/config; then
+              echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
+            fi
+          else
+            echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
+          fi
+
+          chmod 600 $HOME/.kube/config
+
+      - name: Validate kubeconfig and cluster access
+        run: |
+          SERVER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+          if [ -z "$SERVER_URL" ]; then
+            echo "::error::No Kubernetes API server found in kubeconfig"
+            exit 1
+          fi
+
+          if [[ "$SERVER_URL" == *"127.0.0.1"* || "$SERVER_URL" == *"localhost"* ]]; then
+            echo "::error::KUBE_CONFIG points to $SERVER_URL. This is not reachable from GitHub Actions. Use your server public IP/DNS and regenerate the kubeconfig secret."
+            exit 1
+          fi
+
+          kubectl cluster-info
 
       - name: Apply base manifests
         run: |
