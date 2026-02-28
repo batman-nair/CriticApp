@@ -180,8 +180,7 @@ jobs:
           INGRESS
 
           kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
-          kubectl_cmd apply -f "$REMOTE_DIR/k8s/migration-job.yaml"
-          kubectl_cmd set image job/criticapp-migrate migrate="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
+          sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/migration-job.yaml" | kubectl_cmd apply -f -
           kubectl_cmd wait --for=condition=complete job/criticapp-migrate -n "$KUBE_NAMESPACE" --timeout=300s
 
           kubectl_cmd set image deployment/criticapp-web web="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
