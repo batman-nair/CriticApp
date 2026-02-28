@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: criticapp-refresh-review-items
+  namespace: criticapp
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1800
+      template:
+        metadata:
+          labels:
+            app: criticapp-refresh-review-items
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: refresh-review-items
+              image: ghcr.io/batman-nair/criticapp:latest
+              imagePullPolicy: Always
+              command:
+                - python
+                - manage.py
+                - refresh_review_items
+                - --stale-days
+                - "14"
+                - --max-items
+                - "25"
+                - --min-retry-hours
+                - "6"
+                - --request-delay-ms
+                - "800"
+              envFrom:
+                - configMapRef:
+                    name: criticapp-config
+                - secretRef:
+                    name: criticapp-secrets
