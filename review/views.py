@@ -1,5 +1,5 @@
 from django.db import IntegrityError
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -27,6 +27,10 @@ CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
 INVALID_USER_RESPONSE = {"response": "False", "error": "User not authenticated."}
 INVALID_CATEGORY_RESPONSE = {"response": "False", "error": "Invalid category."}
 NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
+
+def health_check(request):
+    """Health check endpoint for k8s probes. Returns 200 OK."""
+    return HttpResponse("OK", status=200)
 
 def view_reviews(request):
     return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys()})
