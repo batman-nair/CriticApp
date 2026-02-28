@@ -22,7 +22,7 @@ spec:
       containers:
         - name: web
           image: ghcr.io/batman-nair/criticapp:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           envFrom:
