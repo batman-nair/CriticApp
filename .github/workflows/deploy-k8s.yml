@@ -68,7 +68,7 @@ jobs:
         run: |
           kubectl create configmap criticapp-config -n $KUBE_NAMESPACE \
             --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
-            --from-literal=ALLOWED_HOSTS=${ALLOWED_HOSTS:-$APP_DOMAIN} \
+            --from-literal=ALLOWED_HOSTS=${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost} \
             --from-literal=CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN} \
             --dry-run=client -o yaml | kubectl apply -f -
 
