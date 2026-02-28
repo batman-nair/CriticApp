@@ -5,6 +5,7 @@ services:
       - .:/critic
     environment:
       - DJANGO_SETTINGS_MODULE=critic.settings.development
+      - DJANGO_MIGRATE=1
       - DJANGO_COLLECTSTATIC=0
       - DJANGO_SEED=1
   db:

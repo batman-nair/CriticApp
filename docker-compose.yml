@@ -10,6 +10,7 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=critic.settings.production
+      - DJANGO_MIGRATE=1
       - DB_HOST=db
       - DB_PORT=5432
     depends_on:

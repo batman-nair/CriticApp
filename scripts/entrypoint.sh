@@ -8,6 +8,11 @@ if [ -n "$DB_HOST" ] && [ -n "$DB_USER" ]; then
   done
 fi
 
+if [ "${DJANGO_MIGRATE:-0}" = "1" ]; then
+  echo "Running migrations..."
+  python manage.py migrate --noinput
+fi
+
 if [ "${DJANGO_SEED:-0}" = "1" ]; then
   python manage.py seed_dev_data
 fi
