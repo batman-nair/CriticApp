@@ -8,7 +8,7 @@ DATABASES = {
         'NAME': os.environ['DB_NAME'],
         'USER': os.environ['DB_USER'],
         'PASSWORD': os.environ['DB_PASSWORD'],
-        'HOST': os.environ.get('DB_HOST', 'db'),
+        'HOST': os.environ.get('DB_HOST', 'criticapp-db'),
         'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
