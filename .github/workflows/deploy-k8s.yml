@@ -111,6 +111,7 @@ jobs:
           APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
           CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
+          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
         run: |
           if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
             echo "::error::SSH_HOST and SSH_USER secrets are required"
@@ -125,7 +126,7 @@ jobs:
           REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
 
           ssh -p "$PORT" "$SSH_USER@$SSH_HOST" \
-            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
+            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
           set -euo pipefail
 
           if kubectl get ns >/dev/null 2>&1; then
@@ -157,6 +158,10 @@ jobs:
             --from-literal=ALLOWED_HOSTS="${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost}" \
             --from-literal=CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN}" \
             --dry-run=client -o yaml | kubectl_cmd apply -f -
+
+          if [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
+            sed "s|__LETSENCRYPT_EMAIL__|$LETSENCRYPT_EMAIL|g" "$REMOTE_DIR/k8s/clusterissuer.yaml" | kubectl_cmd apply -f -
+          fi
 
           sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
 
