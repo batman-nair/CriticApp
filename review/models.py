@@ -16,6 +16,9 @@ class ReviewItem(models.Model):
     attr3 = models.CharField(max_length=300)
     description = models.TextField()
     rating = models.CharField(max_length=5)
+    last_refreshed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_refresh_attempt_at = models.DateTimeField(null=True, blank=True)
+    refresh_error_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return '{}({})'.format(self.title, self.item_id)

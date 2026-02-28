@@ -10,6 +10,7 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import serializers
 from rest_framework import status
+from django.utils import timezone
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer
@@ -68,6 +69,10 @@ def get_review_item_info(request, category, item_id):
     if item_data["response"] == "False":
         return JsonResponse(item_data, status=status.HTTP_400_BAD_REQUEST)
     item_data["category"] = category
+    now = timezone.now()
+    item_data["last_refreshed_at"] = now
+    item_data["last_refresh_attempt_at"] = now
+    item_data["refresh_error_count"] = 0
     serializer = ReviewItemSerializer(data=item_data)
     if serializer.is_valid():
         serializer.save()
