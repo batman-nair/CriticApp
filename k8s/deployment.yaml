@@ -32,19 +32,17 @@ spec:
                 name: criticapp-secrets
           readinessProbe:
             httpGet:
-              host: 127.0.0.1
               path: /health/
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              host: 127.0.0.1
               path: /health/
               port: 8000
-            initialDelaySeconds: 20
+            initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3
