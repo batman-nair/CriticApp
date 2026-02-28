@@ -1,4 +1,5 @@
 from datetime import timedelta
+import time
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -35,12 +36,19 @@ class Command(BaseCommand):
             action='store_true',
             help='Select and report items but do not persist updates.',
         )
+        parser.add_argument(
+            '--request-delay-ms',
+            type=int,
+            default=400,
+            help='Delay between external refresh requests in milliseconds (default: 400).',
+        )
 
     def handle(self, *args, **options):
         stale_days = options['stale_days']
         max_items = options['max_items']
         min_retry_hours = options['min_retry_hours']
         dry_run = options['dry_run']
+        request_delay_ms = options['request_delay_ms']
 
         if stale_days < 0:
             self.stderr.write(self.style.ERROR('--stale-days must be >= 0'))
@@ -50,6 +58,9 @@ class Command(BaseCommand):
             return
         if min_retry_hours < 0:
             self.stderr.write(self.style.ERROR('--min-retry-hours must be >= 0'))
+            return
+        if request_delay_ms < 0:
+            self.stderr.write(self.style.ERROR('--request-delay-ms must be >= 0'))
             return
 
         now = timezone.now()
@@ -88,6 +99,9 @@ class Command(BaseCommand):
                     item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
                 continue
 
+            if request_delay_ms:
+                time.sleep(request_delay_ms / 1000)
+
             details = provider.get_details(item.item_id)
             if details.get('response') != 'True':
                 failed += 1
@@ -95,8 +109,15 @@ class Command(BaseCommand):
                     item.last_refresh_attempt_at = now
                     item.refresh_error_count += 1
                     item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
+                err_message = details.get("error", "Unknown error")
+                status_code = details.get("status_code")
+                upstream_reason = details.get("upstream_reason")
+                if status_code:
+                    err_message = f'{err_message} status={status_code}'
+                if upstream_reason:
+                    err_message = f'{err_message} reason={upstream_reason}'
                 self.stderr.write(self.style.WARNING(
-                    f'Failed refresh for {item.item_id}: {details.get("error", "Unknown error")}.'
+                    f'Failed refresh for {item.item_id}: {err_message}.'
                 ))
                 continue
 

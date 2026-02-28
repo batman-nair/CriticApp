@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv, find_dotenv
@@ -7,6 +8,11 @@ from datetime import datetime
 load_dotenv(find_dotenv())
 MISSING_PREFIX_RESPONSE = {"response": "False", "error": "Missing prefix in item id."}
 NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
+REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_REQUEST_HEADERS = {
+    "User-Agent": "CriticApp/1.0",
+    "Accept": "application/json",
+}
 
 class ReviewItemAPIBase(ABC):
     @abstractmethod
@@ -186,12 +192,8 @@ class JikanItemAPI(ReviewItemAPIBase):
 
     def search(self, query) -> dict:
         search_url = '{base_url}?q={search_term}'.format(base_url=self._base_url, search_term=query)
-        r = requests.get(search_url)
-        if r.status_code == 200:
-            jikan_json = r.json()
-        else:
-            response = NOT_OK_RESPONSE.copy()
-            response["status_code"] = r.status_code
+        jikan_json, response = self._request_json_with_retry(search_url)
+        if response:
             response["query"] = query
             return response
         return self._convert_to_review(jikan_json)
@@ -201,15 +203,49 @@ class JikanItemAPI(ReviewItemAPIBase):
             return MISSING_PREFIX_RESPONSE.copy()
         item_id = item_id[len(self.prefix):]
         info_url = '{base_url}/{item_id}'.format(base_url=self._base_url, item_id=item_id)
-        r = requests.get(info_url)
-        if r.status_code == 200:
-            jikan_json = r.json()
-        else:
-            response = NOT_OK_RESPONSE.copy()
-            response["status_code"] = r.status_code
+        jikan_json, response = self._request_json_with_retry(info_url)
+        if response:
             response["item_id"] = item_id
             return response
         return self._convert_to_review(jikan_json)
+
+    def _request_json_with_retry(self, url: str) -> tuple[dict, dict]:
+        for attempt in range(3):
+            try:
+                response_obj = requests.get(
+                    url,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    headers=DEFAULT_REQUEST_HEADERS,
+                )
+            except requests.RequestException as ex:
+                if attempt < 2:
+                    time.sleep(attempt + 1)
+                    continue
+                response = NOT_OK_RESPONSE.copy()
+                response["error"] = "Request failure to Jikan API."
+                response["exception_type"] = ex.__class__.__name__
+                return {}, response
+
+            if response_obj.status_code == 200:
+                return response_obj.json(), {}
+
+            if response_obj.status_code == 429 and attempt < 2:
+                retry_after = response_obj.headers.get('Retry-After')
+                try:
+                    sleep_time = int(retry_after) if retry_after else (attempt + 1) * 2
+                except ValueError:
+                    sleep_time = (attempt + 1) * 2
+                time.sleep(max(sleep_time, 1))
+                continue
+
+            response = NOT_OK_RESPONSE.copy()
+            response["status_code"] = response_obj.status_code
+            response["upstream_reason"] = response_obj.reason
+            return {}, response
+
+        response = NOT_OK_RESPONSE.copy()
+        response["error"] = "Exhausted retries calling Jikan API."
+        return {}, response
 
     def _convert_to_review(self, jikan_json: dict) -> dict:
         json_data = dict()
