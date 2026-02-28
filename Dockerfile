@@ -20,12 +20,7 @@ RUN pip install -r requirements.txt
 
 COPY . /critic/
 
-ARG DJANGO_SECRET_KEY=build-secret
-ARG DJANGO_SETTINGS_MODULE=critic.settings.production
-ENV SECRET_KEY=$DJANGO_SECRET_KEY
-ENV DJANGO_SETTINGS_MODULE=$DJANGO_SETTINGS_MODULE
-
-RUN python manage.py collectstatic --noinput
+RUN SECRET_KEY=build-secret DJANGO_SETTINGS_MODULE=critic.settings.production DB_NAME=build DB_USER=build DB_PASSWORD=build DB_HOST=localhost DB_PORT=5432 python manage.py collectstatic --noinput
 
 RUN chmod +x /critic/scripts/entrypoint.sh
 
