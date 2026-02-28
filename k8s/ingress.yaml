@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: criticapp-web
+  namespace: criticapp
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: __APP_DOMAIN__
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: criticapp-web
+                port:
+                  number: 80

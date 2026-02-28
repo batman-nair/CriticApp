@@ -158,26 +158,7 @@ jobs:
             --from-literal=CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN}" \
             --dry-run=client -o yaml | kubectl_cmd apply -f -
 
-          cat <<INGRESS | kubectl_cmd apply -f -
-          apiVersion: networking.k8s.io/v1
-          kind: Ingress
-          metadata:
-            name: criticapp-web
-            namespace: $KUBE_NAMESPACE
-          spec:
-            ingressClassName: traefik
-            rules:
-              - host: ${APP_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      pathType: Prefix
-                      backend:
-                        service:
-                          name: criticapp-web
-                          port:
-                            number: 80
-          INGRESS
+          sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
 
           kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
           sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/migration-job.yaml" | kubectl_cmd apply -f -
