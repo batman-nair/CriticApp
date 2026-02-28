@@ -4,7 +4,7 @@ metadata:
   name: criticapp-web
   namespace: criticapp
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 2
   strategy:
     type: RollingUpdate
@@ -31,17 +31,21 @@ spec:
             - secretRef:
                 name: criticapp-secrets
           readinessProbe:
-            httpGet:
-              path: /health/
-              port: 8000
+            exec:
+              command:
+                - python
+                - -c
+                - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3).getcode()==200 else 1)
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet:
-              path: /health/
-              port: 8000
+            exec:
+              command:
+                - python
+                - -c
+                - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3).getcode()==200 else 1)
             initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 5
