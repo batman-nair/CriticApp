@@ -39,73 +39,119 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          version: v1.30.1
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          KUBE_CONFIG_CONTENT='${{ secrets.KUBE_CONFIG }}'
-          if [ -z "$KUBE_CONFIG_CONTENT" ]; then
-            echo "::error::KUBE_CONFIG secret is empty or missing"
-            exit 1
-          fi
-
-          if echo "$KUBE_CONFIG_CONTENT" | base64 -d > $HOME/.kube/config 2>/dev/null; then
-            if ! grep -q '^apiVersion:' $HOME/.kube/config; then
-              echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
-            fi
-          else
-            echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
-          fi
-
-          chmod 600 $HOME/.kube/config
-
-      - name: Validate kubeconfig and cluster access
-        run: |
-          SERVER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-          if [ -z "$SERVER_URL" ]; then
-            echo "::error::No Kubernetes API server found in kubeconfig"
-            exit 1
-          fi
-
-          if [[ "$SERVER_URL" == *"127.0.0.1"* || "$SERVER_URL" == *"localhost"* ]]; then
-            echo "::error::KUBE_CONFIG points to $SERVER_URL. This is not reachable from GitHub Actions. Use your server public IP/DNS and regenerate the kubeconfig secret."
-            exit 1
-          fi
-
-          kubectl cluster-info
-
-      - name: Apply base manifests
-        run: |
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/postgres.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/deployment.yaml
-
-      - name: Wait for postgres readiness
-        run: |
-          kubectl rollout status deployment/criticapp-postgres -n $KUBE_NAMESPACE --timeout=300s
-
-      - name: Apply runtime configmap
+      - name: Configure known hosts
         env:
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::error::SSH_KNOWN_HOSTS secret is required"
+            exit 1
+          fi
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 700 "$HOME/.ssh"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Preflight remote Kubernetes access
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
+            echo "::error::SSH_HOST and SSH_USER secrets are required"
+            exit 1
+          fi
+
+          PORT="${SSH_PORT:-22}"
+          ssh -p "$PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'EOF'
+          set -euo pipefail
+
+          if command -v kubectl >/dev/null 2>&1; then
+            kubectl version --client
+            kubectl get ns >/dev/null
+          elif sudo -n k3s kubectl get ns >/dev/null 2>&1; then
+            sudo k3s kubectl version --client
+            sudo k3s kubectl get ns >/dev/null
+          else
+            echo "Neither kubectl nor passwordless sudo k3s kubectl is available for this SSH user"
+            exit 1
+          fi
+          EOF
+
+      - name: Upload Kubernetes manifests to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
+            echo "::error::SSH_HOST and SSH_USER secrets are required"
+            exit 1
+          fi
+
+          REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
+          PORT="${SSH_PORT:-22}"
+
+          ssh -p "$PORT" "$SSH_USER@$SSH_HOST" "rm -rf '$REMOTE_DIR'; mkdir -p '$REMOTE_DIR'"
+          scp -P "$PORT" -r k8s "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
+
+      - name: Deploy on k3s server over SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          KUBE_NAMESPACE: ${{ env.KUBE_NAMESPACE }}
+          IMAGE_TAG: ${{ github.sha }}
           APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
           CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
         run: |
-          kubectl create configmap criticapp-config -n $KUBE_NAMESPACE \
-            --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
-            --from-literal=ALLOWED_HOSTS=${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost} \
-            --from-literal=CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN} \
-            --dry-run=client -o yaml | kubectl apply -f -
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
+            echo "::error::SSH_HOST and SSH_USER secrets are required"
+            exit 1
+          fi
+          if [ -z "$APP_DOMAIN" ]; then
+            echo "::error::APP_DOMAIN secret is required"
+            exit 1
+          fi
 
-      - name: Apply runtime ingress
-        env:
-          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
-        run: |
-          cat <<EOF | kubectl apply -f -
+          PORT="${SSH_PORT:-22}"
+          REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
+
+          ssh -p "$PORT" "$SSH_USER@$SSH_HOST" \
+            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
+          set -euo pipefail
+
+          kubectl_cmd() {
+            if command -v kubectl >/dev/null 2>&1; then
+              kubectl "$@"
+            else
+              sudo k3s kubectl "$@"
+            fi
+          }
+
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/namespace.yaml"
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/postgres.yaml"
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/service.yaml"
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/deployment.yaml"
+
+          kubectl_cmd rollout status deployment/criticapp-postgres -n "$KUBE_NAMESPACE" --timeout=300s
+
+          kubectl_cmd create configmap criticapp-config -n "$KUBE_NAMESPACE" \
+            --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
+            --from-literal=ALLOWED_HOSTS="${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost}" \
+            --from-literal=CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN}" \
+            --dry-run=client -o yaml | kubectl_cmd apply -f -
+
+          cat <<INGRESS | kubectl_cmd apply -f -
           apiVersion: networking.k8s.io/v1
           kind: Ingress
           metadata:
@@ -124,16 +170,15 @@ jobs:
                           name: criticapp-web
                           port:
                             number: 80
+          INGRESS
+
+          kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/migration-job.yaml"
+          kubectl_cmd set image job/criticapp-migrate migrate="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
+          kubectl_cmd wait --for=condition=complete job/criticapp-migrate -n "$KUBE_NAMESPACE" --timeout=300s
+
+          kubectl_cmd set image deployment/criticapp-web web="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
+          kubectl_cmd rollout status deployment/criticapp-web -n "$KUBE_NAMESPACE" --timeout=300s
+
+          rm -rf "$REMOTE_DIR"
           EOF
-
-      - name: Run database migrations
-        run: |
-          kubectl delete job criticapp-migrate -n $KUBE_NAMESPACE --ignore-not-found
-          kubectl apply -f k8s/migration-job.yaml
-          kubectl set image job/criticapp-migrate migrate=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n $KUBE_NAMESPACE
-          kubectl wait --for=condition=complete job/criticapp-migrate -n $KUBE_NAMESPACE --timeout=300s
-
-      - name: Roll out web deployment
-        run: |
-          kubectl set image deployment/criticapp-web web=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n $KUBE_NAMESPACE
-          kubectl rollout status deployment/criticapp-web -n $KUBE_NAMESPACE --timeout=300s
