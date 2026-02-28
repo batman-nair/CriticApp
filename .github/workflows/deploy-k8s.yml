@@ -72,12 +72,10 @@ jobs:
           ssh -p "$PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'EOF'
           set -euo pipefail
 
-          if command -v kubectl >/dev/null 2>&1; then
+          if kubectl get ns >/dev/null 2>&1; then
             kubectl version --client
-            kubectl get ns >/dev/null
           elif sudo -n k3s kubectl get ns >/dev/null 2>&1; then
-            sudo k3s kubectl version --client
-            sudo k3s kubectl get ns >/dev/null
+            sudo -n k3s kubectl version --client
           else
             echo "Neither kubectl nor passwordless sudo k3s kubectl is available for this SSH user"
             exit 1
@@ -130,11 +128,20 @@ jobs:
             "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
           set -euo pipefail
 
+          if kubectl get ns >/dev/null 2>&1; then
+            KUBE_BIN="kubectl"
+          elif sudo -n k3s kubectl get ns >/dev/null 2>&1; then
+            KUBE_BIN="sudo -n k3s kubectl"
+          else
+            echo "No usable Kubernetes command found for this SSH user"
+            exit 1
+          fi
+
           kubectl_cmd() {
-            if command -v kubectl >/dev/null 2>&1; then
+            if [ "$KUBE_BIN" = "kubectl" ]; then
               kubectl "$@"
             else
-              sudo k3s kubectl "$@"
+              sudo -n k3s kubectl "$@"
             fi
           }
 
