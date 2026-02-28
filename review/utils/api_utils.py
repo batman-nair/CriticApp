@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 
+from . import metrics
+
 load_dotenv(find_dotenv())
 MISSING_PREFIX_RESPONSE = {"response": "False", "error": "Missing prefix in item id."}
 NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
@@ -32,15 +34,19 @@ def request_json_with_retry(url: str, source_name: str='Upstream API', retries: 
             response["error"] = "Request failure to upstream API."
             response["exception_type"] = ex.__class__.__name__
             response["source"] = source_name
+            metrics.record_upstream_api_call(source_name, 'exception')
             return {}, response
 
         if response_obj.status_code == 200:
             try:
-                return response_obj.json(), {}
+                data = response_obj.json()
+                metrics.record_upstream_api_call(source_name, 'success')
+                return data, {}
             except ValueError:
                 response = NOT_OK_RESPONSE.copy()
                 response["error"] = "Invalid JSON from upstream API."
                 response["source"] = source_name
+                metrics.record_upstream_api_call(source_name, 'invalid_json')
                 return {}, response
 
         if response_obj.status_code in RETRY_STATUS_CODES and attempt < retries - 1:
@@ -56,11 +62,13 @@ def request_json_with_retry(url: str, source_name: str='Upstream API', retries: 
         response["status_code"] = response_obj.status_code
         response["upstream_reason"] = response_obj.reason
         response["source"] = source_name
+        metrics.record_upstream_api_call(source_name, 'http_error')
         return {}, response
 
     response = NOT_OK_RESPONSE.copy()
     response["error"] = "Exhausted retries calling upstream API."
     response["source"] = source_name
+    metrics.record_upstream_api_call(source_name, 'exhausted_retries')
     return {}, response
 
 class ReviewItemAPIBase(ABC):

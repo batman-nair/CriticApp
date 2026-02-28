@@ -1,8 +1,10 @@
 from django.db import IntegrityError
+from django.conf import settings
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,7 +16,7 @@ from django.utils import timezone
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer
-from .utils import api_utils, review_utils
+from .utils import api_utils, review_utils, metrics as monitoring_metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
 
@@ -32,6 +34,31 @@ NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
 def health_check(request):
     """Health check endpoint for k8s probes. Returns 200 OK."""
     return HttpResponse("OK", status=200)
+
+
+@staff_member_required(login_url='users:login')
+def monitoring_dashboard(request):
+    snapshot = monitoring_metrics.get_dashboard_snapshot()
+    return render(request, 'review/monitoring_dashboard.html', {'snapshot': snapshot})
+
+
+@staff_member_required(login_url='users:login')
+def monitoring_health(request):
+    snapshot = monitoring_metrics.get_dashboard_snapshot()
+    return JsonResponse({
+        'response': 'True',
+        'healthy': snapshot['healthy'],
+        'window_seconds': snapshot['window_seconds'],
+        'requests_in_window': snapshot['requests_in_window'],
+        'failed_requests_in_window': snapshot['failed_requests_in_window'],
+        'failure_rate_in_window': snapshot['failure_rate_in_window'],
+    })
+
+
+def metrics_endpoint(request):
+    if settings.METRICS_REQUIRE_AUTH and not (request.user.is_authenticated and request.user.is_staff):
+        return HttpResponse('Forbidden', status=403)
+    return monitoring_metrics.metrics_http_response()
 
 def view_reviews(request):
     return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys()})

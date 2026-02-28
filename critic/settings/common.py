@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'review.middleware.RequestMetricsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -133,3 +134,11 @@ MESSAGE_TAGS = {
     messages.WARNING: 'alert-warning',
     messages.ERROR: 'alert-danger',
 }
+
+METRICS_REQUIRE_AUTH = os.environ.get('METRICS_REQUIRE_AUTH', 'False').lower() == 'true'
+MONITORING_FAILURE_RATE_THRESHOLD = float(os.environ.get('MONITORING_FAILURE_RATE_THRESHOLD', '0.15'))
+MONITORING_WINDOW_SECONDS = int(os.environ.get('MONITORING_WINDOW_SECONDS', '300'))
+PROMETHEUS_BASE_URL = os.environ.get('PROMETHEUS_BASE_URL', '').rstrip('/')
+PROMETHEUS_QUERY_TIMEOUT_SECONDS = int(os.environ.get('PROMETHEUS_QUERY_TIMEOUT_SECONDS', '3'))
+PROMETHEUS_NAMESPACE = os.environ.get('PROMETHEUS_NAMESPACE', 'criticapp')
+PROMETHEUS_POD_REGEX = os.environ.get('PROMETHEUS_POD_REGEX', 'criticapp-web.*')

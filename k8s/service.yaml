@@ -3,6 +3,12 @@ kind: Service
 metadata:
   name: criticapp-web
   namespace: criticapp
+  labels:
+    app: criticapp-web
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics/"
+    prometheus.io/port: "80"
 spec:
   selector:
     app: criticapp-web

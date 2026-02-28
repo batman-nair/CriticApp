@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<title>Monitoring | Critic App</title>
+{% endblock title %}
+
+{% block content %}
+<div class="my-4">
+    <h2>Monitoring Dashboard</h2>
+    <p class="text-muted mb-4">Operational metrics for request health, upstream API usage, and process resource usage.</p>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Health Status</h6>
+                    <h4 class="card-title {% if snapshot.healthy %}text-success{% else %}text-danger{% endif %}">
+                        {% if snapshot.healthy %}Healthy{% else %}Unhealthy{% endif %}
+                    </h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Requests (Window)</h6>
+                    <h4 class="card-title">{{ snapshot.requests_in_window }}</h4>
+                    <small class="text-muted">Window: {{ snapshot.window_seconds }}s</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Failed Requests</h6>
+                    <h4 class="card-title">{{ snapshot.failed_requests_in_window }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Failure Rate</h6>
+                    <h4 class="card-title">{{ snapshot.failure_rate_in_window }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-3 text-muted">CPU Seconds</h6>
+                    <h5 class="card-title">{{ snapshot.process.cpu_seconds_total|default:'N/A' }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-3 text-muted">Resident Memory (Bytes)</h6>
+                    <h5 class="card-title">{{ snapshot.process.resident_memory_bytes|default:'N/A' }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-3 text-muted">Open FDs</h6>
+                    <h5 class="card-title">{{ snapshot.process.open_fds|default:'N/A' }}</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Pod CPU Usage (Cores)</h5>
+                    {% if snapshot.infrastructure.pod_cpu_cores is not None %}
+                    <h4 class="card-title">{{ snapshot.infrastructure.pod_cpu_cores }}</h4>
+                    {% else %}
+                    <p class="text-muted mb-0">Unavailable</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Pod Memory Usage (MiB)</h5>
+                    {% if snapshot.infrastructure.pod_memory_mib is not None %}
+                    <h4 class="card-title">{{ snapshot.infrastructure.pod_memory_mib }}</h4>
+                    {% else %}
+                    <p class="text-muted mb-0">Unavailable</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if snapshot.infrastructure.errors %}
+    <div class="alert alert-warning" role="alert">
+        <strong>Infra stats warning:</strong>
+        {% for err in snapshot.infrastructure.errors %}
+        <div>{{ err }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">HTTP Status Counts</h5>
+                    {% if snapshot.status_counts %}
+                    <ul class="list-group list-group-flush">
+                        {% for status_code, count in snapshot.status_counts.items %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ status_code }}</span>
+                            <span class="badge bg-secondary rounded-pill">{{ count }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">No request data collected yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">External API Calls</h5>
+                    {% if snapshot.external_api_calls %}
+                    {% for provider, outcomes in snapshot.external_api_calls.items %}
+                    <div class="mb-3">
+                        <h6 class="text-capitalize">{{ provider }}</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for outcome, count in outcomes.items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ outcome }}</span>
+                                <span class="badge bg-secondary rounded-pill">{{ count }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted mb-0">No external API calls collected yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
