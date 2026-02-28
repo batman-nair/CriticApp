@@ -1,7 +1,9 @@
 services:
   web:
-    command: pytest
+    command: python -m pytest
     environment:
-      - DJANGO_SETTINGS_MODULE=critic.settings.development
+      - DJANGO_SETTINGS_MODULE=critic.settings.test
       - DJANGO_MIGRATE=0
       - DJANGO_COLLECTSTATIC=0
+      - DB_HOST=
+      - DB_USER=

@@ -43,6 +43,34 @@ These API keys need to be set for fetching details in their category:
 The above API keys need to be set as environment variables either by creating a `.env` file in the repo root.
 You can use the `.env.example` as reference if needed.
 
+## Local testing
+
+Use a single command for local tests:
+
+```bash
+make test
+```
+
+Notes:
+- `make test` runs tests in Docker with Django test settings (`critic.settings.test`) and SQLite, so it does not require a Postgres test database to exist.
+- If you want to run tests directly on host Python, use:
+
+```bash
+make test-local
+```
+
+- If you want a fresh local test database state, run:
+
+```bash
+make test-reset && make test
+```
+
+- `make test-docker` is an explicit alias for the same Dockerized test flow:
+
+```bash
+make test-docker
+```
+
 ## Screenshots
 
 While not so great, this is how the current version looks like this. Would probably change
