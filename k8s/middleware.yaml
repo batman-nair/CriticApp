@@ -1,0 +1,12 @@
+# Deny /metrics access at ingress level.
+# Any request routed through this middleware receives 403 unless source IP is loopback.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: block-metrics
+  namespace: criticapp
+spec:
+  ipWhiteList:
+    sourceRange:
+      - 127.0.0.1/32
+      - ::1/128

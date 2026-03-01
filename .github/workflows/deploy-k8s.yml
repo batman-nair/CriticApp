@@ -169,6 +169,7 @@ jobs:
             sed "s|__LETSENCRYPT_EMAIL__|$LETSENCRYPT_EMAIL|g" "$REMOTE_DIR/k8s/clusterissuer.yaml" | kubectl_cmd apply -f -
           fi
 
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/middleware.yaml"
           sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
 
           kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
