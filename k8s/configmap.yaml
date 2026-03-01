@@ -9,3 +9,4 @@ data:
   SESSION_COOKIE_SECURE: "True"
   CSRF_COOKIE_SECURE: "True"
   WHITENOISE_MAX_AGE: "31536000"
+  PROMETHEUS_BASE_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
