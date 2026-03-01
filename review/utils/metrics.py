@@ -41,6 +41,8 @@ _status_counts = defaultdict(int)
 _state_lock = Lock()
 _logger = logging.getLogger(__name__)
 KNOWN_UPSTREAM_PROVIDERS = ('omdb', 'rawg', 'jikan')
+_PROVIDER_EVENT_RETENTION_SECONDS = 35 * 24 * 60 * 60
+_provider_events = defaultdict(deque)
 
 
 def normalize_provider(source_name: str) -> str:
@@ -102,8 +104,14 @@ def record_upstream_api_call(source_name: str, outcome: str):
     safe_outcome = (outcome or 'unknown').lower().replace(' ', '_')
     UPSTREAM_API_CALLS_TOTAL.labels(provider=provider, outcome=safe_outcome).inc()
 
+    now = time.time()
     with _state_lock:
         _provider_counts[provider][safe_outcome] += 1
+        provider_events = _provider_events[provider]
+        provider_events.append(now)
+        cutoff = now - _PROVIDER_EVENT_RETENTION_SECONDS
+        while provider_events and provider_events[0] < cutoff:
+            provider_events.popleft()
 
 
 def _process_metrics():
@@ -263,6 +271,46 @@ def _build_zero_provider_series(start: int, end: int, step: str) -> dict:
     }
 
 
+def _build_provider_series_from_events(start: int, end: int, step: str) -> dict:
+    increment = _step_to_seconds(step)
+    if end < start:
+        return {}
+
+    bucket_count = ((end - start) // increment) + 1
+
+    with _state_lock:
+        provider_events_snapshot = {
+            provider: list(events)
+            for provider, events in _provider_events.items()
+        }
+
+    series = {}
+    for provider, events in provider_events_snapshot.items():
+        bucket_values = [0.0] * bucket_count
+        for event_timestamp in events:
+            if event_timestamp < start or event_timestamp > end:
+                continue
+            bucket_index = int((event_timestamp - start) // increment)
+            if 0 <= bucket_index < bucket_count:
+                bucket_values[bucket_index] += 1.0
+
+        points = []
+        for index in range(bucket_count):
+            timestamp = start + (index * increment)
+            points.append({'timestamp': timestamp, 'value': bucket_values[index]})
+        series[provider] = points
+
+    return series
+
+
+def _provider_series_has_non_zero(series_dict: dict) -> bool:
+    for points in series_dict.values():
+        for point in points:
+            if point.get('value', 0.0) > 0:
+                return True
+    return False
+
+
 def _infrastructure_metrics() -> dict:
     namespace = getattr(settings, 'PROMETHEUS_NAMESPACE', 'criticapp')
     pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
@@ -325,10 +373,12 @@ def _timeline_config(range_key: str) -> Optional[dict]:
         '1w': {
             'seconds': 7 * 24 * 60 * 60,
             'step': '1h',
+            'lookback': '1h',
         },
         '1m': {
             'seconds': 30 * 24 * 60 * 60,
             'step': '1d',
+            'lookback': '1d',
         },
     }.get(range_key)
 
@@ -341,34 +391,34 @@ def get_timeline_snapshot(range_key: str) -> dict:
     end = int(time.time())
     start = end - config['seconds']
     step = config['step']
-    rate_window = '5m'
+    lookback = config['lookback']
 
     namespace = getattr(settings, 'PROMETHEUS_NAMESPACE', 'criticapp')
     pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
 
     query_map = {
-        'requests': f'(sum(rate(critic_http_requests_total[{rate_window}])) * 300 or vector(0))',
+        'requests': f'(sum(increase(critic_http_requests_total[{lookback}])) or vector(0))',
         'pod_cpu_cores': (
             'sum(rate(container_cpu_usage_seconds_total{'
             f'namespace="{namespace}",pod=~"{pod_regex}",container!="POD",container!=""'
             '}[5m]))'
         ),
-        'external_api_calls': f'sum by (provider) (rate(critic_upstream_api_calls_total[{rate_window}])) * 300',
+        'external_api_calls': f'sum by (provider) (increase(critic_upstream_api_calls_total[{lookback}]))',
         'latency_p50': (
             '(histogram_quantile(0.5, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_p95': (
             '(histogram_quantile(0.95, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_p99': (
             '(histogram_quantile(0.99, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_max_approx': (
             '(histogram_quantile(1.0, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
     }
 
@@ -385,11 +435,18 @@ def get_timeline_snapshot(range_key: str) -> dict:
         )
 
         if grouped:
-            if not values and not error:
+            fallback_series = _build_provider_series_from_events(start=start, end=end, step=step)
+            fallback_has_non_zero = _provider_series_has_non_zero(fallback_series)
+            prom_empty = not values
+            prom_all_zero = not prom_empty and not _provider_series_has_non_zero(values)
+
+            if (prom_empty or prom_all_zero) and fallback_has_non_zero:
+                values = fallback_series
+            elif prom_empty and not error:
                 values = _build_zero_provider_series(start=start, end=end, step=step)
-            else:
-                for provider in KNOWN_UPSTREAM_PROVIDERS:
-                    values.setdefault(provider, _build_zero_series(start=start, end=end, step=step))
+
+            for provider in KNOWN_UPSTREAM_PROVIDERS:
+                values.setdefault(provider, _build_zero_series(start=start, end=end, step=step))
         elif not values and not error:
             values = _build_zero_series(start=start, end=end, step=step)
 
@@ -418,4 +475,5 @@ def reset_dashboard_state_for_tests():
         _window_all_requests.clear()
         _window_failed_requests.clear()
         _provider_counts.clear()
+        _provider_events.clear()
         _status_counts.clear()
