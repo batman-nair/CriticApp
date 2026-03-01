@@ -172,12 +172,38 @@ class MonitoringEndpointsTest(TestCase):
             }
             return mocked
 
+        def build_provider_response():
+            mocked = mock.Mock()
+            mocked.raise_for_status.return_value = None
+            mocked.json.return_value = {
+                'status': 'success',
+                'data': {
+                    'result': [
+                        {
+                            'metric': {'provider': 'omdb'},
+                            'values': [
+                                [1700000000, '3'],
+                                [1700003600, '5'],
+                            ],
+                        },
+                        {
+                            'metric': {'provider': 'rawg'},
+                            'values': [
+                                [1700000000, '2'],
+                                [1700003600, '4'],
+                            ],
+                        },
+                    ],
+                },
+            }
+            return mocked
+
         with mock.patch(
             'review.utils.metrics.requests.get',
             side_effect=[
                 build_response('10', '12'),
                 build_response('0.15', '0.2'),
-                build_response('4', '5'),
+                build_provider_response(),
                 build_response('0.1', '0.11'),
                 build_response('0.2', '0.21'),
                 build_response('0.3', '0.31'),
@@ -200,3 +226,8 @@ class MonitoringEndpointsTest(TestCase):
         self.assertIn('latency_p99', payload['series'])
         self.assertIn('latency_max_approx', payload['series'])
         self.assertEqual(len(payload['series']['requests']), 2)
+        self.assertIsInstance(payload['series']['external_api_calls'], dict)
+        self.assertIn('omdb', payload['series']['external_api_calls'])
+        self.assertIn('rawg', payload['series']['external_api_calls'])
+        self.assertIn('jikan', payload['series']['external_api_calls'])
+        self.assertEqual(len(payload['series']['external_api_calls']['omdb']), 2)

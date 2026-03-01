@@ -1,5 +1,6 @@
 import time
 import math
+import logging
 from collections import defaultdict, deque
 from threading import Lock
 from typing import Optional, Tuple
@@ -38,6 +39,8 @@ _window_failed_requests = deque()
 _provider_counts = defaultdict(lambda: defaultdict(int))
 _status_counts = defaultdict(int)
 _state_lock = Lock()
+_logger = logging.getLogger(__name__)
+KNOWN_UPSTREAM_PROVIDERS = ('omdb', 'rawg', 'jikan')
 
 
 def normalize_provider(source_name: str) -> str:
@@ -147,10 +150,16 @@ def _query_prometheus_scalar(query: str) -> Tuple[Optional[float], Optional[str]
         return None, 'Prometheus query result value could not be parsed.'
 
 
-def _query_prometheus_range(query: str, start: int, end: int, step: str) -> Tuple[list, Optional[str]]:
+def _query_prometheus_range(
+    query: str,
+    start: int,
+    end: int,
+    step: str,
+    group_by_label: Optional[str] = None,
+) -> Tuple[object, Optional[str]]:
     base_url = getattr(settings, 'PROMETHEUS_BASE_URL', '')
     if not base_url:
-        return [], 'PROMETHEUS_BASE_URL is not configured.'
+        return {} if group_by_label else [], 'PROMETHEUS_BASE_URL is not configured.'
 
     timeout_seconds = max(getattr(settings, 'PROMETHEUS_QUERY_TIMEOUT_SECONDS', 3), 1)
     endpoint = f'{base_url}/api/v1/query_range'
@@ -169,33 +178,53 @@ def _query_prometheus_range(query: str, start: int, end: int, step: str) -> Tupl
         response.raise_for_status()
         payload = response.json()
     except requests.RequestException as exc:
-        return [], f'Prometheus request failed: {exc.__class__.__name__}'
+        _logger.warning('Prometheus range query failed for %s: %s', query, exc.__class__.__name__)
+        return ({} if group_by_label else []), f'Prometheus request failed: {exc.__class__.__name__}'
     except ValueError:
-        return [], 'Prometheus returned invalid JSON.'
+        _logger.warning('Prometheus range query returned invalid JSON for %s', query)
+        return ({} if group_by_label else []), 'Prometheus returned invalid JSON.'
 
     if payload.get('status') != 'success':
-        return [], 'Prometheus query response status was not success.'
+        _logger.warning('Prometheus range query status was not success for %s', query)
+        return ({} if group_by_label else []), 'Prometheus query response status was not success.'
 
     results = payload.get('data', {}).get('result', [])
     if not results:
-        return [], None
+        return ({} if group_by_label else []), None
 
-    values = results[0].get('values', [])
-    points = []
-    for pair in values:
-        if len(pair) < 2:
-            continue
-        try:
-            parsed_value = float(pair[1])
-            if not math.isfinite(parsed_value):
-                parsed_value = 0.0
-            points.append({
-                'timestamp': int(float(pair[0])),
-                'value': parsed_value,
-            })
-        except (TypeError, ValueError):
-            continue
+    def _parse_points(values: list) -> list:
+        points = []
+        for pair in values:
+            if len(pair) < 2:
+                continue
+            try:
+                parsed_value = float(pair[1])
+                if not math.isfinite(parsed_value):
+                    parsed_value = 0.0
+                points.append({
+                    'timestamp': int(float(pair[0])),
+                    'value': parsed_value,
+                })
+            except (TypeError, ValueError):
+                continue
+        return points
 
+    if group_by_label:
+        grouped_series = {}
+        for series in results:
+            label_value = series.get('metric', {}).get(group_by_label, 'unknown')
+            grouped_series[label_value] = _parse_points(series.get('values', []))
+        return grouped_series, None
+
+    points_by_timestamp = defaultdict(float)
+    for series in results:
+        for point in _parse_points(series.get('values', [])):
+            points_by_timestamp[point['timestamp']] += point['value']
+
+    points = [
+        {'timestamp': timestamp, 'value': value}
+        for timestamp, value in sorted(points_by_timestamp.items())
+    ]
     return points, None
 
 
@@ -225,6 +254,13 @@ def _build_zero_series(start: int, end: int, step: str) -> list:
         points.append({'timestamp': current, 'value': 0.0})
         current += increment
     return points
+
+
+def _build_zero_provider_series(start: int, end: int, step: str) -> dict:
+    return {
+        provider: _build_zero_series(start=start, end=end, step=step)
+        for provider in KNOWN_UPSTREAM_PROVIDERS
+    }
 
 
 def _infrastructure_metrics() -> dict:
@@ -289,12 +325,10 @@ def _timeline_config(range_key: str) -> Optional[dict]:
         '1w': {
             'seconds': 7 * 24 * 60 * 60,
             'step': '1h',
-            'lookback': '1h',
         },
         '1m': {
             'seconds': 30 * 24 * 60 * 60,
             'step': '1d',
-            'lookback': '1d',
         },
     }.get(range_key)
 
@@ -307,43 +341,58 @@ def get_timeline_snapshot(range_key: str) -> dict:
     end = int(time.time())
     start = end - config['seconds']
     step = config['step']
-    lookback = config['lookback']
+    rate_window = '5m'
 
     namespace = getattr(settings, 'PROMETHEUS_NAMESPACE', 'criticapp')
     pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
 
     query_map = {
-        'requests': f'(sum(increase(critic_http_requests_total[{lookback}])) or vector(0))',
+        'requests': f'(sum(rate(critic_http_requests_total[{rate_window}])) * 300 or vector(0))',
         'pod_cpu_cores': (
             'sum(rate(container_cpu_usage_seconds_total{'
             f'namespace="{namespace}",pod=~"{pod_regex}",container!="POD",container!=""'
             '}[5m]))'
         ),
-        'external_api_calls': f'(sum(increase(critic_upstream_api_calls_total[{lookback}])) or vector(0))',
+        'external_api_calls': f'sum by (provider) (rate(critic_upstream_api_calls_total[{rate_window}])) * 300',
         'latency_p50': (
             '(histogram_quantile(0.5, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
         ),
         'latency_p95': (
             '(histogram_quantile(0.95, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
         ),
         'latency_p99': (
             '(histogram_quantile(0.99, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
         ),
         'latency_max_approx': (
             '(histogram_quantile(1.0, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{rate_window}])) by (le)) or vector(0))'
         ),
     }
 
     errors = []
     series = {}
     for metric_key, query in query_map.items():
-        values, error = _query_prometheus_range(query, start=start, end=end, step=step)
-        if not values and not error:
+        grouped = metric_key == 'external_api_calls'
+        values, error = _query_prometheus_range(
+            query,
+            start=start,
+            end=end,
+            step=step,
+            group_by_label='provider' if grouped else None,
+        )
+
+        if grouped:
+            if not values and not error:
+                values = _build_zero_provider_series(start=start, end=end, step=step)
+            else:
+                for provider in KNOWN_UPSTREAM_PROVIDERS:
+                    values.setdefault(provider, _build_zero_series(start=start, end=end, step=step))
+        elif not values and not error:
             values = _build_zero_series(start=start, end=end, step=step)
+
         series[metric_key] = values
         if error:
             errors.append(f'{metric_key}: {error}')

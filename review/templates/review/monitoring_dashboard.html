@@ -251,6 +251,35 @@
         }));
     }
 
+    function buildProviderDatasets(providerSeries, rangeKey) {
+        const providerOrder = ['omdb', 'rawg', 'jikan'];
+        const providerStyles = {
+            omdb: {
+                borderColor: 'var(--bs-primary)',
+                backgroundColor: 'var(--bs-primary)',
+            },
+            rawg: {
+                borderColor: 'var(--bs-success)',
+                backgroundColor: 'var(--bs-success)',
+            },
+            jikan: {
+                borderColor: 'var(--bs-info)',
+                backgroundColor: 'var(--bs-info)',
+            },
+        };
+
+        return providerOrder.map((provider) => {
+            const style = providerStyles[provider] || {};
+            return {
+                label: provider.toUpperCase(),
+                data: parseSeries((providerSeries || {})[provider] || [], rangeKey),
+                borderWidth: 2,
+                tension: 0.2,
+                ...style,
+            };
+        });
+    }
+
     function destroyCharts() {
         [requestsChart, cpuChart, apiChart, latencyChart].forEach((chart) => {
             if (chart) {
@@ -325,12 +354,7 @@
         apiChart = new Chart(document.getElementById('api-chart'), {
             type: 'line',
             data: {
-                datasets: [{
-                    label: 'External API Calls',
-                    data: parseSeries(series.external_api_calls, rangeKey),
-                    borderWidth: 2,
-                    tension: 0.2,
-                }],
+                datasets: buildProviderDatasets(series.external_api_calls, rangeKey),
             },
             options: baseChartOptions(),
         });
