@@ -16,6 +16,7 @@ urlpatterns = [
     path('health/', views.health_check, name='health_check'),
     path('health/monitoring/', views.monitoring_health, name='monitoring_health'),
     path('monitoring/', views.monitoring_dashboard, name='monitoring_dashboard'),
+    path('monitoring/timeline/', views.monitoring_timeline, name='monitoring_timeline'),
     path('metrics/', views.metrics_endpoint, name='metrics_endpoint'),
     path('api/reviews/', include((review_patterns, 'reviews'))),
     path('search_item/<str:category>/<str:search_term>', views.search_review_item, name='search_review_item'),

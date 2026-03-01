@@ -146,6 +146,55 @@ def _query_prometheus_scalar(query: str) -> Tuple[Optional[float], Optional[str]
         return None, 'Prometheus query result value could not be parsed.'
 
 
+def _query_prometheus_range(query: str, start: int, end: int, step: str) -> Tuple[list, Optional[str]]:
+    base_url = getattr(settings, 'PROMETHEUS_BASE_URL', '')
+    if not base_url:
+        return [], 'PROMETHEUS_BASE_URL is not configured.'
+
+    timeout_seconds = max(getattr(settings, 'PROMETHEUS_QUERY_TIMEOUT_SECONDS', 3), 1)
+    endpoint = f'{base_url}/api/v1/query_range'
+
+    try:
+        response = requests.get(
+            endpoint,
+            params={
+                'query': query,
+                'start': start,
+                'end': end,
+                'step': step,
+            },
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as exc:
+        return [], f'Prometheus request failed: {exc.__class__.__name__}'
+    except ValueError:
+        return [], 'Prometheus returned invalid JSON.'
+
+    if payload.get('status') != 'success':
+        return [], 'Prometheus query response status was not success.'
+
+    results = payload.get('data', {}).get('result', [])
+    if not results:
+        return [], None
+
+    values = results[0].get('values', [])
+    points = []
+    for pair in values:
+        if len(pair) < 2:
+            continue
+        try:
+            points.append({
+                'timestamp': int(float(pair[0])),
+                'value': float(pair[1]),
+            })
+        except (TypeError, ValueError):
+            continue
+
+    return points, None
+
+
 def _infrastructure_metrics() -> dict:
     namespace = getattr(settings, 'PROMETHEUS_NAMESPACE', 'criticapp')
     pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
@@ -200,6 +249,79 @@ def get_dashboard_snapshot() -> dict:
         'external_api_calls': provider_counts,
         'process': _process_metrics(),
         'infrastructure': _infrastructure_metrics(),
+    }
+
+
+def _timeline_config(range_key: str) -> Optional[dict]:
+    return {
+        '1w': {
+            'seconds': 7 * 24 * 60 * 60,
+            'step': '1h',
+            'lookback': '1h',
+        },
+        '1m': {
+            'seconds': 30 * 24 * 60 * 60,
+            'step': '1d',
+            'lookback': '1d',
+        },
+    }.get(range_key)
+
+
+def get_timeline_snapshot(range_key: str) -> dict:
+    config = _timeline_config(range_key)
+    if not config:
+        raise ValueError('Invalid timeline range. Use 1w or 1m.')
+
+    end = int(time.time())
+    start = end - config['seconds']
+    step = config['step']
+    lookback = config['lookback']
+
+    namespace = getattr(settings, 'PROMETHEUS_NAMESPACE', 'criticapp')
+    pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
+
+    query_map = {
+        'requests': f'sum(increase(critic_http_requests_total[{lookback}]))',
+        'pod_cpu_cores': (
+            'sum(rate(container_cpu_usage_seconds_total{'
+            f'namespace="{namespace}",pod=~"{pod_regex}",container!="POD",container!=""'
+            '}[5m]))'
+        ),
+        'external_api_calls': f'sum(increase(critic_upstream_api_calls_total[{lookback}]))',
+        'latency_p50': (
+            'histogram_quantile(0.5, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+        ),
+        'latency_p95': (
+            'histogram_quantile(0.95, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+        ),
+        'latency_p99': (
+            'histogram_quantile(0.99, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+        ),
+        'latency_max_approx': (
+            'histogram_quantile(1.0, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+        ),
+    }
+
+    errors = []
+    series = {}
+    for metric_key, query in query_map.items():
+        values, error = _query_prometheus_range(query, start=start, end=end, step=step)
+        series[metric_key] = values
+        if error:
+            errors.append(f'{metric_key}: {error}')
+
+    return {
+        'range': range_key,
+        'step': step,
+        'start': start,
+        'end': end,
+        'available': len(errors) == 0,
+        'errors': errors,
+        'series': series,
     }
 
 

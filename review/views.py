@@ -55,6 +55,20 @@ def monitoring_health(request):
     })
 
 
+@staff_member_required(login_url='users:login')
+def monitoring_timeline(request):
+    range_key = (request.GET.get('range') or '1w').lower()
+    if range_key not in ('1w', '1m'):
+        return JsonResponse({
+            'response': 'False',
+            'error': 'Invalid range. Use 1w or 1m.',
+        }, status=400)
+
+    snapshot = monitoring_metrics.get_timeline_snapshot(range_key)
+    snapshot['response'] = 'True'
+    return JsonResponse(snapshot)
+
+
 def metrics_endpoint(request):
     if settings.METRICS_REQUIRE_AUTH and not (request.user.is_authenticated and request.user.is_staff):
         return HttpResponse('Forbidden', status=403)

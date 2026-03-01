@@ -9,6 +9,57 @@
     <h2>Monitoring Dashboard</h2>
     <p class="text-muted mb-4">Operational metrics for request health, upstream API usage, and process resource usage.</p>
 
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <h5 class="mb-0 me-2">Timeline</h5>
+                <div class="btn-group" role="group" aria-label="Timeline range selector">
+                    <button id="range-1w" type="button" class="btn btn-outline-secondary active" data-range="1w">1 Week</button>
+                    <button id="range-1m" type="button" class="btn btn-outline-secondary" data-range="1m">1 Month</button>
+                </div>
+            </div>
+            <div id="timeline-error" class="alert alert-warning d-none mb-0" role="alert"></div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Requests Over Time</h5>
+                    <canvas id="requests-chart" height="130"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Pod CPU Usage (Cores)</h5>
+                    <canvas id="cpu-chart" height="130"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">External API Calls Over Time</h5>
+                    <canvas id="api-chart" height="130"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Request Latency (Seconds)</h5>
+                    <canvas id="latency-chart" height="130"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="card h-100">
@@ -157,4 +208,197 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    const timelineUrl = "{% url 'review:monitoring_timeline' %}";
+    const timelineErrorEl = document.getElementById('timeline-error');
+    const rangeButtons = Array.from(document.querySelectorAll('[data-range]'));
+    let selectedRange = '1w';
+    let requestsChart = null;
+    let cpuChart = null;
+    let apiChart = null;
+    let latencyChart = null;
+
+    function toLabel(timestampSeconds, rangeKey) {
+        const date = new Date(timestampSeconds * 1000);
+        if (rangeKey === '1m') {
+            return date.toLocaleDateString();
+        }
+        return date.toLocaleString();
+    }
+
+    function parseSeries(points, rangeKey) {
+        return (points || []).map((point) => ({
+            x: toLabel(point.timestamp, rangeKey),
+            y: point.value,
+        }));
+    }
+
+    function destroyCharts() {
+        [requestsChart, cpuChart, apiChart, latencyChart].forEach((chart) => {
+            if (chart) {
+                chart.destroy();
+            }
+        });
+    }
+
+    function setRangeButtons(rangeKey) {
+        rangeButtons.forEach((button) => {
+            const isActive = button.dataset.range === rangeKey;
+            button.classList.toggle('active', isActive);
+        });
+    }
+
+    function hideTimelineError() {
+        timelineErrorEl.classList.add('d-none');
+        timelineErrorEl.textContent = '';
+    }
+
+    function showTimelineError(message) {
+        timelineErrorEl.textContent = message;
+        timelineErrorEl.classList.remove('d-none');
+    }
+
+    function baseChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                },
+            },
+        };
+    }
+
+    function renderCharts(snapshot, rangeKey) {
+        const series = snapshot.series || {};
+
+        requestsChart = new Chart(document.getElementById('requests-chart'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Requests',
+                    data: parseSeries(series.requests, rangeKey),
+                    borderWidth: 2,
+                    tension: 0.2,
+                }],
+            },
+            options: baseChartOptions(),
+        });
+
+        cpuChart = new Chart(document.getElementById('cpu-chart'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'CPU Cores',
+                    data: parseSeries(series.pod_cpu_cores, rangeKey),
+                    borderWidth: 2,
+                    tension: 0.2,
+                }],
+            },
+            options: baseChartOptions(),
+        });
+
+        apiChart = new Chart(document.getElementById('api-chart'), {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'External API Calls',
+                    data: parseSeries(series.external_api_calls, rangeKey),
+                    borderWidth: 2,
+                    tension: 0.2,
+                }],
+            },
+            options: baseChartOptions(),
+        });
+
+        latencyChart = new Chart(document.getElementById('latency-chart'), {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'p50',
+                        data: parseSeries(series.latency_p50, rangeKey),
+                        borderWidth: 2,
+                        tension: 0.2,
+                    },
+                    {
+                        label: 'p95',
+                        data: parseSeries(series.latency_p95, rangeKey),
+                        borderWidth: 2,
+                        tension: 0.2,
+                    },
+                    {
+                        label: 'p99',
+                        data: parseSeries(series.latency_p99, rangeKey),
+                        borderWidth: 2,
+                        tension: 0.2,
+                    },
+                    {
+                        label: 'max (approx)',
+                        data: parseSeries(series.latency_max_approx, rangeKey),
+                        borderWidth: 2,
+                        tension: 0.2,
+                    },
+                ],
+            },
+            options: baseChartOptions(),
+        });
+    }
+
+    async function loadTimeline(rangeKey) {
+        hideTimelineError();
+        const response = await fetch(`${timelineUrl}?range=${rangeKey}`, {
+            headers: {
+                Accept: 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch timeline data.');
+        }
+
+        const payload = await response.json();
+        if (payload.response !== 'True') {
+            throw new Error(payload.error || 'Monitoring timeline API returned an error.');
+        }
+
+        destroyCharts();
+        renderCharts(payload, rangeKey);
+
+        if (payload.errors && payload.errors.length) {
+            showTimelineError(payload.errors.join(' | '));
+        }
+    }
+
+    rangeButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+            const nextRange = button.dataset.range;
+            if (!nextRange || nextRange === selectedRange) {
+                return;
+            }
+
+            selectedRange = nextRange;
+            setRangeButtons(selectedRange);
+
+            try {
+                await loadTimeline(selectedRange);
+            } catch (error) {
+                showTimelineError(error.message || 'Unable to load timeline data.');
+            }
+        });
+    });
+
+    setRangeButtons(selectedRange);
+    loadTimeline(selectedRange).catch((error) => {
+        showTimelineError(error.message || 'Unable to load timeline data.');
+    });
+</script>
 {% endblock content %}

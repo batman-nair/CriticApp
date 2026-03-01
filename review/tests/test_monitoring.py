@@ -126,3 +126,77 @@ class MonitoringEndpointsTest(TestCase):
         payload = allowed_response.json()
         self.assertEqual(payload['response'], 'True')
         self.assertIn('healthy', payload)
+
+    def test_monitoring_timeline_requires_staff(self):
+        response = self.client.get('/monitoring/timeline/?range=1w')
+        self.assertEqual(response.status_code, 302)
+
+        self.client.login(username='monitor_user', password='test-pass-123')
+        non_staff_response = self.client.get('/monitoring/timeline/?range=1w')
+        self.assertEqual(non_staff_response.status_code, 302)
+
+        self.client.logout()
+        self.client.login(username='monitor_admin', password='test-pass-123')
+        allowed_response = self.client.get('/monitoring/timeline/?range=1w')
+        self.assertEqual(allowed_response.status_code, 200)
+        payload = allowed_response.json()
+        self.assertEqual(payload['response'], 'True')
+
+    def test_monitoring_timeline_validates_range(self):
+        self.client.login(username='monitor_admin', password='test-pass-123')
+
+        response = self.client.get('/monitoring/timeline/?range=2w')
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload['response'], 'False')
+
+    @override_settings(PROMETHEUS_BASE_URL='http://prometheus.local:9090')
+    def test_monitoring_timeline_returns_series_payload(self):
+        self.client.login(username='monitor_admin', password='test-pass-123')
+
+        def build_response(v1: str, v2: str):
+            mocked = mock.Mock()
+            mocked.raise_for_status.return_value = None
+            mocked.json.return_value = {
+                'status': 'success',
+                'data': {
+                    'result': [
+                        {
+                            'values': [
+                                [1700000000, v1],
+                                [1700003600, v2],
+                            ],
+                        }
+                    ],
+                },
+            }
+            return mocked
+
+        with mock.patch(
+            'review.utils.metrics.requests.get',
+            side_effect=[
+                build_response('10', '12'),
+                build_response('0.15', '0.2'),
+                build_response('4', '5'),
+                build_response('0.1', '0.11'),
+                build_response('0.2', '0.21'),
+                build_response('0.3', '0.31'),
+                build_response('0.6', '0.7'),
+            ],
+        ):
+            response = self.client.get('/monitoring/timeline/?range=1w')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['response'], 'True')
+        self.assertEqual(payload['range'], '1w')
+        self.assertEqual(payload['step'], '1h')
+        self.assertIn('series', payload)
+        self.assertIn('requests', payload['series'])
+        self.assertIn('pod_cpu_cores', payload['series'])
+        self.assertIn('external_api_calls', payload['series'])
+        self.assertIn('latency_p50', payload['series'])
+        self.assertIn('latency_p95', payload['series'])
+        self.assertIn('latency_p99', payload['series'])
+        self.assertIn('latency_max_approx', payload['series'])
+        self.assertEqual(len(payload['series']['requests']), 2)
