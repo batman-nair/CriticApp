@@ -27,7 +27,9 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h5 class="card-title">Requests Over Time</h5>
-                    <canvas id="requests-chart" height="130"></canvas>
+                    <div class="timeline-chart-container">
+                        <canvas id="requests-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -35,7 +37,9 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h5 class="card-title">Pod CPU Usage (Cores)</h5>
-                    <canvas id="cpu-chart" height="130"></canvas>
+                    <div class="timeline-chart-container">
+                        <canvas id="cpu-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -46,7 +50,9 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h5 class="card-title">External API Calls Over Time</h5>
-                    <canvas id="api-chart" height="130"></canvas>
+                    <div class="timeline-chart-container">
+                        <canvas id="api-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -54,7 +60,9 @@
             <div class="card h-100">
                 <div class="card-body">
                     <h5 class="card-title">Request Latency (Seconds)</h5>
-                    <canvas id="latency-chart" height="130"></canvas>
+                    <div class="timeline-chart-container">
+                        <canvas id="latency-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,6 +216,14 @@
         </div>
     </div>
 </div>
+
+<style>
+    .timeline-chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+    }
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
