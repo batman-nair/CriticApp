@@ -25,4 +25,4 @@ RUN SECRET_KEY=build-secret DJANGO_SETTINGS_MODULE=critic.settings.production DB
 RUN chmod +x /critic/scripts/entrypoint.sh
 
 ENTRYPOINT ["/critic/scripts/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "critic.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "critic.wsgi:application"]
