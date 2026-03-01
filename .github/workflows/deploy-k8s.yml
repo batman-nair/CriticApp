@@ -156,9 +156,13 @@ jobs:
 
           kubectl_cmd create configmap criticapp-config -n "$KUBE_NAMESPACE" \
             --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
-            --from-literal=ALLOWED_HOSTS="${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost}" \
+            --from-literal=ALLOWED_HOSTS="${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost},criticapp-web,criticapp-web.criticapp.svc.cluster.local" \
             --from-literal=CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN}" \
             --from-literal=PROMETHEUS_BASE_URL="${PROMETHEUS_BASE_URL:-}" \
+            --from-literal=SECURE_SSL_REDIRECT="True" \
+            --from-literal=SESSION_COOKIE_SECURE="True" \
+            --from-literal=CSRF_COOKIE_SECURE="True" \
+            --from-literal=WHITENOISE_MAX_AGE="31536000" \
             --dry-run=client -o yaml | kubectl_cmd apply -f -
 
           if [ -n "${LETSENCRYPT_EMAIL:-}" ]; then
