@@ -16,6 +16,11 @@ class _ProviderStub:
         return self._response_by_item_id[item_id]
 
 
+class _ProviderExceptionStub:
+    def get_details(self, item_id):
+        raise RuntimeError(f'boom-{item_id}')
+
+
 class RefreshReviewItemsCommandTest(TestCase):
     def _create_item(self, item_id, **kwargs):
         defaults = {
@@ -101,3 +106,62 @@ class RefreshReviewItemsCommandTest(TestCase):
         self.assertEqual(item.image_url, 'https://example.com/old.jpg')
         self.assertEqual(item.refresh_error_count, 1)
         self.assertIsNotNone(item.last_refresh_attempt_at)
+
+    def test_emits_pushgateway_run_metrics_with_provider_totals(self):
+        item = self._create_item('omdb_push')
+        item.last_refreshed_at = timezone.now() - timedelta(days=30)
+        item.last_refresh_attempt_at = timezone.now() - timedelta(days=30)
+        item.save(update_fields=['last_refreshed_at', 'last_refresh_attempt_at'])
+
+        provider = _ProviderStub({
+            'omdb_push': {
+                'response': 'True',
+                'title': 'Fresh Push Title',
+                'image_url': 'https://example.com/fresh-push.jpg',
+                'year': '2026',
+                'attr1': 'genre',
+                'attr2': 'crew',
+                'attr3': 'movie',
+                'description': 'fresh description',
+                'rating': '9.8',
+            },
+        })
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            with mock.patch('review.management.commands.refresh_review_items.push_refresh_run_metrics') as push_mock:
+                call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0)
+
+        self.assertTrue(push_mock.called)
+        kwargs = push_mock.call_args.kwargs
+        self.assertTrue(kwargs['success'])
+        self.assertEqual(kwargs['processed'], 1)
+        self.assertEqual(kwargs['refreshed'], 1)
+        self.assertEqual(kwargs['failed'], 0)
+        self.assertEqual(kwargs['skipped'], 0)
+        self.assertIn('omdb', kwargs['provider_totals'])
+        self.assertEqual(kwargs['provider_totals']['omdb']['processed'], 1)
+        self.assertEqual(kwargs['provider_totals']['omdb']['refreshed'], 1)
+
+    def test_emits_failed_pushgateway_run_metrics_when_provider_crashes(self):
+        item = self._create_item('omdb_exception')
+        item.last_refreshed_at = timezone.now() - timedelta(days=30)
+        item.last_refresh_attempt_at = timezone.now() - timedelta(days=30)
+        item.save(update_fields=['last_refreshed_at', 'last_refresh_attempt_at'])
+
+        with mock.patch(
+            'review.management.commands.refresh_review_items.Command._build_provider',
+            return_value=_ProviderExceptionStub(),
+        ):
+            with mock.patch('review.management.commands.refresh_review_items.push_refresh_run_metrics') as push_mock:
+                with self.assertRaises(RuntimeError):
+                    call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0)
+
+        self.assertTrue(push_mock.called)
+        kwargs = push_mock.call_args.kwargs
+        self.assertFalse(kwargs['success'])
+        self.assertEqual(kwargs['processed'], 1)
+        self.assertEqual(kwargs['refreshed'], 0)
+        self.assertEqual(kwargs['failed'], 0)
+        self.assertEqual(kwargs['skipped'], 0)
+        self.assertIn('omdb', kwargs['provider_totals'])
+        self.assertEqual(kwargs['provider_totals']['omdb']['processed'], 1)

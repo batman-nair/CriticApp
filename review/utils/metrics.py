@@ -3,12 +3,21 @@ import math
 import logging
 from collections import defaultdict, deque
 from threading import Lock
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import requests
 from django.conf import settings
 from django.http import HttpResponse
-from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, Counter, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    push_to_gateway,
+)
 
 REQUEST_TOTAL = Counter(
     'critic_http_requests_total',
@@ -43,6 +52,91 @@ _logger = logging.getLogger(__name__)
 KNOWN_UPSTREAM_PROVIDERS = ('omdb', 'rawg', 'jikan')
 _PROVIDER_EVENT_RETENTION_SECONDS = 35 * 24 * 60 * 60
 _provider_events = defaultdict(deque)
+
+
+def push_refresh_run_metrics(
+    *,
+    processed: int,
+    refreshed: int,
+    failed: int,
+    skipped: int,
+    duration_seconds: float,
+    dry_run: bool,
+    success: bool,
+    provider_totals: Dict[str, Dict[str, int]],
+):
+    pushgateway_url = getattr(settings, 'PUSHGATEWAY_URL', '').rstrip('/')
+    if not pushgateway_url:
+        return
+
+    job_name = getattr(settings, 'PUSHGATEWAY_JOB_NAME', 'critic_refresh_review_items')
+    timeout_seconds = max(getattr(settings, 'PUSHGATEWAY_TIMEOUT_SECONDS', 5), 1)
+    dry_run_label = 'true' if dry_run else 'false'
+    status_label = 'success' if success else 'failure'
+
+    registry = CollectorRegistry()
+    run_status = Gauge(
+        'critic_refresh_run_status',
+        'Refresh command status (1 for success, 0 for failure).',
+        ['status', 'dry_run'],
+        registry=registry,
+    )
+    run_duration = Gauge(
+        'critic_refresh_run_duration_seconds',
+        'Total duration of refresh command run in seconds.',
+        ['dry_run'],
+        registry=registry,
+    )
+    run_timestamp = Gauge(
+        'critic_refresh_run_last_timestamp_seconds',
+        'Unix timestamp of the latest refresh command completion.',
+        ['dry_run'],
+        registry=registry,
+    )
+    run_item_totals = Gauge(
+        'critic_refresh_run_items_total',
+        'Per-run refresh item totals by result.',
+        ['result', 'dry_run'],
+        registry=registry,
+    )
+    provider_item_totals = Gauge(
+        'critic_refresh_run_provider_items_total',
+        'Per-run refresh item totals by provider and result.',
+        ['provider', 'result', 'dry_run'],
+        registry=registry,
+    )
+
+    run_status.labels(status=status_label, dry_run=dry_run_label).set(1.0)
+    run_duration.labels(dry_run=dry_run_label).set(max(duration_seconds, 0.0))
+    run_timestamp.labels(dry_run=dry_run_label).set(time.time())
+
+    totals_by_result = {
+        'processed': processed,
+        'refreshed': refreshed,
+        'failed': failed,
+        'skipped': skipped,
+    }
+    for result, count in totals_by_result.items():
+        run_item_totals.labels(result=result, dry_run=dry_run_label).set(max(count, 0))
+
+    for provider, totals in sorted(provider_totals.items()):
+        safe_provider = normalize_provider(provider)
+        for result in ('processed', 'refreshed', 'failed', 'skipped'):
+            provider_item_totals.labels(
+                provider=safe_provider,
+                result=result,
+                dry_run=dry_run_label,
+            ).set(max(totals.get(result, 0), 0))
+
+    try:
+        push_to_gateway(
+            gateway=pushgateway_url,
+            job=job_name,
+            registry=registry,
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        _logger.warning('Pushgateway metrics push failed: %s', exc.__class__.__name__)
 
 
 def normalize_provider(source_name: str) -> str:

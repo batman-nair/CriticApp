@@ -1,5 +1,6 @@
 from datetime import timedelta
 import time
+from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -7,6 +8,7 @@ from django.utils import timezone
 
 from review.models import ReviewItem
 from review.utils import api_utils
+from review.utils.metrics import normalize_provider, push_refresh_run_metrics
 
 
 class Command(BaseCommand):
@@ -44,11 +46,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        started_monotonic = time.monotonic()
         stale_days = options['stale_days']
         max_items = options['max_items']
         min_retry_hours = options['min_retry_hours']
         dry_run = options['dry_run']
         request_delay_ms = options['request_delay_ms']
+        emit_metrics = False
+        run_success = False
 
         if stale_days < 0:
             self.stderr.write(self.style.ERROR('--stale-days must be >= 0'))
@@ -62,6 +67,8 @@ class Command(BaseCommand):
         if request_delay_ms < 0:
             self.stderr.write(self.style.ERROR('--request-delay-ms must be >= 0'))
             return
+
+        emit_metrics = True
 
         now = timezone.now()
         stale_cutoff = now - timedelta(days=stale_days)
@@ -80,67 +87,96 @@ class Command(BaseCommand):
         refreshed = 0
         failed = 0
         skipped = 0
+        provider_totals = defaultdict(lambda: defaultdict(int))
 
-        for item in stale_items:
-            processed += 1
-            provider = providers.get(item.category)
-            if item.category not in providers:
-                provider = self._build_provider(item.category)
-                providers[item.category] = provider
+        try:
+            for item in stale_items:
+                processed += 1
+                provider_name = self._provider_name_for_category(item.category)
+                provider_totals[provider_name]['processed'] += 1
+                provider = providers.get(item.category)
+                if item.category not in providers:
+                    provider = self._build_provider(item.category)
+                    providers[item.category] = provider
 
-            if provider is None:
-                skipped += 1
-                self.stderr.write(self.style.WARNING(
-                    f'Skipping {item.item_id}: no provider available for category "{item.category}".'
-                ))
-                if not dry_run:
-                    item.last_refresh_attempt_at = now
-                    item.refresh_error_count += 1
-                    item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
-                continue
+                if provider is None:
+                    skipped += 1
+                    provider_totals[provider_name]['skipped'] += 1
+                    self.stderr.write(self.style.WARNING(
+                        f'Skipping {item.item_id}: no provider available for category "{item.category}".'
+                    ))
+                    if not dry_run:
+                        item.last_refresh_attempt_at = now
+                        item.refresh_error_count += 1
+                        item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
+                    continue
 
-            if request_delay_ms:
-                time.sleep(request_delay_ms / 1000)
+                if request_delay_ms:
+                    time.sleep(request_delay_ms / 1000)
 
-            details = provider.get_details(item.item_id)
-            if details.get('response') != 'True':
-                failed += 1
-                if not dry_run:
-                    item.last_refresh_attempt_at = now
-                    item.refresh_error_count += 1
-                    item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
-                err_message = details.get("error", "Unknown error")
-                status_code = details.get("status_code")
-                upstream_reason = details.get("upstream_reason")
-                if status_code:
-                    err_message = f'{err_message} status={status_code}'
-                if upstream_reason:
-                    err_message = f'{err_message} reason={upstream_reason}'
-                self.stderr.write(self.style.WARNING(
-                    f'Failed refresh for {item.item_id}: {err_message}.'
-                ))
-                continue
+                details = provider.get_details(item.item_id)
+                if details.get('response') != 'True':
+                    failed += 1
+                    provider_totals[provider_name]['failed'] += 1
+                    if not dry_run:
+                        item.last_refresh_attempt_at = now
+                        item.refresh_error_count += 1
+                        item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
+                    err_message = details.get("error", "Unknown error")
+                    status_code = details.get("status_code")
+                    upstream_reason = details.get("upstream_reason")
+                    if status_code:
+                        err_message = f'{err_message} status={status_code}'
+                    if upstream_reason:
+                        err_message = f'{err_message} reason={upstream_reason}'
+                    self.stderr.write(self.style.WARNING(
+                        f'Failed refresh for {item.item_id}: {err_message}.'
+                    ))
+                    continue
 
-            refreshed += 1
-            if dry_run:
-                continue
+                refreshed += 1
+                provider_totals[provider_name]['refreshed'] += 1
+                if dry_run:
+                    continue
 
-            item.title = details.get('title', item.title)
-            item.image_url = details.get('image_url', item.image_url)
-            item.year = details.get('year', item.year)
-            item.attr1 = details.get('attr1', item.attr1)
-            item.attr2 = details.get('attr2', item.attr2)
-            item.attr3 = details.get('attr3', item.attr3)
-            item.description = details.get('description', item.description)
-            item.rating = str(details.get('rating', item.rating))
-            item.last_refreshed_at = now
-            item.last_refresh_attempt_at = now
-            item.refresh_error_count = 0
-            item.save()
+                item.title = details.get('title', item.title)
+                item.image_url = details.get('image_url', item.image_url)
+                item.year = details.get('year', item.year)
+                item.attr1 = details.get('attr1', item.attr1)
+                item.attr2 = details.get('attr2', item.attr2)
+                item.attr3 = details.get('attr3', item.attr3)
+                item.description = details.get('description', item.description)
+                item.rating = str(details.get('rating', item.rating))
+                item.last_refreshed_at = now
+                item.last_refresh_attempt_at = now
+                item.refresh_error_count = 0
+                item.save()
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Refresh complete. processed={processed} refreshed={refreshed} failed={failed} skipped={skipped} dry_run={dry_run}'
-        ))
+            self.stdout.write(self.style.SUCCESS(
+                f'Refresh complete. processed={processed} refreshed={refreshed} failed={failed} skipped={skipped} dry_run={dry_run}'
+            ))
+            run_success = True
+        finally:
+            if emit_metrics:
+                push_refresh_run_metrics(
+                    processed=processed,
+                    refreshed=refreshed,
+                    failed=failed,
+                    skipped=skipped,
+                    duration_seconds=time.monotonic() - started_monotonic,
+                    dry_run=dry_run,
+                    success=run_success,
+                    provider_totals=provider_totals,
+                )
+
+    def _provider_name_for_category(self, category):
+        if category == 'movie':
+            return 'omdb'
+        if category == 'game':
+            return 'rawg'
+        if category in ('anime', 'manga'):
+            return 'jikan'
+        return normalize_provider(category)
 
     def _build_provider(self, category):
         try:

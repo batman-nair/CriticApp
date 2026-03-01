@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: criticapp-pushgateway
+  namespace: criticapp
+  labels:
+    app: criticapp-pushgateway
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: criticapp-pushgateway
+  namespaceSelector:
+    matchNames:
+      - criticapp
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: criticapp-pushgateway
+  namespace: criticapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: criticapp-pushgateway
+  template:
+    metadata:
+      labels:
+        app: criticapp-pushgateway
+    spec:
+      containers:
+        - name: pushgateway
+          image: prom/pushgateway:v1.11.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9091
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: criticapp-pushgateway
+  namespace: criticapp
+  labels:
+    app: criticapp-pushgateway
+spec:
+  selector:
+    app: criticapp-pushgateway
+  ports:
+    - name: http
+      port: 9091
+      targetPort: 9091
+  type: ClusterIP
