@@ -1,4 +1,5 @@
 import time
+import math
 from collections import defaultdict, deque
 from threading import Lock
 from typing import Optional, Tuple
@@ -185,14 +186,45 @@ def _query_prometheus_range(query: str, start: int, end: int, step: str) -> Tupl
         if len(pair) < 2:
             continue
         try:
+            parsed_value = float(pair[1])
+            if not math.isfinite(parsed_value):
+                parsed_value = 0.0
             points.append({
                 'timestamp': int(float(pair[0])),
-                'value': float(pair[1]),
+                'value': parsed_value,
             })
         except (TypeError, ValueError):
             continue
 
     return points, None
+
+
+def _step_to_seconds(step: str) -> int:
+    if not step:
+        return 3600
+    suffix = step[-1]
+    try:
+        amount = int(step[:-1])
+    except ValueError:
+        return 3600
+
+    unit_map = {
+        's': 1,
+        'm': 60,
+        'h': 3600,
+        'd': 86400,
+    }
+    return max(amount * unit_map.get(suffix, 3600), 1)
+
+
+def _build_zero_series(start: int, end: int, step: str) -> list:
+    increment = _step_to_seconds(step)
+    points = []
+    current = start
+    while current <= end:
+        points.append({'timestamp': current, 'value': 0.0})
+        current += increment
+    return points
 
 
 def _infrastructure_metrics() -> dict:
@@ -281,28 +313,28 @@ def get_timeline_snapshot(range_key: str) -> dict:
     pod_regex = getattr(settings, 'PROMETHEUS_POD_REGEX', 'criticapp-web.*')
 
     query_map = {
-        'requests': f'sum(increase(critic_http_requests_total[{lookback}]))',
+        'requests': f'(sum(increase(critic_http_requests_total[{lookback}])) or vector(0))',
         'pod_cpu_cores': (
             'sum(rate(container_cpu_usage_seconds_total{'
             f'namespace="{namespace}",pod=~"{pod_regex}",container!="POD",container!=""'
             '}[5m]))'
         ),
-        'external_api_calls': f'sum(increase(critic_upstream_api_calls_total[{lookback}]))',
+        'external_api_calls': f'(sum(increase(critic_upstream_api_calls_total[{lookback}])) or vector(0))',
         'latency_p50': (
-            'histogram_quantile(0.5, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+            '(histogram_quantile(0.5, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_p95': (
-            'histogram_quantile(0.95, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+            '(histogram_quantile(0.95, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_p99': (
-            'histogram_quantile(0.99, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+            '(histogram_quantile(0.99, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
         'latency_max_approx': (
-            'histogram_quantile(1.0, '
-            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le))'
+            '(histogram_quantile(1.0, '
+            f'sum(rate(critic_http_request_latency_seconds_bucket[{lookback}])) by (le)) or vector(0))'
         ),
     }
 
@@ -310,6 +342,8 @@ def get_timeline_snapshot(range_key: str) -> dict:
     series = {}
     for metric_key, query in query_map.items():
         values, error = _query_prometheus_range(query, start=start, end=end, step=step)
+        if not values and not error:
+            values = _build_zero_series(start=start, end=end, step=step)
         series[metric_key] = values
         if error:
             errors.append(f'{metric_key}: {error}')
