@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -69,6 +70,7 @@ def monitoring_timeline(request):
     return JsonResponse(snapshot)
 
 
+@csrf_exempt
 def metrics_endpoint(request):
     if settings.METRICS_REQUIRE_AUTH and not (request.user.is_authenticated and request.user.is_staff):
         return HttpResponse('Forbidden', status=403)
