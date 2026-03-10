@@ -1,7 +1,7 @@
 asgiref==3.11.1
 certifi==2026.1.4
 charset-normalizer==3.4.4
-Django==5.2.11
+Django==5.2.12
 djangorestframework==3.16.1
 gunicorn==25.0.2
 idna==3.11
