@@ -109,6 +109,7 @@ jobs:
           KUBE_NAMESPACE: ${{ env.KUBE_NAMESPACE }}
           IMAGE_TAG: ${{ github.sha }}
           APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+          GRAFANA_DOMAIN: ${{ secrets.GRAFANA_DOMAIN }}
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
           CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
           LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
@@ -128,7 +129,7 @@ jobs:
           REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
 
           ssh -p "$PORT" "$SSH_USER@$SSH_HOST" \
-            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' PROMETHEUS_BASE_URL='$PROMETHEUS_BASE_URL' PUSHGATEWAY_URL='$PUSHGATEWAY_URL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
+            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' GRAFANA_DOMAIN='$GRAFANA_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' PROMETHEUS_BASE_URL='$PROMETHEUS_BASE_URL' PUSHGATEWAY_URL='$PUSHGATEWAY_URL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
           set -euo pipefail
 
           if kubectl get ns >/dev/null 2>&1; then
@@ -153,6 +154,7 @@ jobs:
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/pushgateway.yaml"
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/service.yaml"
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/deployment.yaml"
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/servicemonitor.yaml"
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/pushgateway-servicemonitor.yaml"
 
           kubectl_cmd rollout status deployment/criticapp-postgres -n "$KUBE_NAMESPACE" --timeout=300s
@@ -177,6 +179,10 @@ jobs:
 
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/middleware.yaml"
           sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
+
+          if [ -n "${GRAFANA_DOMAIN:-}" ]; then
+            sed "s|__GRAFANA_DOMAIN__|$GRAFANA_DOMAIN|g" "$REMOTE_DIR/k8s/grafana-ingress.yaml" | kubectl_cmd apply -f -
+          fi
 
           kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
           sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/migration-job.yaml" | kubectl_cmd apply -f -
