@@ -157,6 +157,10 @@ jobs:
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/servicemonitor.yaml"
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/pushgateway-servicemonitor.yaml"
 
+          if kubectl_cmd get namespace monitoring >/dev/null 2>&1; then
+            kubectl_cmd apply -f "$REMOTE_DIR/k8s/grafana-dashboard-criticapp.yaml"
+          fi
+
           kubectl_cmd rollout status deployment/criticapp-postgres -n "$KUBE_NAMESPACE" --timeout=300s
 
           kubectl_cmd create configmap criticapp-config -n "$KUBE_NAMESPACE" \

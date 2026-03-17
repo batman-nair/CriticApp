@@ -1,0 +1,355 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: criticapp-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  criticapp-overview.json: |
+    {
+      "id": null,
+      "uid": "criticapp-overview",
+      "title": "CriticApp Overview",
+      "tags": ["criticapp", "prometheus"],
+      "timezone": "",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Request Rate (RPS)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(critic_http_requests_total{namespace=\"criticapp\",service=\"criticapp-web\"}[5m]))",
+              "legendFormat": "requests/s"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Request Rate by Status",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (status_code) (rate(critic_http_requests_total{namespace=\"criticapp\",service=\"criticapp-web\"}[5m]))",
+              "legendFormat": "{{status_code}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "5xx Failure Rate (%)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 0
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "100 * sum(rate(critic_http_request_failures_total{namespace=\"criticapp\",service=\"criticapp-web\"}[5m])) / clamp_min(sum(rate(critic_http_requests_total{namespace=\"criticapp\",service=\"criticapp-web\"}[5m])), 0.001)",
+              "legendFormat": "failure %"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "P95 Request Latency",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum(rate(critic_http_request_latency_seconds_bucket{namespace=\"criticapp\",service=\"criticapp-web\"}[5m])) by (le))",
+              "legendFormat": "p95"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Upstream API Calls (15m Increase)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (provider, outcome) (increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\"}[15m]))",
+              "legendFormat": "{{provider}}/{{outcome}}"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "stat",
+          "title": "Last Refresh Status (0/1)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 0,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(critic_refresh_run_status{job=\"critic_refresh_review_items\",dry_run=\"false\"})",
+              "legendFormat": "status"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "stat",
+          "title": "Last Refresh Duration (s)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 6,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(critic_refresh_run_duration_seconds{job=\"critic_refresh_review_items\",dry_run=\"false\"})",
+              "legendFormat": "duration"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "Last Refresh Completed",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 12,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dateTimeFromNow"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max(critic_refresh_run_last_timestamp_seconds{job=\"critic_refresh_review_items\",dry_run=\"false\"})",
+              "legendFormat": "last run"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "type": "barchart",
+          "title": "Last Refresh Items by Result",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 6,
+            "x": 18,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by (result) (critic_refresh_run_items_total{job=\"critic_refresh_review_items\",dry_run=\"false\"})",
+              "legendFormat": "{{result}}"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "table",
+          "title": "Last Refresh Provider Totals",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by (provider, result) (critic_refresh_run_provider_items_total{job=\"critic_refresh_review_items\",dry_run=\"false\"})",
+              "legendFormat": "{{provider}} {{result}}",
+              "format": "table"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Process Memory (RSS)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 22
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(process_resident_memory_bytes{namespace=\"criticapp\",service=\"criticapp-web\"})",
+              "legendFormat": "rss"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "Process CPU and Open FDs",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 22
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(process_cpu_seconds_total{namespace=\"criticapp\",service=\"criticapp-web\"}[5m]))",
+              "legendFormat": "cpu cores"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(process_open_fds{namespace=\"criticapp\",service=\"criticapp-web\"})",
+              "legendFormat": "open fds"
+            }
+          ]
+        }
+      ]
+    }
