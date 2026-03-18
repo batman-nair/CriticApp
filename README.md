@@ -1,83 +1,52 @@
 # Critic App
 
-> A WIP. I use it personally to store reviews. You can try it out if you want.
+Critic App is my personal review tracker.
 
-A place to store your personal reviews.
+I built it because I kept forgetting what I watched, played, or wanted to recommend. The goal was simple: make it fast to add a review, easy to search later, and pleasant to use on both desktop and mobile.
 
-Ever had a brain fart moment when someone asked you for your top horror movies or for indie game suggestions? Yeah, me too. This is a solution to that to provide a database for your reviews so they are easily retrievable. Some required features:
-- **Easy to add** - Minimum friction on adding new reviews. Autocomplete details, no big reviews needed. Just a rating number is good enough.
-- **Easy to fetch** - Should be possible to do keyword searches like 'horror', 'anime', or just an actor or writer name.
-- **Mobile compatible** - Shouldn't have to open a laptop for adding or searching reviews.
-- **Extensible** - New categories should be easy to add on. Maybe I want to review tweets later. As long as there is a details source, should be easy to add on.
+It has also been a way to build and run a full-stack Django project end-to-end, including deployment and operations workflows.
 
-## How to host
+## What It Does
 
-### Docker Deployment (Recommended)
+- Stores personal reviews across movie, game, anime, and manga categories
+- Fetches item metadata from OMDb, RAWG, and Jikan
+- Supports user profiles and searchable review lists
+- Exposes API endpoints for review CRUD and item lookups
+- Includes monitoring with Prometheus metrics and Grafana dashboards
 
-For production deployment using Docker Compose with Postgres and Nginx, see [DEPLOYMENT.md](DEPLOYMENT.md).
+## Technical Stuff
 
-Quick start:
-```bash
-# Clone repo
-git clone <your-repo> criticapp && cd criticapp
+- Django + Django REST Framework backend
+- Custom user model and app-level review domain modeling
+- Category-based external API integration layer
+- Docker-based development and test workflows
+- Kubernetes (k3s) production deployment path
+- GitHub Actions deployment pipeline
+- Prometheus-friendly metrics and background refresh jobs
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
+## Run Locally
 
-# Start services
-docker compose up -d --build
+- Set up `.env` from `.env.example`
+- Use `make dev` to run the app
+- Use `make test` to run tests
 
-# Create superuser
-docker compose exec web python manage.py createsuperuser
-```
+## Environment Notes
 
-## API Keys
+Start from `.env.example` and set values for:
 
-These API keys need to be set for fetching details in their category:
+- `SECRET_KEY`
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `OMDB_API_KEY`, `RAWG_API_KEY` (for metadata enrichment)
 
-`OMDB_API_KEY` for movies - get from [OMDb](https://www.omdbapi.com/)
+## Deployment
 
-`RAWG_API_KEY` for games - get from [RAWG](https://rawg.io/)
+If you want to deploy your own copy, use the Kubernetes guide in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-The above API keys need to be set as environment variables either by creating a `.env` file in the repo root.
-You can use the `.env.example` as reference if needed.
+## Contributing
 
-## Local testing
+Contributions are welcome.
 
-Use a single command for local tests:
-
-```bash
-make test
-```
-
-Notes:
-- `make test` runs tests in Docker with Django test settings (`critic.settings.test`) and SQLite, so it does not require a Postgres test database to exist.
-- If you want to run tests directly on host Python, use:
-
-```bash
-make test-local
-```
-
-- If you want a fresh local test database state, run:
-
-```bash
-make test-reset && make test
-```
-
-- `make test-docker` is an explicit alias for the same Dockerized test flow:
-
-```bash
-make test-docker
-```
-
-## Screenshots
-
-While not so great, this is how the current version looks like this. Would probably change
-
-![Main view](screenshots/2023-11-11_laptop.png)
-![Review info](screenshots/2023-11-11_laptop_info.png)
-![Add review page](screenshots/2023-11-11_laptop_add_review.png)
+If you spot a bug, have an idea, or want to improve docs/tests/features, open an issue or submit a PR.
 
 
 

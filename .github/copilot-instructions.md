@@ -38,7 +38,7 @@
 - External item providers are OMDb, RAWG, and Jikan in `review/utils/api_utils.py`.
 - Required env vars include `SECRET_KEY`, database `DB_*`, `OMDB_API_KEY`, and `RAWG_API_KEY`.
 - Compose production mounts static files via `./static:/critic/static` and uses `postgres_data` (`docker-compose.yml`).
-- Deployment targets include Docker Compose and k3s manifests in `k8s/` (see `DEPLOYMENT.md`).
+- Deployment targets include Docker Compose and k3s manifests in `k8s/` (see `docs/DEPLOYMENT.md`).
 
 ## Security
 - Write protection is enforced with DRF permissions in `review/permissions.py` (`IsOwnerOrReadOnly`).
