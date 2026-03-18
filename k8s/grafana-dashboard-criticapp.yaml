@@ -14,7 +14,7 @@ data:
       "tags": ["criticapp", "prometheus"],
       "timezone": "",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "refresh": "30s",
       "time": {
         "from": "now-6h",
@@ -136,7 +136,7 @@ data:
         {
           "id": 5,
           "type": "timeseries",
-          "title": "Upstream API Calls (15m Increase)",
+          "title": "Upstream API Calls",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -156,8 +156,95 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "sum by (provider, outcome) (increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\"}[15m]))",
+              "expr": "sum by (provider, outcome) (increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\"}[$__range]))",
               "legendFormat": "{{provider}}/{{outcome}}"
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "type": "stat",
+          "title": "Jikan Requests",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 0,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\",provider=\"jikan\"}[$__range])) or vector(0)",
+              "legendFormat": "jikan"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "type": "stat",
+          "title": "OMDb Requests",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 8,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\",provider=\"omdb\"}[$__range])) or vector(0)",
+              "legendFormat": "omdb"
+            }
+          ]
+        },
+        {
+          "id": 15,
+          "type": "stat",
+          "title": "RAWG Requests",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 8,
+            "x": 16,
+            "y": 16
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(critic_upstream_api_calls_total{namespace=\"criticapp\",service=\"criticapp-web\",provider=\"rawg\"}[$__range])) or vector(0)",
+              "legendFormat": "rawg"
             }
           ]
         },
@@ -173,7 +260,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 0,
-            "y": 16
+            "y": 22
           },
           "fieldConfig": {
             "defaults": {
@@ -201,7 +288,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 6,
-            "y": 16
+            "y": 22
           },
           "fieldConfig": {
             "defaults": {
@@ -229,7 +316,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 12,
-            "y": 16
+            "y": 22
           },
           "fieldConfig": {
             "defaults": {
@@ -257,7 +344,7 @@ data:
             "h": 6,
             "w": 6,
             "x": 18,
-            "y": 16
+            "y": 22
           },
           "fieldConfig": {
             "defaults": {
@@ -285,7 +372,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 22
+            "y": 28
           },
           "targets": [
             {
@@ -308,7 +395,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 22
+            "y": 28
           },
           "fieldConfig": {
             "defaults": {
@@ -336,7 +423,7 @@ data:
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 22
+            "y": 28
           },
           "targets": [
             {
