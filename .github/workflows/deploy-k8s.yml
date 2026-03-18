@@ -113,7 +113,6 @@ jobs:
           ALLOWED_HOSTS: ${{ secrets.ALLOWED_HOSTS }}
           CSRF_TRUSTED_ORIGINS: ${{ secrets.CSRF_TRUSTED_ORIGINS }}
           LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
-          PROMETHEUS_BASE_URL: ${{ secrets.PROMETHEUS_BASE_URL }}
           PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
         run: |
           if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
@@ -129,7 +128,7 @@ jobs:
           REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
 
           ssh -p "$PORT" "$SSH_USER@$SSH_HOST" \
-            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' GRAFANA_DOMAIN='$GRAFANA_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' PROMETHEUS_BASE_URL='$PROMETHEUS_BASE_URL' PUSHGATEWAY_URL='$PUSHGATEWAY_URL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
+            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' GRAFANA_DOMAIN='$GRAFANA_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' PUSHGATEWAY_URL='$PUSHGATEWAY_URL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
           set -euo pipefail
 
           if kubectl get ns >/dev/null 2>&1; then
@@ -167,7 +166,6 @@ jobs:
             --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
             --from-literal=ALLOWED_HOSTS="${ALLOWED_HOSTS:-$APP_DOMAIN,127.0.0.1,localhost},criticapp-web,criticapp-web.criticapp.svc.cluster.local" \
             --from-literal=CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://$APP_DOMAIN}" \
-            --from-literal=PROMETHEUS_BASE_URL="${PROMETHEUS_BASE_URL:-}" \
             --from-literal=PUSHGATEWAY_URL="${PUSHGATEWAY_URL:-http://criticapp-pushgateway.$KUBE_NAMESPACE.svc.cluster.local:9091}" \
             --from-literal=PUSHGATEWAY_JOB_NAME="critic_refresh_review_items" \
             --from-literal=PUSHGATEWAY_TIMEOUT_SECONDS="5" \

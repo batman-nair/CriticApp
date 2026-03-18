@@ -136,12 +136,6 @@ MESSAGE_TAGS = {
 }
 
 METRICS_REQUIRE_AUTH = os.environ.get('METRICS_REQUIRE_AUTH', 'False').lower() == 'true'
-MONITORING_FAILURE_RATE_THRESHOLD = float(os.environ.get('MONITORING_FAILURE_RATE_THRESHOLD', '0.15'))
-MONITORING_WINDOW_SECONDS = int(os.environ.get('MONITORING_WINDOW_SECONDS', '300'))
-PROMETHEUS_BASE_URL = os.environ.get('PROMETHEUS_BASE_URL', '').rstrip('/')
-PROMETHEUS_QUERY_TIMEOUT_SECONDS = int(os.environ.get('PROMETHEUS_QUERY_TIMEOUT_SECONDS', '3'))
-PROMETHEUS_NAMESPACE = os.environ.get('PROMETHEUS_NAMESPACE', 'criticapp')
-PROMETHEUS_POD_REGEX = os.environ.get('PROMETHEUS_POD_REGEX', 'criticapp-web.*')
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', '').rstrip('/')
 PUSHGATEWAY_JOB_NAME = os.environ.get('PUSHGATEWAY_JOB_NAME', 'critic_refresh_review_items')
 PUSHGATEWAY_TIMEOUT_SECONDS = int(os.environ.get('PUSHGATEWAY_TIMEOUT_SECONDS', '5'))
