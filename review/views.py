@@ -19,6 +19,7 @@ from .serializers import ReviewItemSerializer, ReviewSerializer
 from .utils import api_utils, review_utils, metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
+from .response_formatters import success_response, error_response, legacy_success_response, legacy_error_response
 
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'movie': api_utils.OMDBItemAPI(),
@@ -184,3 +185,203 @@ def get_user_review(request, item_id):
     json_data["category"] = review.review_item.category  # Have a custom serializer instead?
     return JsonResponse(json_data)
 
+
+# ============================================================================
+# API v2 Views - RFC-compliant response format
+# ============================================================================
+
+class ReviewListV2(APIView):
+    """
+    List all reviews with filtering and sorting.
+    
+    Returns RFC-compliant v2 response format: {"data": [...], "meta": {...}}
+    Supports query parameters: ?query=..., ?username=..., ?categories=..., ?ordering=...
+    """
+    class OutputSerializer(serializers.ModelSerializer):
+        user = serializers.ReadOnlyField(source='user.username')
+        review_item = ReviewItemSerializer()
+        class Meta:
+            model = Review
+            fields = '__all__'
+
+    def get(self, request):
+        reviews = Review.objects.select_related('user', 'review_item').all()
+        query = request.GET.get('query', '')
+        username = request.GET.get('username', '')
+        filter_categories = request.GET.getlist('filter_categories')
+        ordering = request.GET.get('ordering', '')
+        reviews = review_utils.get_filtered_review_objects(query, username, filter_categories, ordering)
+        data = self.OutputSerializer(reviews, many=True).data
+        
+        return Response(success_response(data, meta={"version": "2.0"}))
+
+
+class ReviewCreateV2(generics.CreateAPIView):
+    """
+    Create a new review.
+    
+    Requires authentication. Returns RFC-compliant v2 response.
+    Duplicate reviews (same user + item) return detailed error.
+    """
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        try:
+            response = super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                error_response(
+                    code="DUPLICATE_REVIEW",
+                    message="You've already reviewed this item.",
+                    details={"constraint": "unique(user, review_item)"},
+                    status_code=status.HTTP_400_BAD_REQUEST
+                ),
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if response.status_code == status.HTTP_201_CREATED:
+            return Response(
+                success_response(response.data, meta={"version": "2.0"}),
+                status=status.HTTP_201_CREATED
+            )
+        
+        return Response(
+            error_response(
+                code="INVALID_REQUEST",
+                message="Failed to create review.",
+                details={},
+                status_code=status.HTTP_400_BAD_REQUEST
+            ),
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update, or delete a specific review.
+    
+    Returns RFC-compliant v2 response format.
+    Only the review owner can modify.
+    """
+    queryset = Review.objects.select_related('user', 'review_item').all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        return Response(success_response(response.data, meta={"version": "2.0"}))
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return Response(success_response(response.data, meta={"version": "2.0"}))
+
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return Response(
+            success_response({"deleted": True}, meta={"version": "2.0"}),
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+class ReviewPostV2(APIView):
+    """
+    Create or update review via form submission (v2 format).
+    
+    Supports both create and update in a single POST.
+    Returns RFC-compliant v2 response.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        error_code = None
+        error_details = {}
+        is_update = False
+        review_data = request.data
+        
+        try:
+            review_obj = None
+            if review_data.get('id'):
+                is_update = True
+                review_obj = Review.objects.get(id=review_data['id'])
+                if review_obj.user != request.user:
+                    return Response(
+                        error_response(
+                            code="PERMISSION_DENIED",
+                            message="You do not have permission to edit this review.",
+                            status_code=status.HTTP_403_FORBIDDEN
+                        ),
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            
+            serializer = ReviewSerializer(review_obj, review_data)
+            if not serializer.is_valid():
+                return Response(
+                    error_response(
+                        code="VALIDATION_ERROR",
+                        message="Invalid review data.",
+                        details=serializer.errors,
+                        status_code=status.HTTP_400_BAD_REQUEST
+                    ),
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            serializer.save(user=request.user)
+            action = "updated" if is_update else "created"
+            return Response(
+                success_response(
+                    {"message": f"Review {action} successfully", "review": serializer.data},
+                    meta={"version": "2.0"}
+                ),
+                status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED
+            )
+            
+        except Review.DoesNotExist:
+            return Response(
+                error_response(
+                    code="NOT_FOUND",
+                    message="Review not found.",
+                    status_code=status.HTTP_404_NOT_FOUND
+                ),
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except IntegrityError:
+            return Response(
+                error_response(
+                    code="DUPLICATE_REVIEW",
+                    message="You've already reviewed this item.",
+                    details={"constraint": "unique(user, review_item)"},
+                    status_code=status.HTTP_400_BAD_REQUEST
+                ),
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+@login_required
+def get_user_review_v2(request, item_id):
+    """
+    Get the authenticated user's review for a specific item (v2 format).
+    
+    Returns RFC-compliant v2 response.
+    """
+    try:
+        review = Review.objects.select_related('user', 'review_item').get(
+            user=request.user,
+            review_item__item_id=item_id
+        )
+        json_data = ReviewSerializer(review).data
+        json_data["category"] = review.review_item.category
+        return JsonResponse(success_response(json_data, meta={"version": "2.0"}))
+    except Review.DoesNotExist:
+        return JsonResponse(
+            error_response(
+                code="NOT_FOUND",
+                message="Review not found for this item.",
+                status_code=status.HTTP_404_NOT_FOUND
+            ),
+            status=status.HTTP_404_NOT_FOUND
+        )
