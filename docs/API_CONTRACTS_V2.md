@@ -107,7 +107,6 @@ All error responses follow this structure:
 | `NOT_FOUND` | 404 | Resource not found |
 | `PERMISSION_DENIED` | 403 | Authenticated but not owner or insufficient permissions |
 | `UNAUTHENTICATED` | 403 | Authentication required but not provided |
-| `RATE_LIMITED` | 429 | Too many requests; see `Retry-After` header |
 | `INTERNAL_ERROR` | 500 | Server error |
 
 ---
@@ -123,7 +122,10 @@ List all reviews with filtering and sorting.
 - `query` (string, optional): Search term across title, tags, description
 - `username` (string, optional): Filter by username
 - `categories` (list, optional): **FIXED**: Include only these categories (comma-separated)
+- `exclude_categories` (list, optional): Exclude these categories (comma-separated)
 - `ordering` (string, optional): Sort by `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`, `relevance`
+- `limit` (integer, optional): Number of results to return (default 20)
+- `offset` (integer, optional): Starting index for paginated results
 
 **Response** (200):
 ```json
@@ -152,7 +154,12 @@ List all reviews with filtering and sorting.
     }
   ],
   "meta": {
-    "version": "2.0"
+    "version": "2.0",
+    "pagination": {
+      "count": 120,
+      "limit": 20,
+      "offset": 0
+    }
   }
 }
 ```
@@ -424,7 +431,7 @@ Create or update a review via form submission (v2 format).
 ### External Item Lookup
 
 #### `GET /search_item/<category>/<search_term>`
-Search for items in external APIs. (Note: v1 endpoint, still returns v1 format)
+Search for items in external APIs. (Legacy response shape retained for compatibility.)
 
 **Authentication**: Required
 
@@ -449,13 +456,12 @@ Search for items in external APIs. (Note: v1 endpoint, still returns v1 format)
 - `200 OK` - Search results
 - `400 Bad Request` - Invalid category
 - `403 Forbidden` - Not authenticated
-
-**Note**: v2-compatible endpoint coming in Phase 2. For now, uses v1 format.
+- `429 Too Many Requests` - External lookup request rejected
 
 ---
 
 #### `GET /get_item_info/<category>/<item_id>`
-Get detailed information for an item. (Note: v1 endpoint, still returns v1 format)
+Get detailed information for an item. (Legacy response shape retained for compatibility.)
 
 **Authentication**: Required
 
@@ -473,8 +479,7 @@ Get detailed information for an item. (Note: v1 endpoint, still returns v1 forma
 - `200 OK` - Item details
 - `400 Bad Request` - Error from upstream
 - `403 Forbidden` - Not authenticated
-
-**Note**: v2-compatible endpoint coming in Phase 2.
+- `429 Too Many Requests` - External lookup request rejected
 
 ---
 
@@ -548,9 +553,9 @@ v1 endpoints may also include:
 | **Error format** | Ad-hoc | Consistent with error codes |
 | **Categorization** | Bug: `filter_categories` inverted | Fixed: `categories` includes |
 | **Field metadata** | None | `attr1`, `attr2`, `attr3` renamed in future |
-| **Pagination** | None (Phase 2) | Coming Phase 2 |
-| **Validation** | Basic | Enhanced (Phase 2) |
-| **Rate limiting** | None | Coming Phase 2 |
+| **Pagination** | None | Limit/offset on v2 review list |
+| **Validation** | Basic | Enhanced review/tag/lookup validation |
+| **Rate limiting** | None | Not implemented |
 | **Deprecation signals** | None | Headers included |
 
 ---

@@ -1,4 +1,5 @@
 from django.db.models import Q
+from typing import Optional
 from review.serializers import ReviewSerializer
 from review.models import Review
 
@@ -11,7 +12,28 @@ ORDERING_DICT = {
     '-date': '-modified_date',
     'relevance': '',
 }
-def get_filtered_review_objects(query: str='', username: str='', filter_categories: list=None, ordering: str='') -> list[Review]:
+
+
+def _normalize_categories(values: Optional[list]) -> list:
+    if not values:
+        return []
+    normalized = []
+    for value in values:
+        if value is None:
+            continue
+        parts = [part.strip() for part in str(value).split(',') if part.strip()]
+        normalized.extend(parts)
+    return normalized
+
+
+def get_filtered_review_objects(
+    query: str='',
+    username: str='',
+    filter_categories: list=None,
+    ordering: str='',
+    categories: list=None,
+    exclude_categories: list=None,
+) -> list[Review]:
     query_obj = None
     for word in query.split():
         word_query_obj = Q(review_item__title__icontains=word)
@@ -30,8 +52,20 @@ def get_filtered_review_objects(query: str='', username: str='', filter_categori
 
     if username:
         reviews = reviews.filter(user__username=username)
-    if filter_categories:
-        reviews = reviews.exclude(review_item__category__in=filter_categories)
+
+    include_categories = _normalize_categories(categories)
+    legacy_exclude_categories = _normalize_categories(filter_categories)
+    explicit_exclude_categories = _normalize_categories(exclude_categories)
+
+    if include_categories:
+        reviews = reviews.filter(review_item__category__in=include_categories)
+
+    if legacy_exclude_categories:
+        reviews = reviews.exclude(review_item__category__in=legacy_exclude_categories)
+
+    if explicit_exclude_categories:
+        reviews = reviews.exclude(review_item__category__in=explicit_exclude_categories)
+
     ordering = ORDERING_DICT.get(ordering, '')
     if ordering in ('review_item__title', '-review_item__title'):
         reviews = list(reviews.select_related('review_item'))

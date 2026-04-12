@@ -12,10 +12,11 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import serializers
 from rest_framework import status
+from rest_framework.pagination import LimitOffsetPagination
 from django.utils import timezone
 
 from .forms import ReviewForm
-from .serializers import ReviewItemSerializer, ReviewSerializer
+from .serializers import ReviewItemSerializer, ReviewSerializer, ExternalLookupSerializer
 from .utils import api_utils, review_utils, metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
@@ -55,6 +56,7 @@ def review_item_api_validator(api_func):
     def inner(request, category, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse(INVALID_USER_RESPONSE, status=status.HTTP_403_FORBIDDEN)
+
         if category not in CATEGORY_TO_API:
             return JsonResponse(INVALID_CATEGORY_RESPONSE, status=status.HTTP_400_BAD_REQUEST)
         return api_func(request, category, *args, **kwargs)
@@ -62,11 +64,33 @@ def review_item_api_validator(api_func):
 
 @review_item_api_validator
 def search_review_item(request, category, search_term):
+    lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
+    if not lookup_serializer.is_valid():
+        return JsonResponse(
+            {
+                'response': 'False',
+                'error': 'Invalid lookup request.',
+                'details': lookup_serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     api_obj = CATEGORY_TO_API[category]
     return JsonResponse(api_obj.search(search_term))
 
 @review_item_api_validator
 def get_review_item_info(request, category, item_id):
+    lookup_serializer = ExternalLookupSerializer(data={'item_id': item_id})
+    if not lookup_serializer.is_valid():
+        return JsonResponse(
+            {
+                'response': 'False',
+                'error': 'Invalid lookup request.',
+                'details': lookup_serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
         review_item = ReviewItem.objects.get(item_id=item_id)
         review_item_json = ReviewItemSerializer(review_item).data
@@ -197,6 +221,8 @@ class ReviewListV2(APIView):
     Returns RFC-compliant v2 response format: {"data": [...], "meta": {...}}
     Supports query parameters: ?query=..., ?username=..., ?categories=..., ?ordering=...
     """
+    pagination_class = LimitOffsetPagination
+
     class OutputSerializer(serializers.ModelSerializer):
         user = serializers.ReadOnlyField(source='user.username')
         review_item = ReviewItemSerializer()
@@ -209,11 +235,30 @@ class ReviewListV2(APIView):
         query = request.GET.get('query', '')
         username = request.GET.get('username', '')
         filter_categories = request.GET.getlist('filter_categories')
+        categories = request.GET.getlist('categories')
+        exclude_categories = request.GET.getlist('exclude_categories')
         ordering = request.GET.get('ordering', '')
-        reviews = review_utils.get_filtered_review_objects(query, username, filter_categories, ordering)
-        data = self.OutputSerializer(reviews, many=True).data
-        
-        return Response(success_response(data, meta={"version": "2.0"}))
+        reviews = review_utils.get_filtered_review_objects(
+            query,
+            username,
+            filter_categories,
+            ordering,
+            categories,
+            exclude_categories,
+        )
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(reviews, request, view=self)
+        data = self.OutputSerializer(page, many=True).data
+        meta = {
+            'version': '2.0',
+            'pagination': {
+                'count': paginator.count,
+                'limit': paginator.get_limit(request),
+                'offset': paginator.get_offset(request),
+            },
+        }
+        return Response(success_response(data, meta=meta))
 
 
 class ReviewCreateV2(generics.CreateAPIView):
@@ -295,8 +340,7 @@ class ReviewPostV2(APIView):
     Supports both create and update in a single POST.
     Returns RFC-compliant v2 response.
     """
-    permission_classes = [permissions.IsAuthenticated]
-    
+    permission_classes = [permissions.IsAuthenticated]    
     def post(self, request):
         error_code = None
         error_details = {}
