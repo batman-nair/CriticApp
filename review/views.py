@@ -217,7 +217,7 @@ def get_user_review(request, item_id):
 class ReviewListV2(APIView):
     """
     List all reviews with filtering and sorting.
-    
+
     Returns RFC-compliant v2 response format: {"data": [...], "meta": {...}}
     Supports query parameters: ?query=..., ?username=..., ?categories=..., ?ordering=...
     """
@@ -264,7 +264,7 @@ class ReviewListV2(APIView):
 class ReviewCreateV2(generics.CreateAPIView):
     """
     Create a new review.
-    
+
     Requires authentication. Returns RFC-compliant v2 response.
     Duplicate reviews (same user + item) return detailed error.
     """
@@ -285,13 +285,13 @@ class ReviewCreateV2(generics.CreateAPIView):
                 ),
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         if response.status_code == status.HTTP_201_CREATED:
             return Response(
                 success_response(response.data, meta={"version": "2.0"}),
                 status=status.HTTP_201_CREATED
             )
-        
+
         return Response(
             error_response(
                 code="INVALID_REQUEST",
@@ -309,7 +309,7 @@ class ReviewCreateV2(generics.CreateAPIView):
 class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or delete a specific review.
-    
+
     Returns RFC-compliant v2 response format.
     Only the review owner can modify.
     """
@@ -336,17 +336,17 @@ class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
 class ReviewPostV2(APIView):
     """
     Create or update review via form submission (v2 format).
-    
+
     Supports both create and update in a single POST.
     Returns RFC-compliant v2 response.
     """
-    permission_classes = [permissions.IsAuthenticated]    
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         error_code = None
         error_details = {}
         is_update = False
         review_data = request.data
-        
+
         try:
             review_obj = None
             if review_data.get('id'):
@@ -361,7 +361,7 @@ class ReviewPostV2(APIView):
                         ),
                         status=status.HTTP_403_FORBIDDEN
                     )
-            
+
             serializer = ReviewSerializer(review_obj, review_data)
             if not serializer.is_valid():
                 return Response(
@@ -373,7 +373,7 @@ class ReviewPostV2(APIView):
                     ),
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             serializer.save(user=request.user)
             action = "updated" if is_update else "created"
             return Response(
@@ -383,7 +383,7 @@ class ReviewPostV2(APIView):
                 ),
                 status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED
             )
-            
+
         except Review.DoesNotExist:
             return Response(
                 error_response(
@@ -409,7 +409,7 @@ class ReviewPostV2(APIView):
 def get_user_review_v2(request, item_id):
     """
     Get the authenticated user's review for a specific item (v2 format).
-    
+
     Returns RFC-compliant v2 response.
     """
     try:

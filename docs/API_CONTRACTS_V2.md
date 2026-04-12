@@ -1,7 +1,7 @@
 # API v2 Contracts (Current - Production Ready)
 
-**Status**: Current (v2.0)  
-**Release Date**: March 28, 2026  
+**Status**: Current (v2.0)
+**Release Date**: March 28, 2026
 **Backwards Compatibility**: v1 endpoints remain available indefinitely; see [API_CONTRACTS_V1.md](API_CONTRACTS_V1.md)
 
 ## Overview
@@ -123,7 +123,7 @@ List all reviews with filtering and sorting.
 - `username` (string, optional): Filter by username
 - `categories` (list, optional): **FIXED**: Include only these categories (comma-separated)
 - `exclude_categories` (list, optional): Exclude these categories (comma-separated)
-- `ordering` (string, optional): Sort by `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`, `relevance`
+- `ordering` (string, optional): Sort by `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`
 - `limit` (integer, optional): Number of results to return (default 20)
 - `offset` (integer, optional): Starting index for paginated results
 

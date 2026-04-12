@@ -47,7 +47,7 @@ List all reviews with filtering and sorting.
 - `query` (string, optional): Search term across title, tags, description. AND logic for multiple words.
 - `username` (string, optional): Filter by username
 - `filter_categories` (list, optional): **Note**: This parameter EXCLUDES categories (inverted semantics). To exclude movie/game reviews: `?filter_categories=movie,game`
-- `ordering` (string, optional): Sort by `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`, `relevance`
+- `ordering` (string, optional): Sort by `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`
 
 **Response**:
 ```json

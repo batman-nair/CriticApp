@@ -10,7 +10,6 @@ ORDERING_DICT = {
     '-rating': '-review_rating',
     'date': 'modified_date',
     '-date': '-modified_date',
-    'relevance': '',
 }
 
 
