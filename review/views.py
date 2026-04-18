@@ -260,6 +260,7 @@ class ReviewListV2(APIView):
         parameters=[
             OpenApiParameter('query', str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('username', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('item_id', str, OpenApiParameter.QUERY, required=False, description='Filter by review item ID'),
             OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list'),
             OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list'),
             OpenApiParameter('ordering', str, OpenApiParameter.QUERY, required=False),
@@ -272,6 +273,7 @@ class ReviewListV2(APIView):
         reviews = Review.objects.select_related('user', 'review_item').all()
         query = request.GET.get('query', '')
         username = request.GET.get('username', '')
+        item_id = request.GET.get('item_id', '')
         filter_categories = request.GET.getlist('filter_categories')
         categories = request.GET.getlist('categories')
         exclude_categories = request.GET.getlist('exclude_categories')
@@ -283,6 +285,7 @@ class ReviewListV2(APIView):
             ordering,
             categories,
             exclude_categories,
+            item_id,
         )
 
         paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
@@ -401,106 +404,137 @@ class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
         )
 
 
-class ReviewPostV2(APIView):
-    """
-    Create or update review via form submission (v2 format).
+# ============================================================================
+# API v2 Lookup Views - External item search and details
+# ============================================================================
 
-    Supports both create and update in a single POST.
-    Returns RFC-compliant v2 response.
-    """
+class SearchItemV2(APIView):
+    """Search external providers for review items (v2 format)."""
     permission_classes = [permissions.IsAuthenticated]
+
     @extend_schema(
-        tags=['reviews'],
-        summary='Create or update review (v2 form endpoint)',
-        request=ReviewSerializer,
-        responses={200: dict, 201: dict, 400: dict, 403: dict, 404: dict},
+        tags=['lookup'],
+        summary='Search external review items (v2)',
+        parameters=[
+            OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(name='search_term', type=str, location=OpenApiParameter.PATH),
+        ],
+        responses={200: dict, 400: dict, 403: dict},
     )
-    def post(self, request):
-        error_code = None
-        error_details = {}
-        is_update = False
-        review_data = request.data
+    def get(self, request, category, search_term):
+        if category not in CATEGORY_TO_API:
+            return Response(
+                error_response(
+                    code='INVALID_CATEGORY',
+                    message='Invalid category.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
+        if not lookup_serializer.is_valid():
+            return Response(
+                error_response(
+                    code='VALIDATION_ERROR',
+                    message='Invalid lookup request.',
+                    details=lookup_serializer.errors,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_obj = CATEGORY_TO_API[category]
+        result = api_obj.search(search_term)
+        if result.get('response') == 'False':
+            return Response(
+                error_response(
+                    code='UPSTREAM_ERROR',
+                    message=result.get('error', 'Bad response from API.'),
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            success_response(result.get('results', []), meta={'version': '2.0'}),
+        )
+
+
+class GetItemInfoV2(APIView):
+    """Get review item details from DB cache or external provider (v2 format)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['lookup'],
+        summary='Get external review item details (v2)',
+        parameters=[
+            OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(name='item_id', type=str, location=OpenApiParameter.PATH),
+        ],
+        responses={200: dict, 400: dict, 403: dict},
+    )
+    def get(self, request, category, item_id):
+        if category not in CATEGORY_TO_API:
+            return Response(
+                error_response(
+                    code='INVALID_CATEGORY',
+                    message='Invalid category.',
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lookup_serializer = ExternalLookupSerializer(data={'item_id': item_id})
+        if not lookup_serializer.is_valid():
+            return Response(
+                error_response(
+                    code='VALIDATION_ERROR',
+                    message='Invalid lookup request.',
+                    details=lookup_serializer.errors,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            review_obj = None
-            if review_data.get('id'):
-                is_update = True
-                review_obj = Review.objects.get(id=review_data['id'])
-                if review_obj.user != request.user:
-                    return Response(
-                        error_response(
-                            code="PERMISSION_DENIED",
-                            message="You do not have permission to edit this review.",
-                            status_code=status.HTTP_403_FORBIDDEN
-                        ),
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-
-            serializer = ReviewSerializer(review_obj, review_data)
-            if not serializer.is_valid():
-                return Response(
-                    error_response(
-                        code="VALIDATION_ERROR",
-                        message="Invalid review data.",
-                        details=serializer.errors,
-                        status_code=status.HTTP_400_BAD_REQUEST
-                    ),
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            serializer.save(user=request.user)
-            action = "updated" if is_update else "created"
+            review_item = ReviewItem.objects.get(item_id=item_id)
             return Response(
-                success_response(
-                    {"message": f"Review {action} successfully", "review": serializer.data},
-                    meta={"version": "2.0"}
-                ),
-                status=status.HTTP_200_OK if is_update else status.HTTP_201_CREATED
+                success_response(ReviewItemSerializer(review_item).data, meta={'version': '2.0'}),
             )
+        except ReviewItem.DoesNotExist:
+            pass
 
-        except Review.DoesNotExist:
+        api_obj = CATEGORY_TO_API[category]
+        item_data = api_obj.get_details(item_id)
+        if item_data.get('response') == 'False':
             return Response(
                 error_response(
-                    code="NOT_FOUND",
-                    message="Review not found.",
-                    status_code=status.HTTP_404_NOT_FOUND
+                    code='UPSTREAM_ERROR',
+                    message=item_data.get('error', 'Bad response from API.'),
+                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        except IntegrityError:
+
+        item_data['category'] = category
+        now = timezone.now()
+        item_data['last_refreshed_at'] = now
+        item_data['last_refresh_attempt_at'] = now
+        item_data['refresh_error_count'] = 0
+        serializer = ReviewItemSerializer(data=item_data)
+        if serializer.is_valid():
+            serializer.save()
             return Response(
-                error_response(
-                    code="DUPLICATE_REVIEW",
-                    message="You've already reviewed this item.",
-                    details={"constraint": "unique(user, review_item)"},
-                    status_code=status.HTTP_400_BAD_REQUEST
-                ),
-                status=status.HTTP_400_BAD_REQUEST
+                success_response(serializer.data, meta={'version': '2.0'}),
             )
 
-
-@login_required
-@extend_schema(tags=['reviews'], summary='Get current user review for item (v2)', responses={200: dict, 404: dict, 403: dict})
-def get_user_review_v2(request, item_id):
-    """
-    Get the authenticated user's review for a specific item (v2 format).
-
-    Returns RFC-compliant v2 response.
-    """
-    try:
-        review = Review.objects.select_related('user', 'review_item').get(
-            user=request.user,
-            review_item__item_id=item_id
-        )
-        json_data = ReviewSerializer(review).data
-        json_data["category"] = review.review_item.category
-        return JsonResponse(success_response(json_data, meta={"version": "2.0"}))
-    except Review.DoesNotExist:
-        return JsonResponse(
+        return Response(
             error_response(
-                code="NOT_FOUND",
-                message="Review not found for this item.",
-                status_code=status.HTTP_404_NOT_FOUND
+                code='SERIALIZATION_ERROR',
+                message='Failed to process item data.',
+                details=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
             ),
-            status=status.HTTP_404_NOT_FOUND
+            status=status.HTTP_400_BAD_REQUEST,
         )

@@ -32,6 +32,7 @@ def get_filtered_review_objects(
     ordering: str='',
     categories: list=None,
     exclude_categories: list=None,
+    item_id: str='',
 ) -> list[Review]:
     query_obj = None
     for word in query.split():
@@ -51,6 +52,9 @@ def get_filtered_review_objects(
 
     if username:
         reviews = reviews.filter(user__username=username)
+
+    if item_id:
+        reviews = reviews.filter(review_item__item_id=item_id)
 
     include_categories = _normalize_categories(categories)
     legacy_exclude_categories = _normalize_categories(filter_categories)

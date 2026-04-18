@@ -18,8 +18,12 @@ review_patterns_v2 = [
     path('', views.ReviewListV2.as_view(), name='list'),
     path('create/', views.ReviewCreateV2.as_view(), name='create'),
     path('<int:pk>/', views.ReviewDetailV2.as_view(), name='detail'),
-    path('get_user_review/<str:item_id>/', views.get_user_review_v2, name='get_user_review'),
-    path('post_review/', views.ReviewPostV2.as_view(), name='post_review')
+]
+
+# v2 external lookup endpoints
+lookup_patterns_v2 = [
+    path('search/<str:category>/<str:search_term>/', views.SearchItemV2.as_view(), name='search_item'),
+    path('item/<str:category>/<str:item_id>/', views.GetItemInfoV2.as_view(), name='get_item_info'),
 ]
 
 urlpatterns = [
@@ -29,6 +33,8 @@ urlpatterns = [
     path('api/reviews/', include((review_patterns_v1, 'reviews_v1'))),
     # v2 API routes (new)
     path('api/v2/reviews/', include((review_patterns_v2, 'reviews_v2'))),
+    # v2 lookup routes
+    path('api/v2/lookup/', include((lookup_patterns_v2, 'lookup_v2'))),
     path('search_item/<str:category>/<str:search_term>', views.search_review_item, name='search_review_item'),
     path('get_item_info/<str:category>/<str:item_id>', views.get_review_item_info, name='get_item_info'),
     path('add', views.add_review, name='add_review'),
