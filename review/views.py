@@ -12,8 +12,9 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import serializers
 from rest_framework import status
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.settings import api_settings
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer, ExternalLookupSerializer
@@ -63,6 +64,22 @@ def review_item_api_validator(api_func):
     return inner
 
 @review_item_api_validator
+@extend_schema(
+    tags=['lookup'],
+    summary='Search external review items',
+    parameters=[
+        OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+        OpenApiParameter(name='search_term', type=str, location=OpenApiParameter.PATH),
+    ],
+    responses={200: dict, 400: dict, 403: dict},
+    examples=[
+        OpenApiExample(
+            'Search success',
+            value={'response': 'True', 'results': [{'item_id': 'omdb_tt1234567', 'title': 'Example'}]},
+            response_only=True,
+        )
+    ],
+)
 def search_review_item(request, category, search_term):
     lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
     if not lookup_serializer.is_valid():
@@ -79,6 +96,15 @@ def search_review_item(request, category, search_term):
     return JsonResponse(api_obj.search(search_term))
 
 @review_item_api_validator
+@extend_schema(
+    tags=['lookup'],
+    summary='Get external review item details',
+    parameters=[
+        OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+        OpenApiParameter(name='item_id', type=str, location=OpenApiParameter.PATH),
+    ],
+    responses={200: dict, 400: dict, 403: dict},
+)
 def get_review_item_info(request, category, item_id):
     lookup_serializer = ExternalLookupSerializer(data={'item_id': item_id})
     if not lookup_serializer.is_valid():
@@ -221,8 +247,6 @@ class ReviewListV2(APIView):
     Returns RFC-compliant v2 response format: {"data": [...], "meta": {...}}
     Supports query parameters: ?query=..., ?username=..., ?categories=..., ?ordering=...
     """
-    pagination_class = LimitOffsetPagination
-
     class OutputSerializer(serializers.ModelSerializer):
         user = serializers.ReadOnlyField(source='user.username')
         review_item = ReviewItemSerializer()
@@ -230,6 +254,20 @@ class ReviewListV2(APIView):
             model = Review
             fields = '__all__'
 
+    @extend_schema(
+        tags=['reviews'],
+        summary='List reviews (v2)',
+        parameters=[
+            OpenApiParameter('query', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('username', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list'),
+            OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list'),
+            OpenApiParameter('ordering', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('offset', int, OpenApiParameter.QUERY, required=False),
+        ],
+        responses={200: dict},
+    )
     def get(self, request):
         reviews = Review.objects.select_related('user', 'review_item').all()
         query = request.GET.get('query', '')
@@ -247,8 +285,29 @@ class ReviewListV2(APIView):
             exclude_categories,
         )
 
-        paginator = self.pagination_class()
+        paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
+        if paginator_class is None:
+            return Response(
+                error_response(
+                    code='PAGINATION_REQUIRED',
+                    message='Pagination is required for this endpoint and must be configured.',
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        paginator = paginator_class()
         page = paginator.paginate_queryset(reviews, request, view=self)
+        if page is None:
+            return Response(
+                error_response(
+                    code='PAGINATION_REQUIRED',
+                    message='Pagination is required for this endpoint and must be configured.',
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         data = self.OutputSerializer(page, many=True).data
         meta = {
             'version': '2.0',
@@ -272,6 +331,12 @@ class ReviewCreateV2(generics.CreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        tags=['reviews'],
+        summary='Create review (v2)',
+        request=ReviewSerializer,
+        responses={201: dict, 400: dict, 403: dict},
+    )
     def create(self, request, *args, **kwargs):
         try:
             response = super().create(request, *args, **kwargs)
@@ -317,14 +382,17 @@ class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
 
+    @extend_schema(tags=['reviews'], summary='Get review by id (v2)', responses={200: dict, 404: dict})
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)
         return Response(success_response(response.data, meta={"version": "2.0"}))
 
+    @extend_schema(tags=['reviews'], summary='Update review by id (v2)', request=ReviewSerializer, responses={200: dict, 400: dict, 403: dict, 404: dict})
     def update(self, request, *args, **kwargs):
         response = super().update(request, *args, **kwargs)
         return Response(success_response(response.data, meta={"version": "2.0"}))
 
+    @extend_schema(tags=['reviews'], summary='Delete review by id (v2)', responses={204: None, 403: dict, 404: dict})
     def destroy(self, request, *args, **kwargs):
         super().destroy(request, *args, **kwargs)
         return Response(
@@ -341,6 +409,12 @@ class ReviewPostV2(APIView):
     Returns RFC-compliant v2 response.
     """
     permission_classes = [permissions.IsAuthenticated]
+    @extend_schema(
+        tags=['reviews'],
+        summary='Create or update review (v2 form endpoint)',
+        request=ReviewSerializer,
+        responses={200: dict, 201: dict, 400: dict, 403: dict, 404: dict},
+    )
     def post(self, request):
         error_code = None
         error_details = {}
@@ -406,6 +480,7 @@ class ReviewPostV2(APIView):
 
 
 @login_required
+@extend_schema(tags=['reviews'], summary='Get current user review for item (v2)', responses={200: dict, 404: dict, 403: dict})
 def get_user_review_v2(request, item_id):
     """
     Get the authenticated user's review for a specific item (v2 format).

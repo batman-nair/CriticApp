@@ -1,7 +1,7 @@
 # API v1 Contracts (Legacy - Deprecated)
 
-**Status**: Deprecated  
-**Sunset Date**: January 1, 2027  
+**Status**: Deprecated
+**Sunset Date**: January 1, 2027
 **Migration**: See [API_MIGRATION_GUIDE.md](API_MIGRATION_GUIDE.md)
 
 ## Overview
@@ -115,7 +115,7 @@ Create a new review.
 }
 ```
 
-**Status Codes**: 
+**Status Codes**:
 - `201 Created` - Review created
 - `400 Bad Request` - Validation error or duplicate
 - `403 Forbidden` - Not authenticated
