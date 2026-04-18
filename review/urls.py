@@ -15,8 +15,7 @@ review_patterns_v1 = [
 
 # v2 API endpoints (new RFC-compliant format)
 review_patterns_v2 = [
-    path('', views.ReviewListV2.as_view(), name='list'),
-    path('create/', views.ReviewCreateV2.as_view(), name='create'),
+    path('', views.ReviewListCreateV2.as_view(), name='list'),
     path('<int:pk>/', views.ReviewDetailV2.as_view(), name='detail'),
 ]
 

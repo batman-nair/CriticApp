@@ -168,7 +168,7 @@ List all reviews with filtering and sorting.
 
 ---
 
-#### `POST /api/v2/reviews/create/`
+#### `POST /api/v2/reviews/`
 Create a new review.
 
 **Authentication**: Required (login)

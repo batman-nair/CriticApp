@@ -240,19 +240,29 @@ def get_user_review(request, item_id):
 # API v2 Views - RFC-compliant response format
 # ============================================================================
 
-class ReviewListV2(APIView):
+class ReviewListCreateV2(generics.ListCreateAPIView):
     """
-    List all reviews with filtering and sorting.
+    List all reviews or create a new review.
 
-    Returns RFC-compliant v2 response format: {"data": [...], "meta": {...}}
-    Supports query parameters: ?query=..., ?username=..., ?categories=..., ?ordering=...
+    GET: Returns paginated reviews with filtering/sorting. Public access.
+    POST: Creates a new review. Requires authentication.
+    Returns RFC-compliant v2 response format: {"data": ..., "meta": {...}}
     """
+    queryset = Review.objects.select_related('user', 'review_item').all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
     class OutputSerializer(serializers.ModelSerializer):
         user = serializers.ReadOnlyField(source='user.username')
         review_item = ReviewItemSerializer()
         class Meta:
             model = Review
             fields = '__all__'
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return self.OutputSerializer
+        return ReviewSerializer
 
     @extend_schema(
         tags=['reviews'],
@@ -269,8 +279,7 @@ class ReviewListV2(APIView):
         ],
         responses={200: dict},
     )
-    def get(self, request):
-        reviews = Review.objects.select_related('user', 'review_item').all()
+    def list(self, request, *args, **kwargs):
         query = request.GET.get('query', '')
         username = request.GET.get('username', '')
         item_id = request.GET.get('item_id', '')
@@ -321,18 +330,6 @@ class ReviewListV2(APIView):
             },
         }
         return Response(success_response(data, meta=meta))
-
-
-class ReviewCreateV2(generics.CreateAPIView):
-    """
-    Create a new review.
-
-    Requires authentication. Returns RFC-compliant v2 response.
-    Duplicate reviews (same user + item) return detailed error.
-    """
-    queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         tags=['reviews'],
