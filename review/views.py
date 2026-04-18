@@ -303,7 +303,6 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
                 error_response(
                     code='PAGINATION_REQUIRED',
                     message='Pagination is required for this endpoint and must be configured.',
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 ),
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -315,7 +314,6 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
                 error_response(
                     code='PAGINATION_REQUIRED',
                     message='Pagination is required for this endpoint and must be configured.',
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 ),
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -346,7 +344,6 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
                     code="DUPLICATE_REVIEW",
                     message="You've already reviewed this item.",
                     details={"constraint": "unique(user, review_item)"},
-                    status_code=status.HTTP_400_BAD_REQUEST
                 ),
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -362,7 +359,6 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
                 code="INVALID_REQUEST",
                 message="Failed to create review.",
                 details={},
-                status_code=status.HTTP_400_BAD_REQUEST
             ),
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -424,7 +420,6 @@ class SearchItemV2(APIView):
                 error_response(
                     code='INVALID_CATEGORY',
                     message='Invalid category.',
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -436,7 +431,6 @@ class SearchItemV2(APIView):
                     code='VALIDATION_ERROR',
                     message='Invalid lookup request.',
                     details=lookup_serializer.errors,
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -448,7 +442,6 @@ class SearchItemV2(APIView):
                 error_response(
                     code='UPSTREAM_ERROR',
                     message=result.get('error', 'Bad response from API.'),
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -477,7 +470,6 @@ class GetItemInfoV2(APIView):
                 error_response(
                     code='INVALID_CATEGORY',
                     message='Invalid category.',
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -489,7 +481,6 @@ class GetItemInfoV2(APIView):
                     code='VALIDATION_ERROR',
                     message='Invalid lookup request.',
                     details=lookup_serializer.errors,
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -509,7 +500,6 @@ class GetItemInfoV2(APIView):
                 error_response(
                     code='UPSTREAM_ERROR',
                     message=item_data.get('error', 'Bad response from API.'),
-                    status_code=status.HTTP_400_BAD_REQUEST,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -531,7 +521,6 @@ class GetItemInfoV2(APIView):
                 code='SERIALIZATION_ERROR',
                 message='Failed to process item data.',
                 details=serializer.errors,
-                status_code=status.HTTP_400_BAD_REQUEST,
             ),
             status=status.HTTP_400_BAD_REQUEST,
         )
