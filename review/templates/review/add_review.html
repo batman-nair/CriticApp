@@ -49,7 +49,9 @@
 </div>
 
 
-<form method="post" action="{% url 'review:reviews:post_review' %}" class="mb-5">
+<div id="form-messages"></div>
+
+<form id="review-submit-form" method="post" class="mb-5">
   <fieldset id="review-form" disabled>
   {% csrf_token %}
 
@@ -86,6 +88,8 @@
 <script src="{% static 'review/js/review.js' %}"></script>
 
 <script>
+  const currentUsername = "{{ user.username }}";
+
   document.querySelector("#id_review_item").addEventListener('input', () => {
     document.querySelector("#review-form").removeAttribute("disabled");
   })
@@ -142,5 +146,10 @@
   if (item_id && category) {
     validateAndPopulateReviewItemData(category, item_id);
   }
+
+  document.querySelector("#review-submit-form").addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitReview();
+  });
 </script>
 {% endblock content %}

@@ -1,21 +1,27 @@
 const baseUrl = window.location.origin;
 
 async function getSearchItems(category, query) {
-    const searchUrl = `${baseUrl}/search_item/${category}/${query}`;
+    const searchUrl = `${baseUrl}/api/v2/lookup/search/${category}/${query}/`;
     const response = await fetch(searchUrl);
     const data = await response.json();
-    if (data["response"] == "False") {
+    if (!response.ok || data.error) {
         return [];
     }
-    return data["results"];
+    return data.data;
 }
 
-async function getReviewData(itemID) {
-    const fetchUrl = `${baseUrl}/api/reviews/get_user_review/${itemID}`;
+async function getReviewData(itemID, username) {
+    const fetchUrl = new URL(`${baseUrl}/api/v2/reviews/`);
+    fetchUrl.searchParams.append('item_id', itemID);
+    fetchUrl.searchParams.append('username', username);
     const response = await fetch(fetchUrl);
     if (response.ok) {
         const data = await response.json();
-        return data;
+        if (data.data.length > 0) {
+            const review = data.data[0];
+            review.category = review.review_item.category;
+            return review;
+        }
     }
     return null;
 }
@@ -23,7 +29,7 @@ async function getReviewData(itemID) {
 async function updateForm(category, itemID) {
     document.querySelector("#id_review_item").value = itemID;
     document.querySelector("#id_category").value = category;
-    data = await getReviewData(itemID);
+    data = await getReviewData(itemID, currentUsername);
     if (data != null) {
         document.querySelector("#id_id").value = data["id"];
         document.querySelector("#id_review_data").value = data["review_data"];
@@ -47,17 +53,17 @@ function populateReviewItemData(category, itemID) {
 }
 
 async function validateAndPopulateReviewItemData(category, itemID) {
-    data = await getReviewData(itemID);
-    if (data["category"] != category) {
+    data = await getReviewData(itemID, currentUsername);
+    if (!data || data["category"] != category) {
         return;
     }
     populateReviewItemData(category, itemID);
 }
 
 async function getReviewItem(category, itemID) {
-    const response = await fetch(`${baseUrl}/get_item_info/${category}/${itemID}`);
+    const response = await fetch(`${baseUrl}/api/v2/lookup/item/${category}/${itemID}/`);
     const data = await response.json();
-    return data;
+    return data.data;
 }
 
 async function updateReviewItem(category, itemID, reviewCard) {
@@ -92,23 +98,25 @@ async function updateReviewItem(category, itemID, reviewCard) {
     reviewCard.removeAttribute("hidden");
 }
 
-async function getReviews(query = '', username = '', filter_categories = [], ordering = '') {
-    const reviewUrl = new URL(`${baseUrl}/api/reviews`);
+async function getReviews(query = '', username = '', exclude_categories = [], ordering = '', limit = 20, offset = 0) {
+    const reviewUrl = new URL(`${baseUrl}/api/v2/reviews/`);
     if (query) {
         reviewUrl.searchParams.append('query', query);
     }
     if (username) {
         reviewUrl.searchParams.append('username', username);
     }
-    for (category of filter_categories) {
-        reviewUrl.searchParams.append('filter_categories', category);
+    if (exclude_categories.length) {
+        reviewUrl.searchParams.append('exclude_categories', exclude_categories.join(','));
     }
     if (ordering) {
         reviewUrl.searchParams.append('ordering', ordering);
     }
+    reviewUrl.searchParams.append('limit', limit);
+    reviewUrl.searchParams.append('offset', offset);
     const response = await fetch(reviewUrl);
     const data = await response.json();
-    return [...data];
+    return { reviews: data.data, pagination: data.meta.pagination };
 }
 
 // Helper to safely create an element with text
@@ -260,6 +268,14 @@ function populateReviewCards(parentSelector, reviews) {
     }
 }
 
+function appendReviewCards(parentSelector, reviews) {
+    const container = document.querySelector(parentSelector);
+    for (var review of reviews) {
+        const reviewCard = buildReviewCardObject(review);
+        container.appendChild(reviewCard);
+    }
+}
+
 // From freecodecamp
 function debounce(func, timeout = 300) {
     let timer;
@@ -296,8 +312,60 @@ function getCookie(name) {
     return cookieValue;
 }
 
+async function submitReview() {
+    const reviewId = document.querySelector("#id_id").value;
+    const isUpdate = !!reviewId;
+
+    const body = {
+        review_rating: parseFloat(document.querySelector("#id_review_rating").value),
+        review_data: document.querySelector("#id_review_data").value,
+        review_tags: document.querySelector("#id_review_tags").value,
+    };
+    if (!isUpdate) {
+        body.review_item = document.querySelector("#id_review_item").value;
+    }
+
+    const url = isUpdate ? `/api/v2/reviews/${reviewId}/` : `/api/v2/reviews/`;
+    const method = isUpdate ? 'PATCH' : 'POST';
+
+    let csrfToken = getCookie('csrftoken');
+    if (!csrfToken) {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input) csrfToken = input.value;
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify(body),
+        });
+        const data = await response.json();
+
+        const msgContainer = document.querySelector("#form-messages");
+        if (response.ok) {
+            const action = isUpdate ? 'Updated' : 'Added';
+            msgContainer.innerHTML = `<div class="alert alert-success">${action} review successfully.</div>`;
+            if (!isUpdate) {
+                document.querySelector("#id_id").value = data.data.id;
+                document.querySelector("#post-review-button").innerText = "Update Review";
+            }
+        } else {
+            const msg = data.error ? data.error.message : 'An error occurred.';
+            msgContainer.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+        }
+    } catch (e) {
+        console.error('Submit error:', e);
+        const msgContainer = document.querySelector("#form-messages");
+        msgContainer.innerHTML = '<div class="alert alert-danger">Network error occurred.</div>';
+    }
+}
+
 function deleteReview(reviewId) {
-    const url = `/api/reviews/${reviewId}/`;
+    const url = `/api/v2/reviews/${reviewId}/`;
 
     let csrfToken = getCookie('csrftoken');
     if (!csrfToken) {
@@ -339,7 +407,8 @@ function deleteReview(reviewId) {
                 // If not ok, there might be JSON.
                 try {
                     const data = await response.json();
-                    alert("Error deleting review: " + (data.detail || data.error || response.statusText));
+                    const msg = data.error ? data.error.message : (data.detail || response.statusText);
+                    alert("Error deleting review: " + msg);
                     console.error('Delete error:', data);
                 } catch (e) {
                     alert("Error deleting review: " + response.statusText);

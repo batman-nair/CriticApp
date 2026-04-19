@@ -25,7 +25,9 @@ All endpoints are under `/api/v2/`. For migrating from v1, see [API_MIGRATION_GU
 - Method: `POST`
 - Path: `/api/v2/reviews/`
 - Auth: required
-- Body: `{ "review_item": "<item_id>", "review_rating": 8.5, "review_data": "...", "review_tags": "tag1,tag2" }`
+- Required body fields: `review_item`, `review_rating`
+- Optional body fields: `review_data`, `review_tags`
+- Body example: `{ "review_item": "<item_id>", "review_rating": 8.5, "review_data": "...", "review_tags": "tag1,tag2" }`
 - Response: `{ "data": { ... }, "meta": { "version": "2.0" } }` (201 Created)
 - Errors: 400 `DUPLICATE_REVIEW` if user already reviewed this item, 400 `INVALID_REQUEST` on validation failure
 
