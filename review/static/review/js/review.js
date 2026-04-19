@@ -4,9 +4,7 @@ async function getSearchItems(category, query) {
     const searchUrl = `${baseUrl}/search_item/${category}/${query}`;
     const response = await fetch(searchUrl);
     const data = await response.json();
-    console.log('Got data from search', query, data);
     if (data["response"] == "False") {
-        console.log("Got error from search ", query, data["error"]);
         return [];
     }
     return data["results"];
@@ -15,10 +13,8 @@ async function getSearchItems(category, query) {
 async function getReviewData(itemID) {
     const fetchUrl = `${baseUrl}/api/reviews/get_user_review/${itemID}`;
     const response = await fetch(fetchUrl);
-    console.log('got reponse ', itemID, response);
     if (response.ok) {
         const data = await response.json();
-        console.log('Got previous review data ', response, itemID, data);
         return data;
     }
     return null;
@@ -52,7 +48,6 @@ function populateReviewItemData(category, itemID) {
 
 async function validateAndPopulateReviewItemData(category, itemID) {
     data = await getReviewData(itemID);
-    console.log('testing data ', data, category, itemID)
     if (data["category"] != category) {
         return;
     }
@@ -62,13 +57,11 @@ async function validateAndPopulateReviewItemData(category, itemID) {
 async function getReviewItem(category, itemID) {
     const response = await fetch(`${baseUrl}/get_item_info/${category}/${itemID}`);
     const data = await response.json();
-    console.log('Got review details: ', data);
     return data;
 }
 
 async function updateReviewItem(category, itemID, reviewCard) {
     const data = await getReviewItem(category, itemID);
-    console.log('Got review item data: ', data);
     let titleDOM = reviewCard.querySelector(".review-title");
     let yearDOM = reviewCard.querySelector(".review-year");
     let imageDOM = reviewCard.querySelector("img");
@@ -83,10 +76,8 @@ async function updateReviewItem(category, itemID, reviewCard) {
     }
     yearDOM.innerText = data["year"];
     reviewCard.querySelector(".review-attr1").innerText = data["attr1"];
-    console.log(reviewCard.querySelector("img").height, reviewCard.querySelector("img").width);
     let descriptionDOM = reviewCard.querySelector(".review-description");
     let descriptionDOMBelow = reviewCard.querySelector(".review-description-below");
-    console.log('Details', imageDOM.width, imageDOM.height, data["description"].length);
     if (imageDOM.width > imageDOM.height || data["description"].length > 300) {
         descriptionDOM.innerText = "";
         descriptionDOM = descriptionDOMBelow;
@@ -117,7 +108,6 @@ async function getReviews(query = '', username = '', filter_categories = [], ord
     }
     const response = await fetch(reviewUrl);
     const data = await response.json();
-    console.log('Got reviews', data);
     return [...data];
 }
 
@@ -238,7 +228,6 @@ function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".review-rating").innerText = reviewData.review_rating;
     modalObj.querySelector(".description").innerText = reviewData.description;
     modalObj.querySelector(".edit-button").setAttribute("onclick", `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
-    // console.log("Setting onclick to " + `window.location.href='/add?item_id=${reviewData.item_id}&category=${reviewData.category}'`);
     modalObj.querySelector(".item-id").innerText = reviewData.item_id;
     modalObj.querySelector(".category").innerText = reviewData.category;
     modalObj.querySelector(".review-tags").innerText = reviewData.review_tags;
@@ -259,7 +248,6 @@ function reviewDetailModalListener(event) {
     const modalObj = event.target;
     const reviewCard = event.relatedTarget;
     const reviewData = getReviewDataFromCard(reviewCard);
-    console.log(reviewData)
     populateModalFromReviewData(modalObj, reviewData);
 }
 

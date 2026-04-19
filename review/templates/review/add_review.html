@@ -97,7 +97,7 @@
         try {
           return getSearchItems(category, query);
         } catch (error) {
-          console.log("Error fetching search data ", query, error);
+          console.error("Error fetching search data ", query, error);
           return error;
         }
       },
@@ -134,7 +134,6 @@
     const selection = event.detail.selection.value;
     const itemID = selection["item_id"];
     populateReviewItemData(category, itemID);
-    console.log('Selected: ', selection, event.detail);
   });
 
   let params = new URLSearchParams(location.search);
