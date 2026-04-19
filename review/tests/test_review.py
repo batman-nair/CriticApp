@@ -6,23 +6,7 @@ from rest_framework import status
 
 from model_bakery import baker
 from review.models import Review
-from review.serializers import ReviewItemSerializer
-
-_JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
-
-SAMPLE_REVIEW_ITEM_JSON = {
-    "category": "movie",
-    "item_id": "test1",
-    "title": "Cool title",
-    "image_url": "http://fakeurl.com",
-    "year": "2021",
-    "attr1": "Attr1",
-    "attr2": "Attr2",
-    "attr3": "Attr3",
-    "description": "Sample desc",
-    "rating": "10",
-    "response": "True",
-}
+from review.tests.factories import JUNK_DATA, create_review_item
 
 GET_ENDPOINT = '/api/reviews/'
 POST_ENDPOINT = '/api/reviews/create/'
@@ -33,12 +17,7 @@ class ReviewAPITest(APITransactionTestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
-        item_serializer = ReviewItemSerializer(data=SAMPLE_REVIEW_ITEM_JSON)
-        item_serializer.is_valid(raise_exception=True)
-        self.review_item1 = item_serializer.save()
-
-    def tearDown(self):
-        self.user.delete()
+        self.review_item1 = create_review_item()
 
     def test_get_reviews(self):
         self.review1 = Review(user=self.user, review_item=self.review_item1, review_rating=9.5)
@@ -50,7 +29,7 @@ class ReviewAPITest(APITransactionTestCase):
         json_response = self.client.get(GET_ENDPOINT, {'query': 'Cool', 'username': self.user.username})
         self._check_valid_reviews_response(json_response.json())
 
-        json_response = self.client.get(GET_ENDPOINT, {'query': _JUNK_DATA})
+        json_response = self.client.get(GET_ENDPOINT, {'query': JUNK_DATA})
         self.assertEqual(len(json_response.json()), 0)
 
     def _populate_review_data(self, num_items):
@@ -138,7 +117,7 @@ class ReviewAPITest(APITransactionTestCase):
         self.assertEqual(len(Review.objects.all()), 0)
         invalid_review_response = self.client.post(ADD_OR_EDIT_ENDPOINT, {
             'id': '',
-            'review_item': _JUNK_DATA,
+            'review_item': JUNK_DATA,
             'category': self.review_item1.category,
             'review_rating': 8.3,
             'review_tags': 'test',
@@ -167,9 +146,7 @@ class ReviewAPITest(APITransactionTestCase):
 
 class ReviewAPIAuthTest(APITestCase):
     def setUp(self):
-        item_serializer = ReviewItemSerializer(data=SAMPLE_REVIEW_ITEM_JSON)
-        item_serializer.is_valid(raise_exception=True)
-        self.review_item1 = item_serializer.save()
+        self.review_item1 = create_review_item()
 
     def test_auth_block(self):
         response = self.client.post(POST_ENDPOINT, {

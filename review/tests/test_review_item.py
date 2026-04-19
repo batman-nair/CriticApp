@@ -1,15 +1,15 @@
+import pytest
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-_JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
+from review.tests.factories import JUNK_DATA
 
+
+@pytest.mark.integration
 class ReviewItemAPITest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='testuser', password='123test123')
         self.client.login(username='testuser', password='123test123')
-
-    def tearDown(self):
-        self.user.delete()
 
     def _check_invalid_response(self, json_data):
         self.assertEqual(json_data["response"], "False")
@@ -26,7 +26,7 @@ class ReviewItemAPITest(TestCase):
     def _test_search_review_for_category(self, endpoint, category, valid_query):
         json_response = self.client.get('{}/{}/{}'.format(endpoint, category, valid_query))
         self._check_valid_search_response(json_response.json())
-        json_response = self.client.get('{}/{}/{}'.format(endpoint, category, _JUNK_DATA))
+        json_response = self.client.get('{}/{}/{}'.format(endpoint, category, JUNK_DATA))
         self._check_invalid_response(json_response.json())
 
     def _check_valid_search_response(self, json_data):
@@ -44,7 +44,7 @@ class ReviewItemAPITest(TestCase):
     def _test_item_info_for_category(self, endpoint, category, valid_id):
         json_response = self.client.get('{}/{}/{}'.format(endpoint, category, valid_id))
         self._check_valid_item_info_response(json_response.json())
-        json_response = self.client.get('{}/{}/{}'.format(endpoint, category, _JUNK_DATA))
+        json_response = self.client.get('{}/{}/{}'.format(endpoint, category, JUNK_DATA))
         self._check_invalid_response(json_response.json())
 
     def _check_valid_item_info_response(self, json_data):
