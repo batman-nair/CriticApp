@@ -1,9 +1,5 @@
 const baseUrl = window.location.origin;
 
-function getCurrentUsername() {
-    return typeof currentUsername !== 'undefined' ? currentUsername : '';
-}
-
 async function getSearchItems(category, query) {
     const searchUrl = `${baseUrl}/api/v2/lookup/search/${category}/${query}/`;
     const response = await fetch(searchUrl);
@@ -33,7 +29,7 @@ async function getReviewData(itemID, username) {
 async function updateForm(category, itemID) {
     document.querySelector("#id_review_item").value = itemID;
     document.querySelector("#id_category").value = category;
-    const data = await getReviewData(itemID, getCurrentUsername());
+    const data = await getReviewData(itemID, currentUsername);
     if (data != null) {
         document.querySelector("#id_id").value = data["id"];
         document.querySelector("#id_review_data").value = data["review_data"];
@@ -57,7 +53,7 @@ function populateReviewItemData(category, itemID) {
 }
 
 async function validateAndPopulateReviewItemData(category, itemID) {
-    const data = await getReviewData(itemID, getCurrentUsername());
+    const data = await getReviewData(itemID, currentUsername);
     if (!data || data["category"] != category) {
         return;
     }
