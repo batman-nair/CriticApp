@@ -266,7 +266,7 @@ function reviewDetailModalListener(event) {
 function populateReviewCards(parentSelector, reviews) {
     const container = document.querySelector(parentSelector);
     container.innerHTML = "";
-    for (var review of reviews) {
+    for (const review of reviews) {
         const reviewCard = buildReviewCardObject(review);
         container.appendChild(reviewCard);
     }
@@ -274,7 +274,7 @@ function populateReviewCards(parentSelector, reviews) {
 
 function appendReviewCards(parentSelector, reviews) {
     const container = document.querySelector(parentSelector);
-    for (var review of reviews) {
+    for (const review of reviews) {
         const reviewCard = buildReviewCardObject(review);
         container.appendChild(reviewCard);
     }
