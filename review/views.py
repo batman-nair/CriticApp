@@ -12,13 +12,16 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import serializers
 from rest_framework import status
+from rest_framework.settings import api_settings
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 
 from .forms import ReviewForm
-from .serializers import ReviewItemSerializer, ReviewSerializer
+from .serializers import ReviewItemSerializer, ReviewSerializer, ExternalLookupSerializer
 from .utils import api_utils, review_utils, metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
+from .response_formatters import success_response, error_response, legacy_success_response, legacy_error_response
 
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'movie': api_utils.OMDBItemAPI(),
@@ -54,18 +57,66 @@ def review_item_api_validator(api_func):
     def inner(request, category, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse(INVALID_USER_RESPONSE, status=status.HTTP_403_FORBIDDEN)
+
         if category not in CATEGORY_TO_API:
             return JsonResponse(INVALID_CATEGORY_RESPONSE, status=status.HTTP_400_BAD_REQUEST)
         return api_func(request, category, *args, **kwargs)
     return inner
 
 @review_item_api_validator
+@extend_schema(
+    tags=['lookup'],
+    summary='Search external review items',
+    parameters=[
+        OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+        OpenApiParameter(name='search_term', type=str, location=OpenApiParameter.PATH),
+    ],
+    responses={200: dict, 400: dict, 403: dict},
+    examples=[
+        OpenApiExample(
+            'Search success',
+            value={'response': 'True', 'results': [{'item_id': 'omdb_tt1234567', 'title': 'Example'}]},
+            response_only=True,
+        )
+    ],
+)
 def search_review_item(request, category, search_term):
+    lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
+    if not lookup_serializer.is_valid():
+        return JsonResponse(
+            {
+                'response': 'False',
+                'error': 'Invalid lookup request.',
+                'details': lookup_serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     api_obj = CATEGORY_TO_API[category]
     return JsonResponse(api_obj.search(search_term))
 
 @review_item_api_validator
+@extend_schema(
+    tags=['lookup'],
+    summary='Get external review item details',
+    parameters=[
+        OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+        OpenApiParameter(name='item_id', type=str, location=OpenApiParameter.PATH),
+    ],
+    responses={200: dict, 400: dict, 403: dict},
+)
 def get_review_item_info(request, category, item_id):
+    lookup_serializer = ExternalLookupSerializer(data={'item_id': item_id})
+    if not lookup_serializer.is_valid():
+        return JsonResponse(
+            {
+                'response': 'False',
+                'error': 'Invalid lookup request.',
+                'details': lookup_serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     try:
         review_item = ReviewItem.objects.get(item_id=item_id)
         review_item_json = ReviewItemSerializer(review_item).data
@@ -184,3 +235,292 @@ def get_user_review(request, item_id):
     json_data["category"] = review.review_item.category  # Have a custom serializer instead?
     return JsonResponse(json_data)
 
+
+# ============================================================================
+# API v2 Views - RFC-compliant response format
+# ============================================================================
+
+class ReviewListCreateV2(generics.ListCreateAPIView):
+    """
+    List all reviews or create a new review.
+
+    GET: Returns paginated reviews with filtering/sorting. Public access.
+    POST: Creates a new review. Requires authentication.
+    Returns RFC-compliant v2 response format: {"data": ..., "meta": {...}}
+    """
+    queryset = Review.objects.select_related('user', 'review_item').all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    class OutputSerializer(serializers.ModelSerializer):
+        user = serializers.ReadOnlyField(source='user.username')
+        review_item = ReviewItemSerializer()
+        class Meta:
+            model = Review
+            fields = '__all__'
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return self.OutputSerializer
+        return ReviewSerializer
+
+    @extend_schema(
+        tags=['reviews'],
+        summary='List reviews (v2)',
+        parameters=[
+            OpenApiParameter('query', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('username', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('item_id', str, OpenApiParameter.QUERY, required=False, description='Filter by review item ID'),
+            OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list'),
+            OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list'),
+            OpenApiParameter('ordering', str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter('offset', int, OpenApiParameter.QUERY, required=False),
+        ],
+        responses={200: dict},
+    )
+    def list(self, request, *args, **kwargs):
+        query = request.GET.get('query', '')
+        username = request.GET.get('username', '')
+        item_id = request.GET.get('item_id', '')
+        filter_categories = request.GET.getlist('filter_categories')
+        categories = request.GET.getlist('categories')
+        exclude_categories = request.GET.getlist('exclude_categories')
+        ordering = request.GET.get('ordering', '')
+        reviews = review_utils.get_filtered_review_objects(
+            query,
+            username,
+            filter_categories,
+            ordering,
+            categories,
+            exclude_categories,
+            item_id,
+        )
+
+        paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
+        if paginator_class is None:
+            return Response(
+                error_response(
+                    code='PAGINATION_REQUIRED',
+                    message='Pagination is required for this endpoint and must be configured.',
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        paginator = paginator_class()
+        page = paginator.paginate_queryset(reviews, request, view=self)
+        if page is None:
+            return Response(
+                error_response(
+                    code='PAGINATION_REQUIRED',
+                    message='Pagination is required for this endpoint and must be configured.',
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        data = self.OutputSerializer(page, many=True).data
+        meta = {
+            'version': '2.0',
+            'pagination': {
+                'count': paginator.count,
+                'limit': paginator.get_limit(request),
+                'offset': paginator.get_offset(request),
+            },
+        }
+        return Response(success_response(data, meta=meta))
+
+    @extend_schema(
+        tags=['reviews'],
+        summary='Create review (v2)',
+        request=ReviewSerializer,
+        responses={201: dict, 400: dict, 403: dict},
+    )
+    def create(self, request, *args, **kwargs):
+        try:
+            response = super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                error_response(
+                    code="DUPLICATE_REVIEW",
+                    message="You've already reviewed this item.",
+                    details={"constraint": "unique(user, review_item)"},
+                ),
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if response.status_code == status.HTTP_201_CREATED:
+            return Response(
+                success_response(response.data, meta={"version": "2.0"}),
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            error_response(
+                code="INVALID_REQUEST",
+                message="Failed to create review.",
+                details={},
+            ),
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ReviewDetailV2(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update, or delete a specific review.
+
+    Returns RFC-compliant v2 response format.
+    Only the review owner can modify.
+    """
+    queryset = Review.objects.select_related('user', 'review_item').all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+
+    @extend_schema(tags=['reviews'], summary='Get review by id (v2)', responses={200: dict, 404: dict})
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        return Response(success_response(response.data, meta={"version": "2.0"}))
+
+    @extend_schema(tags=['reviews'], summary='Update review by id (v2)', request=ReviewSerializer, responses={200: dict, 400: dict, 403: dict, 404: dict})
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return Response(success_response(response.data, meta={"version": "2.0"}))
+
+    @extend_schema(tags=['reviews'], summary='Delete review by id (v2)', responses={204: None, 403: dict, 404: dict})
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return Response(
+            success_response({"deleted": True}, meta={"version": "2.0"}),
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+# ============================================================================
+# API v2 Lookup Views - External item search and details
+# ============================================================================
+
+class SearchItemV2(APIView):
+    """Search external providers for review items (v2 format)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['lookup'],
+        summary='Search external review items (v2)',
+        parameters=[
+            OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(name='search_term', type=str, location=OpenApiParameter.PATH),
+        ],
+        responses={200: dict, 400: dict, 403: dict},
+    )
+    def get(self, request, category, search_term):
+        if category not in CATEGORY_TO_API:
+            return Response(
+                error_response(
+                    code='INVALID_CATEGORY',
+                    message='Invalid category.',
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
+        if not lookup_serializer.is_valid():
+            return Response(
+                error_response(
+                    code='VALIDATION_ERROR',
+                    message='Invalid lookup request.',
+                    details=lookup_serializer.errors,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_obj = CATEGORY_TO_API[category]
+        result = api_obj.search(search_term)
+        if result.get('response') == 'False':
+            return Response(
+                error_response(
+                    code='UPSTREAM_ERROR',
+                    message=result.get('error', 'Bad response from API.'),
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            success_response(result.get('results', []), meta={'version': '2.0'}),
+        )
+
+
+class GetItemInfoV2(APIView):
+    """Get review item details from DB cache or external provider (v2 format)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['lookup'],
+        summary='Get external review item details (v2)',
+        parameters=[
+            OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(name='item_id', type=str, location=OpenApiParameter.PATH),
+        ],
+        responses={200: dict, 400: dict, 403: dict},
+    )
+    def get(self, request, category, item_id):
+        if category not in CATEGORY_TO_API:
+            return Response(
+                error_response(
+                    code='INVALID_CATEGORY',
+                    message='Invalid category.',
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lookup_serializer = ExternalLookupSerializer(data={'item_id': item_id})
+        if not lookup_serializer.is_valid():
+            return Response(
+                error_response(
+                    code='VALIDATION_ERROR',
+                    message='Invalid lookup request.',
+                    details=lookup_serializer.errors,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            review_item = ReviewItem.objects.get(item_id=item_id)
+            return Response(
+                success_response(ReviewItemSerializer(review_item).data, meta={'version': '2.0'}),
+            )
+        except ReviewItem.DoesNotExist:
+            pass
+
+        api_obj = CATEGORY_TO_API[category]
+        item_data = api_obj.get_details(item_id)
+        if item_data.get('response') == 'False':
+            return Response(
+                error_response(
+                    code='UPSTREAM_ERROR',
+                    message=item_data.get('error', 'Bad response from API.'),
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        item_data['category'] = category
+        now = timezone.now()
+        item_data['last_refreshed_at'] = now
+        item_data['last_refresh_attempt_at'] = now
+        item_data['refresh_error_count'] = 0
+        serializer = ReviewItemSerializer(data=item_data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                success_response(serializer.data, meta={'version': '2.0'}),
+            )
+
+        return Response(
+            error_response(
+                code='SERIALIZATION_ERROR',
+                message='Failed to process item data.',
+                details=serializer.errors,
+            ),
+            status=status.HTTP_400_BAD_REQUEST,
+        )

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'review',
     'users',
     'rest_framework',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -139,3 +140,29 @@ METRICS_REQUIRE_AUTH = os.environ.get('METRICS_REQUIRE_AUTH', 'False').lower() =
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', '').rstrip('/')
 PUSHGATEWAY_JOB_NAME = os.environ.get('PUSHGATEWAY_JOB_NAME', 'critic_refresh_review_items')
 PUSHGATEWAY_TIMEOUT_SECONDS = int(os.environ.get('PUSHGATEWAY_TIMEOUT_SECONDS', '5'))
+
+
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_VERSIONING_CLASS': 'review.versioning.URLPathAndHeaderVersioning',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'ALLOWED_VERSIONS': ('1.0', '2.0'),
+    'DEFAULT_VERSION': '1.0',
+    'PAGE_SIZE': 20,
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'CriticApp API',
+    'DESCRIPTION': 'Review and item lookup APIs for movies, games, anime, and manga.',
+    'VERSION': '2.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'TAGS': [
+        {'name': 'reviews', 'description': 'CRUD operations for reviews'},
+        {'name': 'lookup', 'description': 'External item search and details lookup'},
+        {'name': 'ops', 'description': 'Operational endpoints'},
+    ],
+}
+
+# API Response format versioning
+API_RESPONSE_VERSION = '2.0'
