@@ -19,6 +19,13 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = '__all__'
+        extra_kwargs = {
+            'review_tags': {
+                'required': False,
+                'allow_null': True,
+                'allow_blank': True,
+            }
+        }
 
     def validate_review_data(self, value):
         if value is None:

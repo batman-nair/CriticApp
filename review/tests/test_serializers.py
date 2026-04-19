@@ -27,6 +27,10 @@ class ReviewDataValidationTest(SimpleTestCase):
 
 
 class ReviewTagsValidationTest(SimpleTestCase):
+    def test_review_tags_field_not_required(self):
+        s = ReviewSerializer()
+        self.assertFalse(s.fields['review_tags'].required)
+
     def test_too_many_tags_rejected(self):
         s = ReviewSerializer()
         tags = ','.join(f'tag{i}' for i in range(11))
