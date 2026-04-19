@@ -149,6 +149,10 @@
 <div class="row justify-content-evenly" id="review-container">
 </div>
 
+<div class="text-center my-4" id="load-more-container" hidden>
+    <button class="btn btn-outline-primary" id="load-more-button" onclick="loadMore()">Load More</button>
+</div>
+
 <script src="{% static 'review/js/review.js' %}"></script>
 <script src="{% static 'js/masonry.pkgd.min.js' %}"></script>
 <script src="{% static 'js/imagesloaded.pkgd.min.js' %}"></script>
@@ -157,6 +161,9 @@
     var reviewsData;
     var queryString = '', username = '{{ username }}', filterCategories = [], orderName = 'sort-date';
     const currentUsername = "{{ user.username }}";
+    const pageLimit = 20;
+    var currentOffset = 0;
+    var totalCount = 0;
     const masonry = new Masonry('#review-container', options = {
         percentPosition: true,
         horizontalOrder: false,
@@ -193,18 +200,46 @@
         document.querySelector("#review-container").removeAttribute("hidden");
     }
     function updateReviewsImpl() {
+        currentOffset = 0;
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
-        getReviews(queryString, username, filterCategories, ordering)
-            .then((reviews) => {
+        getReviews(queryString, username, filterCategories, ordering, pageLimit, 0)
+            .then(({ reviews, pagination }) => {
+                totalCount = pagination.count;
                 showReviewLoading();
                 populateReviewCards('#review-container', reviews);
+                updateLoadMoreButton();
                 imagesLoaded('#review-container', () => {
                     hideReviewLoading();
                     masonry.reloadItems();
                     masonry.layout();
                 })
             })
+    }
+
+    function loadMore() {
+        currentOffset += pageLimit;
+        populateFilterCategories();
+        ordering = ORDERING_STRING_MAP[orderName];
+        getReviews(queryString, username, filterCategories, ordering, pageLimit, currentOffset)
+            .then(({ reviews, pagination }) => {
+                totalCount = pagination.count;
+                appendReviewCards('#review-container', reviews);
+                updateLoadMoreButton();
+                imagesLoaded('#review-container', () => {
+                    masonry.reloadItems();
+                    masonry.layout();
+                })
+            })
+    }
+
+    function updateLoadMoreButton() {
+        const container = document.querySelector("#load-more-container");
+        if (currentOffset + pageLimit < totalCount) {
+            container.removeAttribute("hidden");
+        } else {
+            container.setAttribute("hidden", "");
+        }
     }
     const updateReviews = debounce(updateReviewsImpl);
 
