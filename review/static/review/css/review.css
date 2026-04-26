@@ -18,6 +18,21 @@
     max-width: 60%;
     max-height: 20em;
 }
+.review-image-placeholder {
+    background-color: #f4f4f4;
+    border: 1px solid #dcdcdc;
+    border-radius: 0.25rem;
+}
+.review-grid-image-placeholder {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+}
+.review-modal-image-placeholder {
+    width: 60%;
+    max-height: 20em;
+    aspect-ratio: 2 / 3;
+    margin: 0 auto;
+}
 #review-detail-modal .delete-button {
     color: var(--danger-color);
 }
@@ -73,10 +88,15 @@
 #autoComplete_list_1 {
     max-height: 70vh;
 }
-.review-search-element > img {
+.review-search-element > img,
+.review-search-element > .review-image-placeholder {
     max-width: 5em;
     max-height: 5em;
     margin-right: 0.5em;
+}
+.review-search-image-placeholder {
+    width: 5em;
+    height: 5em;
 }
 .review-search-element > small {
     margin-left: 0.5em;
@@ -93,6 +113,10 @@
 .review-image > img {
     max-width: 20em;
     max-height: 20em;
+}
+.review-add-image-placeholder {
+    width: min(100%, 20em);
+    aspect-ratio: 2 / 3;
 }
 .review-text-container {
     height: 100%;

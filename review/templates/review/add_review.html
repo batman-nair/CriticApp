@@ -117,11 +117,10 @@
       element: (item, data) => {
         const item_img = document.createElement('img');
         const image_url = data['value']['image_url'];
-        if (image_url == "N/A") {
-            return;
-        }
-        item_img.src = image_url;
+        item_img.alt = "Poster Image";
+        item_img.classList.add('review-search-image');
         item.prepend(item_img);
+        setImageWithFallback(item_img, image_url, ['review-search-image-placeholder']);
         item.classList.add('review-search-element');
         const year_span = document.createElement('small');
         year_span.innerText = data['value']['year'];

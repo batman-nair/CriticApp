@@ -1,4 +1,61 @@
 const baseUrl = window.location.origin;
+let imagePlaceholderCounter = 0;
+
+function isImageUrlAvailable(imageUrl) {
+    return typeof imageUrl === "string" && imageUrl.trim() !== "" && imageUrl !== "N/A";
+}
+
+function getOrCreateImagePlaceholder(imageDOM, placeholderClasses = []) {
+    if (!imageDOM.dataset.placeholderId) {
+        imagePlaceholderCounter += 1;
+        imageDOM.dataset.placeholderId = `review-image-placeholder-${imagePlaceholderCounter}`;
+    }
+
+    const selector = `.review-image-placeholder[data-placeholder-for="${imageDOM.dataset.placeholderId}"]`;
+    let placeholderDOM = imageDOM.parentElement.querySelector(selector);
+    if (!placeholderDOM) {
+        placeholderDOM = document.createElement("div");
+        placeholderDOM.setAttribute("data-placeholder-for", imageDOM.dataset.placeholderId);
+        imageDOM.insertAdjacentElement("afterend", placeholderDOM);
+    }
+
+    placeholderDOM.className = "review-image-placeholder";
+    if (placeholderClasses.length) {
+        placeholderDOM.classList.add(...placeholderClasses);
+    }
+    placeholderDOM.setAttribute("aria-label", "Image unavailable");
+    placeholderDOM.setAttribute("hidden", "");
+    return placeholderDOM;
+}
+
+function setImageWithFallback(imageDOM, imageUrl, placeholderClasses = []) {
+    if (!imageDOM) {
+        return;
+    }
+
+    const placeholderDOM = getOrCreateImagePlaceholder(imageDOM, placeholderClasses);
+    imageDOM.dataset.imageUrl = typeof imageUrl === "string" ? imageUrl : "";
+    const showPlaceholder = () => {
+        imageDOM.setAttribute("hidden", "");
+        placeholderDOM.removeAttribute("hidden");
+    };
+    const showImage = () => {
+        placeholderDOM.setAttribute("hidden", "");
+        imageDOM.removeAttribute("hidden");
+    };
+
+    imageDOM.onload = showImage;
+    imageDOM.onerror = showPlaceholder;
+
+    if (!isImageUrlAvailable(imageUrl)) {
+        imageDOM.removeAttribute("src");
+        showPlaceholder();
+        return;
+    }
+
+    showImage();
+    imageDOM.src = imageUrl;
+}
 
 async function getSearchItems(category, query) {
     const searchUrl = `${baseUrl}/api/v2/lookup/search/${category}/${query}/`;
@@ -75,11 +132,7 @@ async function updateReviewItem(category, itemID, reviewCard) {
     titleDOM.textContent = data["title"] + " ";
     titleDOM.appendChild(yearDOM);
 
-    if (data["image_url"] != "N/A") {
-        imageDOM.src = data["image_url"];
-    } else {
-        imageDOM.src = "";
-    }
+    setImageWithFallback(imageDOM, data["image_url"], ["review-add-image-placeholder"]);
     yearDOM.innerText = data["year"];
     reviewCard.querySelector(".review-attr1").innerText = data["attr1"];
     let descriptionDOM = reviewCard.querySelector(".review-description");
@@ -145,9 +198,9 @@ function buildReviewGridItem(review) {
 
     // Image
     const img = createElement('img', ['card-img-top']);
-    img.src = review.review_item.image_url;
     img.alt = "Poster Image";
     card.appendChild(img);
+    setImageWithFallback(img, review.review_item.image_url, ["review-grid-image-placeholder"]);
 
     // Card Body
     const body = createElement('div', ['card-body']);
@@ -207,9 +260,10 @@ function buildReviewCardObject(review) {
 }
 
 function getReviewDataFromCard(reviewObject) {
+    const imageDOM = reviewObject.querySelector("img");
     const review = {
         title: reviewObject.querySelector(".review-title").textContent,
-        image_url: reviewObject.querySelector("img").src,
+        image_url: imageDOM.dataset.imageUrl || imageDOM.getAttribute("src") || "",
         description: reviewObject.querySelector(".description").textContent,
         year: reviewObject.querySelector(".year").textContent,
         attr1: reviewObject.querySelector(".attr1").textContent,
@@ -228,7 +282,7 @@ function getReviewDataFromCard(reviewObject) {
 function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".review-title").innerText = reviewData.title;
     modalObj.querySelector(".year").innerText = reviewData.year;
-    modalObj.querySelector("img").src = reviewData.image_url;
+    setImageWithFallback(modalObj.querySelector("img"), reviewData.image_url, ["review-modal-image-placeholder"]);
     modalObj.querySelector(".attr1").innerText = reviewData.attr1;
     modalObj.querySelector(".attr2").innerText = reviewData.attr2;
     modalObj.querySelector(".attr3").innerText = reviewData.attr3;
