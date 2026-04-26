@@ -42,9 +42,13 @@ All endpoints are under `/api/v2/`. For migrating from v1, see [API_MIGRATION_GU
 
 ### Search items from external provider
 - Method: `GET`
-- Path: `/api/v2/lookup/search/<category>/<search_term>/`
+- Path: `/api/v2/lookup/search/<category>/?q=<search_term>`
 - Auth: required
 - Categories: `movie`, `game`, `anime`, `manga`
+- Notes:
+  - `q` accepts normal title search text for all categories.
+  - For `movie`, `q` can also be a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
+  - IMDb title URLs are normalized to the existing `omdb_tt...` item ID and returned as a single exact-match result.
 - Response: `{ "data": [{ "item_id": "...", "title": "...", ... }], "meta": { "version": "2.0" } }`
 - Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`
 
@@ -105,7 +109,10 @@ curl -X PATCH "http://localhost:8000/api/v2/reviews/1/" \
 curl -X DELETE "http://localhost:8000/api/v2/reviews/1/"
 
 # Search items
-curl "http://localhost:8000/api/v2/lookup/search/movie/inception/"
+curl "http://localhost:8000/api/v2/lookup/search/movie/?q=inception"
+
+# Search movie by full IMDb title URL
+curl "http://localhost:8000/api/v2/lookup/search/movie/?q=https%3A%2F%2Fwww.imdb.com%2Ftitle%2Ftt0111161%2F"
 
 # Get item details
 curl "http://localhost:8000/api/v2/lookup/item/movie/omdb_tt1375666/"
@@ -137,8 +144,12 @@ const createResp = await fetch('/api/v2/reviews/', {
 const createData = await createResp.json();
 
 // Search external items
-const searchResp = await fetch('/api/v2/lookup/search/movie/inception/');
+const searchResp = await fetch('/api/v2/lookup/search/movie/?q=inception');
 const { data: results } = await searchResp.json();
+
+// Search a movie by full IMDb title URL
+const imdbResp = await fetch('/api/v2/lookup/search/movie/?q=' + encodeURIComponent('https://www.imdb.com/title/tt0111161/'));
+const { data: imdbResults } = await imdbResp.json();
 
 // Get item details
 const itemResp = await fetch('/api/v2/lookup/item/movie/omdb_tt1375666/');

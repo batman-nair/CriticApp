@@ -430,56 +430,80 @@ Create or update a review via form submission (v2 format).
 
 ### External Item Lookup
 
-#### `GET /search_item/<category>/<search_term>`
-Search for items in external APIs. (Legacy response shape retained for compatibility.)
+#### `GET /api/v2/lookup/search/<category>/?q=<search_term>`
+Search for items in external APIs using the v2 response envelope.
 
 **Authentication**: Required
 
 **Supported Categories**: `movie`, `game`, `anime`, `manga`
 
+**Query Parameters**:
+- `q` (string, required): Search input.
+
+**Movie-specific behavior**:
+- For `movie`, `q` supports either a normal title search or a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
+- Full IMDb title URLs are normalized to the existing `omdb_tt...` OMDb item ID and returned as a single exact-match search result.
+
 **Response**:
 ```json
 {
-  "response": "True",
-  "results": [
+  "data": [
     {
       "item_id": "omdb_tt1234567",
       "title": "Movie Title",
       "image_url": "...",
       "year": "2021"
     }
-  ]
+  ],
+  "meta": {
+    "version": "2.0"
+  }
 }
 ```
 
 **Status Codes**:
 - `200 OK` - Search results
-- `400 Bad Request` - Invalid category
+- `400 Bad Request` - Invalid category or upstream lookup error
 - `403 Forbidden` - Not authenticated
-- `429 Too Many Requests` - External lookup request rejected
 
 ---
 
-#### `GET /get_item_info/<category>/<item_id>`
-Get detailed information for an item. (Legacy response shape retained for compatibility.)
+#### `GET /api/v2/lookup/item/<category>/<item_id>/`
+Get detailed information for an item in the v2 response envelope.
 
 **Authentication**: Required
 
 **Response**:
 ```json
 {
-  "response": "True",
-  "item_id": "omdb_tt1234567",
-  "title": "Movie Title",
-  ...
+  "data": {
+    "item_id": "omdb_tt1234567",
+    "title": "Movie Title",
+    "image_url": "...",
+    "year": "2021",
+    "attr1": "Action, Sci-Fi",
+    "attr2": "Directors, Actors",
+    "attr3": "movie",
+    "description": "...",
+    "rating": "8.5"
+  },
+  "meta": {
+    "version": "2.0"
+  }
 }
 ```
 
+**Behavior**:
+- Returns the cached item from the database if available.
+- Otherwise fetches from the external provider and persists the normalized item.
+
 **Status Codes**:
 - `200 OK` - Item details
-- `400 Bad Request` - Error from upstream
+- `400 Bad Request` - Invalid category, upstream error, or serialization error
 - `403 Forbidden` - Not authenticated
-- `429 Too Many Requests` - External lookup request rejected
+
+**Legacy compatibility**:
+- Legacy lookup routes `/search_item/<category>/<search_term>` and `/get_item_info/<category>/<item_id>` still exist with the legacy response shape.
 
 ---
 

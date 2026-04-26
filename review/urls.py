@@ -21,7 +21,7 @@ review_patterns_v2 = [
 
 # v2 external lookup endpoints
 lookup_patterns_v2 = [
-    path('search/<str:category>/<str:search_term>/', views.SearchItemV2.as_view(), name='search_item'),
+    path('search/<str:category>/', views.SearchItemV2.as_view(), name='search_item'),
     path('item/<str:category>/<str:item_id>/', views.GetItemInfoV2.as_view(), name='get_item_info'),
 ]
 

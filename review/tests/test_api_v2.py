@@ -214,7 +214,7 @@ class LookupV2Test(APITestCase):
 
     def test_search_v2_returns_envelope(self):
         self._patch_category_api()
-        response = self.client.get('/api/v2/lookup/search/movie/test/')
+        response = self.client.get('/api/v2/lookup/search/movie/', {'q': 'test'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         json_data = response.json()
         self.assertIn('data', json_data)
@@ -223,8 +223,32 @@ class LookupV2Test(APITestCase):
         self.assertIsInstance(json_data['data'], list)
         self.assertTrue(len(json_data['data']) > 0)
 
+    def test_search_v2_requires_query_param(self):
+        self._patch_category_api()
+        response = self.client.get('/api/v2/lookup/search/movie/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        json_data = response.json()
+        self.assertEqual(json_data['error']['code'], 'VALIDATION_ERROR')
+
+    def test_search_v2_supports_query_param(self):
+        self._patch_category_api()
+        response = self.client.get('/api/v2/lookup/search/movie/', {'q': 'test'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        json_data = response.json()
+        self.assertIn('data', json_data)
+        self.assertEqual(json_data['data'][0]['title'], 'test')
+
+    def test_search_v2_movie_imdb_url_returns_exact_result(self):
+        self._patch_category_api()
+        response = self.client.get('/api/v2/lookup/search/movie/', {'q': 'https://www.imdb.com/title/tt9999999/'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        json_data = response.json()
+        self.assertEqual(len(json_data['data']), 1)
+        self.assertEqual(json_data['data'][0]['item_id'], 'omdb_tt9999999')
+        self.assertEqual(json_data['data'][0]['title'], 'Title')
+
     def test_search_v2_invalid_category(self):
-        response = self.client.get('/api/v2/lookup/search/invalid/test/')
+        response = self.client.get('/api/v2/lookup/search/invalid/', {'q': 'test'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         json_data = response.json()
         self.assertIn('error', json_data)
@@ -232,7 +256,7 @@ class LookupV2Test(APITestCase):
 
     def test_search_v2_unauthenticated(self):
         self.client.logout()
-        response = self.client.get('/api/v2/lookup/search/movie/test/')
+        response = self.client.get('/api/v2/lookup/search/movie/', {'q': 'test'})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     # --- GetItemInfoV2 ---

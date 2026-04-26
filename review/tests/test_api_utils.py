@@ -3,7 +3,7 @@ from unittest import mock
 from django.test import SimpleTestCase
 import requests
 
-from review.utils.api_utils import request_json_with_retry
+from review.utils.api_utils import normalize_imdb_title_url_to_item_id, request_json_with_retry
 
 
 class _ResponseStub:
@@ -50,3 +50,17 @@ class RequestJsonRetryTest(SimpleTestCase):
         self.assertEqual(error['exception_type'], 'ConnectionError')
         self.assertEqual(error['source'], 'Test API')
         self.assertEqual(sleep_mock.call_count, 2)
+
+
+def test_normalize_imdb_title_url_to_item_id_accepts_title_url():
+    assert normalize_imdb_title_url_to_item_id('https://www.imdb.com/title/tt0111161/') == 'omdb_tt0111161'
+
+
+def test_normalize_imdb_title_url_to_item_id_accepts_mobile_url_and_query_string():
+    assert normalize_imdb_title_url_to_item_id('https://m.imdb.com/title/tt3896198/?ref_=fn_al_tt_1') == 'omdb_tt3896198'
+
+
+def test_normalize_imdb_title_url_to_item_id_rejects_non_title_urls():
+    assert normalize_imdb_title_url_to_item_id('https://www.imdb.com/name/nm0000209/') is None
+    assert normalize_imdb_title_url_to_item_id('tt0111161') is None
+    assert normalize_imdb_title_url_to_item_id('The Shawshank Redemption') is None

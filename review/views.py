@@ -34,6 +34,15 @@ INVALID_USER_RESPONSE = {"response": "False", "error": "User not authenticated."
 INVALID_CATEGORY_RESPONSE = {"response": "False", "error": "Invalid category."}
 NOT_OK_RESPONSE = {"response": "False", "error": "Bad reponse from API."}
 
+
+def _build_search_result_from_item(item_data):
+    return {
+        'item_id': item_data['item_id'],
+        'title': item_data['title'],
+        'image_url': item_data['image_url'],
+        'year': item_data['year'],
+    }
+
 def health_check(request):
     """Health check endpoint for k8s probes. Returns 200 OK."""
     return HttpResponse("OK", status=200)
@@ -410,11 +419,11 @@ class SearchItemV2(APIView):
         summary='Search external review items (v2)',
         parameters=[
             OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
-            OpenApiParameter(name='search_term', type=str, location=OpenApiParameter.PATH),
+            OpenApiParameter(name='q', type=str, location=OpenApiParameter.QUERY),
         ],
         responses={200: dict, 400: dict, 403: dict},
     )
-    def get(self, request, category, search_term):
+    def get(self, request, category):
         if category not in CATEGORY_TO_API:
             return Response(
                 error_response(
@@ -424,6 +433,7 @@ class SearchItemV2(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        search_term = request.query_params.get('q', '')
         lookup_serializer = ExternalLookupSerializer(data={'search_term': search_term})
         if not lookup_serializer.is_valid():
             return Response(
@@ -436,6 +446,24 @@ class SearchItemV2(APIView):
             )
 
         api_obj = CATEGORY_TO_API[category]
+        normalized_item_id = None
+        if category == 'movie':
+            normalized_item_id = api_utils.normalize_imdb_title_url_to_item_id(search_term)
+
+        if normalized_item_id is not None:
+            result = api_obj.get_details(normalized_item_id)
+            if result.get('response') == 'False':
+                return Response(
+                    error_response(
+                        code='UPSTREAM_ERROR',
+                        message=result.get('error', 'Bad response from API.'),
+                    ),
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                success_response([_build_search_result_from_item(result)], meta={'version': '2.0'}),
+            )
+
         result = api_obj.search(search_term)
         if result.get('response') == 'False':
             return Response(

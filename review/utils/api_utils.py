@@ -1,9 +1,11 @@
 import os
 import time
+import re
 import requests
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
+from typing import Optional
 
 from . import metrics
 
@@ -17,6 +19,17 @@ DEFAULT_REQUEST_HEADERS = {
     "User-Agent": "CriticApp/1.0",
     "Accept": "application/json",
 }
+IMDB_TITLE_URL_RE = re.compile(
+    r'^https?://(?:www\.|m\.)?imdb\.com/title/(?P<imdb_id>tt\d+)(?:/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$',
+    re.IGNORECASE,
+)
+
+
+def normalize_imdb_title_url_to_item_id(value: str) -> Optional[str]:
+    match = IMDB_TITLE_URL_RE.fullmatch(value.strip())
+    if not match:
+        return None
+    return f"omdb_{match.group('imdb_id').lower()}"
 
 def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES) -> tuple[dict, dict]:
     for attempt in range(retries):

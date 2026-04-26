@@ -58,7 +58,8 @@ function setImageWithFallback(imageDOM, imageUrl, placeholderClasses = []) {
 }
 
 async function getSearchItems(category, query) {
-    const searchUrl = `${baseUrl}/api/v2/lookup/search/${category}/${query}/`;
+    const searchUrl = new URL(`${baseUrl}/api/v2/lookup/search/${category}/`);
+    searchUrl.searchParams.append('q', query);
     const response = await fetch(searchUrl);
     const data = await response.json();
     if (!response.ok || data.error) {

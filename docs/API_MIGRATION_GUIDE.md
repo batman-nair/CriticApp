@@ -22,7 +22,7 @@ For the full v2 reference, see [API_ENDPOINTS.md](API_ENDPOINTS.md).
 | `GET/PUT/PATCH/DELETE /api/reviews/<id>/` | `GET/PUT/PATCH/DELETE /api/v2/reviews/<id>/` | Response wrapped in `{ data, meta }` |
 | `GET /api/reviews/get_user_review/<item_id>/` | **Removed** | Use `GET /api/v2/reviews/?item_id=<item_id>&username=<username>` |
 | `POST /api/reviews/post_review/` | **Removed** | Use `POST /api/v2/reviews/` to create, `PATCH /api/v2/reviews/<id>/` to update |
-| `GET /search_item/<category>/<term>` | `GET /api/v2/lookup/search/<category>/<term>/` | Response wrapped in `{ data, meta }` |
+| `GET /search_item/<category>/<term>` | `GET /api/v2/lookup/search/<category>/?q=<term>` | Response wrapped in `{ data, meta }` |
 | `GET /get_item_info/<category>/<id>` | `GET /api/v2/lookup/item/<category>/<id>/` | Response wrapped in `{ data, meta }` |
 
 ## Step 1: Update base paths
@@ -33,7 +33,7 @@ Switch all request URLs:
 | --- | --- |
 | `/api/reviews/` | `/api/v2/reviews/` |
 | `/api/reviews/<id>/` | `/api/v2/reviews/<id>/` |
-| `/search_item/...` | `/api/v2/lookup/search/.../` |
+| `/search_item/...` | `/api/v2/lookup/search/<category>/?q=...` |
 | `/get_item_info/...` | `/api/v2/lookup/item/.../` |
 
 ## Step 2: Update response parsing
@@ -182,7 +182,7 @@ GET /search_item/<category>/<search_term>
 # Response: { "response": "True", "results": [...] }
 
 # v2
-GET /api/v2/lookup/search/<category>/<search_term>/
+GET /api/v2/lookup/search/<category>/?q=<search_term>
 # Response: { "data": [...], "meta": { "version": "2.0" } }
 ```
 
