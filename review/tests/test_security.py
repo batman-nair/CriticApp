@@ -20,30 +20,20 @@ class ReviewSecurityReproTest(APITestCase):
             review_data='Original Data'
         )
 
-    def test_review_post_idor_vulnerability(self):
-        # User B logs in
+    def test_review_update_as_non_owner_is_rejected(self):
         self.client.force_authenticate(user=self.user_b)
 
-        # User B attempts to update User A's review
         data = {
-            'id': self.review_a.id,
-            'review_item': self.review_item.pk,
             'review_rating': 1.0,
             'review_data': 'Hacked',
             'review_tags': 'hacked'
         }
 
-        # This endpoint redirects on success/failure
-        response = self.client.post('/api/reviews/post_review/', data, format='json')
+        response = self.client.patch(f'/api/v2/reviews/{self.review_a.id}/', data, format='json')
 
-        # Expect redirect
-        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Reload review_a from DB
         self.review_a.refresh_from_db()
 
-        # SECURITY CHECKS:
-        # The data should NOT be updated
         self.assertEqual(self.review_a.review_data, 'Original Data', "VULNERABILITY: Review data was maliciously updated")
-        # The user should NOT be changed
         self.assertEqual(self.review_a.user, self.user_a, "VULNERABILITY: Review ownership was stolen")

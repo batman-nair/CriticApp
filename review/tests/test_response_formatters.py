@@ -4,8 +4,6 @@ from review.response_formatters import (
     success_response,
     error_response,
     paginated_response,
-    legacy_success_response,
-    legacy_error_response,
 )
 
 
@@ -62,36 +60,3 @@ class PaginatedResponseTest(SimpleTestCase):
         result = paginated_response([], count=0, limit=20, offset=0)
         self.assertEqual(result["data"], [])
         self.assertEqual(result["meta"]["pagination"]["count"], 0)
-
-
-class LegacySuccessResponseTest(SimpleTestCase):
-    def test_basic_success(self):
-        result = legacy_success_response(True)
-        self.assertEqual(result["response"], "True")
-
-    def test_with_results(self):
-        result = legacy_success_response(True, results=[{"id": 1}])
-        self.assertEqual(result["results"], [{"id": 1}])
-
-    def test_false_response(self):
-        result = legacy_success_response(False)
-        self.assertEqual(result["response"], "False")
-
-    def test_extra_kwargs(self):
-        result = legacy_success_response(True, foo="bar")
-        self.assertEqual(result["foo"], "bar")
-
-
-class LegacyErrorResponseTest(SimpleTestCase):
-    def test_basic_error(self):
-        result = legacy_error_response("Something broke")
-        self.assertEqual(result["response"], "False")
-        self.assertEqual(result["error"], "Something broke")
-
-    def test_with_source(self):
-        result = legacy_error_response("Timeout", source="OMDB API")
-        self.assertEqual(result["source"], "OMDB API")
-
-    def test_without_source(self):
-        result = legacy_error_response("Error")
-        self.assertNotIn("source", result)
