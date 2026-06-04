@@ -12,6 +12,7 @@
 
 .review-card-expandable:hover {
     cursor: pointer;
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
 }
 
 #review-detail-modal img {
@@ -71,23 +72,131 @@
 
 /* Add reviews page */
 
-/* Review item search */
-#review-category {
-    width: unset;
-    flex: unset;
+/* Container */
+.add-review-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
+
+.add-review-header {
+    margin-bottom: 2rem;
+}
+.add-review-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: var(--foreground-color);
+}
+.add-review-sub {
+    color: #808080;
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* Category cards grid */
+.category-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.875rem;
+    margin-bottom: 2rem;
+}
+@media (max-width: 540px) {
+    .category-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    box-shadow: 0 1px 3px var(--foreground-shadow-color);
+    user-select: none;
+}
+.category-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 18px var(--foreground-shadow-color);
+    border-color: var(--primary-color);
+}
+.category-card.selected {
+    border-color: var(--primary-color);
+    background: #e6f9fa;
+    box-shadow: 0 0 0 3px var(--primary-shadow-color);
+}
+.category-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+.category-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--foreground-color);
+    letter-spacing: 0.01em;
+}
+
+/* Reveal sections */
+.reveal-section {
+    overflow: hidden;
+    opacity: 0;
+    max-height: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease, max-height 0.35s ease;
+}
+.reveal-section.revealed {
+    overflow: visible;
+    opacity: 1;
+    max-height: 1200px;
+    pointer-events: auto;
+    margin-bottom: 1.5rem;
+}
+
+/* Search section */
+.add-review-search-wrap {
+    position: relative;
 }
 .autoComplete_wrapper {
-    flex-grow: 1!important;
+    width: 100%;
 }
 #autoComplete {
     width: 100%;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
     height: unset;
+    font-size: 1rem;
+    border-radius: 0.5rem !important;
+    border: 1.5px solid #d0d0d0;
+    padding: 0.625rem 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+#autoComplete:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem var(--primary-shadow-color);
+    outline: none;
 }
 #autoComplete_list_1 {
     max-height: 70vh;
+    border-radius: 0.5rem;
+    margin-top: 0.25rem;
+    z-index: 1050;
 }
+
+/* IMDb hint */
+.add-review-imdb-hint {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+    font-size: 0.82rem;
+    color: #666;
+}
+
+/* Review item search result items */
 .review-search-element > img,
 .review-search-element > .review-image-placeholder {
     max-width: 5em;
@@ -102,13 +211,46 @@
     margin-left: 0.5em;
 }
 
+/* Review form fields layout */
+.add-review-fields {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    align-items: end;
+}
+@media (max-width: 540px) {
+    .add-review-fields {
+        grid-template-columns: 1fr;
+    }
+}
+.add-review-rating-wrap {
+    min-width: 9rem;
+}
+.add-review-field-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.add-review-textarea {
+    min-height: unset !important;
+    height: auto !important;
+    resize: none;
+    overflow-y: hidden;
+    field-sizing: content;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
 /* Review item card */
 .review-card {
-    transition: 0.3s;
     box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
-}
-.review-card:hover {
-    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+    margin-bottom: 1.5rem;
+    transition: box-shadow 0.3s;
 }
 .review-image > img {
     max-width: 20em;
