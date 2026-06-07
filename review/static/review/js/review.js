@@ -367,6 +367,55 @@ function getCookie(name) {
     return cookieValue;
 }
 
+function getToastContainer() {
+    let container = document.querySelector('.review-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'review-toast-container';
+        document.body.appendChild(container);
+    }
+    return container;
+}
+
+function showToast(message, type = 'success', autoDismiss = true) {
+    const container = getToastContainer();
+
+    const toast = document.createElement('div');
+    toast.className = `review-toast review-toast--${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+
+    const msg = document.createElement('span');
+    msg.className = 'review-toast__message';
+    msg.textContent = message;
+    toast.appendChild(msg);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'review-toast__close';
+    closeBtn.setAttribute('aria-label', 'Dismiss');
+    closeBtn.textContent = '×';
+    toast.appendChild(closeBtn);
+
+    if (autoDismiss) {
+        const progress = document.createElement('div');
+        progress.className = 'review-toast__progress';
+        toast.appendChild(progress);
+    }
+
+    function dismiss() {
+        toast.classList.add('review-toast--dismissing');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }
+
+    closeBtn.addEventListener('click', dismiss);
+
+    if (autoDismiss) {
+        setTimeout(dismiss, 4000);
+    }
+
+    container.appendChild(toast);
+}
+
 async function submitReview() {
     const reviewId = document.querySelector("#id_id").value;
     const isUpdate = !!reviewId;
@@ -400,22 +449,20 @@ async function submitReview() {
         });
         const data = await response.json();
 
-        const msgContainer = document.querySelector("#form-messages");
         if (response.ok) {
             const action = isUpdate ? 'Updated' : 'Added';
-            msgContainer.innerHTML = `<div class="alert alert-success">${action} review successfully.</div>`;
+            showToast(`${action} review successfully.`, 'success', true);
             if (!isUpdate) {
                 document.querySelector("#id_id").value = data.data.id;
                 document.querySelector("#post-review-button").innerText = "Update Review";
             }
         } else {
             const msg = data.error ? data.error.message : 'An error occurred.';
-            msgContainer.innerHTML = `<div class="alert alert-danger">${msg}</div>`;
+            showToast(msg, 'error', false);
         }
     } catch (e) {
         console.error('Submit error:', e);
-        const msgContainer = document.querySelector("#form-messages");
-        msgContainer.innerHTML = '<div class="alert alert-danger">Network error occurred.</div>';
+        showToast('Network error occurred.', 'error', false);
     }
 }
 

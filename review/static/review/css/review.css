@@ -274,3 +274,111 @@
   margin: 0;
   color: #606060;
 }
+
+/* ── Toast notifications ─────────────────────────────────── */
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-8px); }
+}
+
+@keyframes toastProgress {
+    from { width: 100%; }
+    to   { width: 0%; }
+}
+
+.review-toast-container {
+    position: fixed;
+    top: 80px;
+    right: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1080;
+    pointer-events: none;
+}
+
+.review-toast {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-width: 260px;
+    max-width: 360px;
+    padding: 0.85rem 1rem 1rem 1rem;
+    background: var(--foreground-color);
+    color: var(--background-color);
+    border-radius: 0.5rem;
+    border-left: 4px solid var(--primary-color);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    overflow: hidden;
+    pointer-events: auto;
+    animation: toastIn 0.25s ease forwards;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.review-toast--success {
+    border-left-color: var(--primary-color);
+}
+
+.review-toast--error {
+    border-left-color: var(--danger-color);
+}
+
+.review-toast--dismissing {
+    animation: toastOut 0.25s ease forwards;
+}
+
+.review-toast__message {
+    flex: 1;
+}
+
+.review-toast__close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--background-color);
+    opacity: 0.55;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    margin-top: -1px;
+    transition: opacity 0.15s;
+}
+
+.review-toast__close:hover {
+    opacity: 1;
+}
+
+.review-toast__progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: var(--primary-color);
+    animation: toastProgress 4s linear forwards;
+}
+
+.review-toast--error .review-toast__progress {
+    background: var(--danger-color);
+}
+
+@media (max-width: 576px) {
+    .review-toast-container {
+        top: 70px;
+        right: 16px;
+        left: 16px;
+    }
+    .review-toast {
+        min-width: unset;
+        max-width: unset;
+        width: 100%;
+    }
+}
