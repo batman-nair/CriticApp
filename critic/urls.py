@@ -18,11 +18,18 @@ from django.urls import path, include
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.views.generic.base import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenBlacklistView
+from users.views import MeView, RegisterView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/schema/', SpectacularAPIView.as_view(), name='api-schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='api-schema'), name='api-docs'),
+    path('api/auth/token/', TokenObtainPairView.as_view(), name='token-obtain'),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+    path('api/auth/logout/', TokenBlacklistView.as_view(), name='token-blacklist'),
+    path('api/auth/me/', MeView.as_view(), name='auth-me'),
+    path('api/auth/register/', RegisterView.as_view(), name='auth-register'),
     path('profile/', include('users.urls')),
     path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url('favicon.ico'))),
     path('', include('review.urls')),

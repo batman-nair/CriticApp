@@ -188,7 +188,7 @@ class ReviewV2Phase2Test(APITestCase):
             'review_item': self.movie_item.pk,
             'review_rating': '6.0',
         })
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class LookupV2Test(APITestCase):
@@ -257,7 +257,7 @@ class LookupV2Test(APITestCase):
     def test_search_v2_unauthenticated(self):
         self.client.logout()
         response = self.client.get('/api/v2/lookup/search/movie/', {'q': 'test'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     # --- GetItemInfoV2 ---
 
@@ -303,5 +303,5 @@ class LookupV2Test(APITestCase):
     def test_get_item_info_v2_unauthenticated(self):
         self.client.logout()
         response = self.client.get('/api/v2/lookup/item/movie/omdb_tt1111111/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
