@@ -241,7 +241,7 @@ class SearchItemV2(APIView):
             OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
             OpenApiParameter(name='q', type=str, location=OpenApiParameter.QUERY),
         ],
-        responses={200: dict, 400: dict, 403: dict},
+        responses={200: dict, 400: dict, 403: dict, 502: dict},
     )
     def get(self, request, category):
         if category not in CATEGORY_TO_API:
@@ -278,7 +278,7 @@ class SearchItemV2(APIView):
                         code='UPSTREAM_ERROR',
                         message=result.get('error', 'Bad response from API.'),
                     ),
-                    status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_502_BAD_GATEWAY,
                 )
             return Response(
                 success_response([_build_search_result_from_item(result)], meta={'version': '2.0'}),
@@ -291,7 +291,7 @@ class SearchItemV2(APIView):
                     code='UPSTREAM_ERROR',
                     message=result.get('error', 'Bad response from API.'),
                 ),
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
         return Response(
@@ -310,7 +310,7 @@ class GetItemInfoV2(APIView):
             OpenApiParameter(name='category', type=str, location=OpenApiParameter.PATH),
             OpenApiParameter(name='item_id', type=str, location=OpenApiParameter.PATH),
         ],
-        responses={200: dict, 400: dict, 403: dict},
+        responses={200: dict, 400: dict, 403: dict, 502: dict},
     )
     def get(self, request, category, item_id):
         if category not in CATEGORY_TO_API:
@@ -349,7 +349,7 @@ class GetItemInfoV2(APIView):
                     code='UPSTREAM_ERROR',
                     message=item_data.get('error', 'Bad response from API.'),
                 ),
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
         item_data['category'] = category
