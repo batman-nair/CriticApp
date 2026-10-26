@@ -13,14 +13,30 @@ jobs:
   tests:
     name: tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Same major version as k8s/postgres.yaml
+        image: postgres:15
+        env:
+          POSTGRES_USER: critic
+          POSTGRES_PASSWORD: critic
+          POSTGRES_DB: critic_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U critic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DJANGO_SETTINGS_MODULE: critic.settings.test
-      # Dummy values only. External APIs are mocked in non-integration tests,
-      # but review/views.py builds the API clients at import time and they
-      # require these keys to be set.
       SECRET_KEY: ci-dummy-secret-key-not-for-production
-      OMDB_API_KEY: ci-dummy
-      RAWG_API_KEY: ci-dummy
+      TEST_DB_ENGINE: postgresql
+      TEST_DB_NAME: critic_test
+      TEST_DB_USER: critic
+      TEST_DB_PASSWORD: critic
+      TEST_DB_HOST: localhost
+      TEST_DB_PORT: '5432'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,3 +63,15 @@ jobs:
 
       - name: Check for missing migrations
         run: python manage.py makemigrations --check --dry-run
+
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Same Dockerfile the deploy builds; also runs collectstatic with
+      # production settings. Nothing is pushed.
+      - name: Build image
+        run: docker build -t criticapp:ci .
