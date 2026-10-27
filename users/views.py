@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model, logout
 from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import UserRegistrationSerializer
@@ -19,6 +20,15 @@ def logout_view(request):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary='Get the current user',
+        responses={
+            200: inline_serializer('MeResponse', {
+                'id': serializers.IntegerField(),
+                'username': serializers.CharField(),
+            }),
+        },
+    )
     def get(self, request):
         return Response({'id': request.user.id, 'username': request.user.username})
 
@@ -26,6 +36,17 @@ class MeView(APIView):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary='Register a new user',
+        request=UserRegistrationSerializer,
+        responses={
+            201: inline_serializer('RegisterResponse', {
+                'refresh': serializers.CharField(),
+                'access': serializers.CharField(),
+            }),
+            400: dict,
+        },
+    )
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if not serializer.is_valid():
