@@ -9,7 +9,7 @@ _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
 @pytest.mark.integration
 class UtilAPITest:
-    """Integration tests that hit real external APIs (OMDb, RAWG, Jikan).
+    """Integration tests that hit real external APIs (OMDb, RAWG, MyAnimeList).
 
     Skipped in CI by default. Run with: pytest -m integration
     """
@@ -17,16 +17,16 @@ class UtilAPITest:
     def setup_method(self):
         self.omdb_api = api_utils.OMDBItemAPI()
         self.rawg_api = api_utils.RAWGItemAPI()
-        self.jikan_anime_api = api_utils.JikanItemAPI('anime')
-        self.jikan_manga_api = api_utils.JikanItemAPI('manga')
+        self.mal_anime_api = api_utils.MALItemAPI('anime')
+        self.mal_manga_api = api_utils.MALItemAPI('manga')
 
     def test_search(self):
         self._test_search_api(self.omdb_api, 'Breaking Bad')
         self._test_search_api(self.rawg_api, 'Ori and the Blind Forest')
-        self._test_search_api(self.jikan_anime_api, 'Kimetsu no Yaiba')
+        self._test_search_api(self.mal_anime_api, 'Kimetsu no Yaiba')
         # Sleep to avoid rate limiting
         time.sleep(1)
-        self._test_search_api(self.jikan_manga_api, 'Berserk')
+        self._test_search_api(self.mal_manga_api, 'Berserk')
 
     def _test_search_api(self, api_obj: api_utils.ReviewItemAPIBase, success_query: str):
         search_json = api_obj.search(success_query)
@@ -44,8 +44,8 @@ class UtilAPITest:
     def test_details(self):
         self._test_details_api(self.omdb_api, 'omdb_tt3896198')
         self._test_details_api(self.rawg_api, 'rawg_19590')
-        self._test_details_api(self.jikan_anime_api, 'jikan_anime_38000')
-        self._test_details_api(self.jikan_manga_api, 'jikan_manga_2')
+        self._test_details_api(self.mal_anime_api, 'jikan_anime_38000')
+        self._test_details_api(self.mal_manga_api, 'jikan_manga_2')
 
     def _test_details_api(self, api_obj: api_utils.ReviewItemAPIBase, success_id: str):
         details_json = api_obj.get_details(success_id)

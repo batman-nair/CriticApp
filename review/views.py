@@ -24,8 +24,8 @@ from .response_formatters import success_response, error_response
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'movie': api_utils.OMDBItemAPI(),
     'game': api_utils.RAWGItemAPI(),
-    'anime': api_utils.JikanItemAPI('anime'),
-    'manga': api_utils.JikanItemAPI('manga'),
+    'anime': api_utils.MALItemAPI('anime'),
+    'manga': api_utils.MALItemAPI('manga'),
 }
 
 

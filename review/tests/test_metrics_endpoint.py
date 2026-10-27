@@ -34,3 +34,11 @@ class MetricsEndpointTest(TestCase):
         self.client.login(username='metrics_admin', password='test-pass-123')
         allowed_response = self.client.get('/metrics/')
         self.assertEqual(allowed_response.status_code, 200)
+
+
+def test_normalize_provider_maps_mal_source():
+    from review.utils.metrics import normalize_provider
+
+    assert normalize_provider('MAL API') == 'mal'
+    assert normalize_provider('OMDB API') == 'omdb'
+    assert normalize_provider('animal') == 'animal'

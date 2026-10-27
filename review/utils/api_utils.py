@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from dotenv import load_dotenv, find_dotenv
 from datetime import datetime
 from typing import Optional
+from urllib.parse import quote
 
 from . import metrics
 
@@ -31,13 +32,14 @@ def normalize_imdb_title_url_to_item_id(value: str) -> Optional[str]:
         return None
     return f"omdb_{match.group('imdb_id').lower()}"
 
-def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES) -> tuple[dict, dict]:
+def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES, headers: Optional[dict]=None) -> tuple[dict, dict]:
+    request_headers = {**DEFAULT_REQUEST_HEADERS, **(headers or {})}
     for attempt in range(retries):
         try:
             response_obj = requests.get(
                 url,
                 timeout=REQUEST_TIMEOUT_SECONDS,
-                headers=DEFAULT_REQUEST_HEADERS,
+                headers=request_headers,
             )
         except requests.RequestException as ex:
             if attempt < retries - 1:
@@ -240,78 +242,98 @@ class RAWGItemAPI(ReviewItemAPIBase):
         return json_data
 
 
-class JikanItemAPI(ReviewItemAPIBase):
+class MALItemAPI(ReviewItemAPIBase):
+    _COMMON_FIELDS = 'id,title,main_picture,start_date,end_date,mean'
+    _DETAIL_FIELDS = {
+        'anime': 'genres,studios,media_type,synopsis',
+        'manga': 'genres,authors{first_name,last_name},media_type,synopsis',
+    }
+
     def __init__(self, type: str):
         self.type_ = type
         if type not in ['anime', 'manga']:
-            raise RuntimeError('Jikan API should be of type "anime" or "manga".')
+            raise RuntimeError('MAL API should be of type "anime" or "manga".')
+        # Items were first fetched from Jikan, which uses the same MAL ids, so the
+        # old prefix is kept to keep existing item ids valid.
         self.prefix = 'jikan_{}_'.format(self.type_)
-        self._base_url = 'https://api.jikan.moe/v4/{type}'.format(type=type)
+        self._client_id = os.environ.get('MAL_CLIENT_ID', None)
+        if not self._client_id:
+            raise RuntimeError('MAL_CLIENT_ID required for accessing MAL data.')
+        self._headers = {'X-MAL-CLIENT-ID': self._client_id}
+        self._base_url = 'https://api.myanimelist.net/v2/{type}'.format(type=type)
 
     def search(self, query) -> dict:
-        search_url = '{base_url}?q={search_term}'.format(base_url=self._base_url, search_term=query)
-        jikan_json, response = request_json_with_retry(search_url, source_name='Jikan API')
+        search_url = '{base_url}?q={search_term}&limit=20&fields={fields}'.format(
+            base_url=self._base_url, search_term=quote(query), fields=self._COMMON_FIELDS)
+        mal_json, response = request_json_with_retry(search_url, source_name='MAL API', headers=self._headers)
         if response:
             response["query"] = query
             return response
-        return self._convert_to_review(jikan_json)
+        return self._convert_to_review(mal_json)
 
     def get_details(self, item_id: str) -> dict:
         if not item_id.startswith(self.prefix):
             return MISSING_PREFIX_RESPONSE.copy()
         item_id = item_id[len(self.prefix):]
-        info_url = '{base_url}/{item_id}'.format(base_url=self._base_url, item_id=item_id)
-        jikan_json, response = request_json_with_retry(info_url, source_name='Jikan API')
+        info_url = '{base_url}/{item_id}?fields={fields}'.format(
+            base_url=self._base_url, item_id=item_id,
+            fields='{},{}'.format(self._COMMON_FIELDS, self._DETAIL_FIELDS[self.type_]))
+        mal_json, response = request_json_with_retry(info_url, source_name='MAL API', headers=self._headers)
         if response:
             response["item_id"] = item_id
             return response
-        return self._convert_to_review(jikan_json)
+        return self._convert_to_review(mal_json)
 
-    def _convert_to_review(self, jikan_json: dict) -> dict:
+    def _convert_to_review(self, mal_json: dict) -> dict:
         json_data = dict()
-        if isinstance(jikan_json["data"], list):
+        if "data" in mal_json:
             json_data["results"] = []
-            count = 0
-            for item in jikan_json["data"]:
-                if not item["score"]:
+            for entry in mal_json["data"]:
+                item = entry["node"]
+                if not item.get("mean"):
                     continue
-                count += 1
-                if count >= 10:
+                json_data["results"].append(self._convert_mal_item_to_review(item))
+                if len(json_data["results"]) >= 10:
                     break
-                json_data["results"].append(self._convert_jikan_item_to_review(item))
+            if len(json_data["results"]) == 0:
+                return {
+                    "response": "False",
+                    "error": "{} not found!".format(self.type_.capitalize()),
+                }
         else:
-            json_data = self._convert_jikan_item_to_review(jikan_json["data"], detailed=True)
+            json_data = self._convert_mal_item_to_review(mal_json, detailed=True)
         json_data["response"] = "True"
         return json_data
 
-    def _convert_jikan_item_to_review(self, jikan_json: dict, detailed: bool=False) -> dict:
+    def _convert_mal_item_to_review(self, mal_json: dict, detailed: bool=False) -> dict:
         json_data = dict()
-        json_data["item_id"] = self.prefix + str(jikan_json["mal_id"])
-        json_data["title"] = jikan_json["title"]
-        json_data["image_url"] = jikan_json["images"]["jpg"]["image_url"]
-        if self.type_ == 'anime':
-            time_data = jikan_json["aired"]["prop"]
-        else:
-            time_data = jikan_json["published"]["prop"]
-        json_data["year"] = str(time_data["from"]["year"])
-        if time_data["to"]["year"]:
-            json_data["year"] += '-{}'.format(time_data["to"]["year"])
-        if not json_data["year"]:
+        json_data["item_id"] = self.prefix + str(mal_json["id"])
+        json_data["title"] = mal_json["title"]
+        picture = mal_json.get("main_picture") or {}
+        json_data["image_url"] = picture.get("large") or picture.get("medium") or "N/A"
+        start_date = mal_json.get("start_date")
+        end_date = mal_json.get("end_date")
+        if not start_date:
             json_data["year"] = "N/A"
+        else:
+            json_data["year"] = start_date[:4]
+            if end_date:
+                json_data["year"] += '-{}'.format(end_date[:4])
         if not detailed:
             return json_data
-        genres = set(entry["name"] for entry in jikan_json["genres"])
+        genres = set(entry["name"] for entry in mal_json.get("genres", []))
         json_data["attr1"] = ', '.join(genres)
         crew = set()
         if self.type_ == 'manga':
-            roles = ["authors"]
+            for entry in mal_json.get("authors", []):
+                node = entry["node"]
+                name = ' '.join(part for part in [node.get("first_name"), node.get("last_name")] if part)
+                if name:
+                    crew.add(name)
         else:
-            roles = ["studios"]
-        for role in roles:
-            crew.update(set(entry["name"] for entry in jikan_json[role]))
+            crew.update(entry["name"] for entry in mal_json.get("studios", []))
         json_data["attr2"] = ', '.join(crew)
-        json_data["attr3"] = jikan_json["type"]
-        json_data["description"] = jikan_json["synopsis"]
-        json_data["rating"] = jikan_json["score"]
+        json_data["attr3"] = mal_json.get("media_type", "N/A")
+        json_data["description"] = mal_json.get("synopsis", "")
+        json_data["rating"] = mal_json.get("mean", "N/A")
         return json_data
-

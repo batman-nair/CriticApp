@@ -10,6 +10,7 @@ DEBUG = False
 # from the environment or .env still take precedence.
 os.environ.setdefault('OMDB_API_KEY', 'test-dummy')
 os.environ.setdefault('RAWG_API_KEY', 'test-dummy')
+os.environ.setdefault('MAL_CLIENT_ID', 'test-dummy')
 
 # SQLite by default; set TEST_DB_ENGINE=postgresql to test against Postgres
 # (used in CI so migrations are exercised on the same engine as prod).
