@@ -9,7 +9,7 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 ## What It Does
 
 - Stores personal reviews across movie, game, anime, and manga categories
-- Fetches item metadata from OMDb, RAWG, and Jikan
+- Fetches item metadata from OMDb, RAWG, and MyAnimeList
 - Supports user profiles and searchable review lists
 - Exposes API endpoints for review CRUD and item lookups
 - Includes monitoring with Prometheus metrics and Grafana dashboards
@@ -36,7 +36,7 @@ Start from `.env.example` and set values for:
 
 - `SECRET_KEY`
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `OMDB_API_KEY`, `RAWG_API_KEY` (for metadata enrichment)
+- `OMDB_API_KEY`, `RAWG_API_KEY`, `MAL_CLIENT_ID` (for metadata enrichment)
 
 ## Deployment
 

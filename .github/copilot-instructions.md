@@ -31,12 +31,12 @@
 - Preserve uniqueness of reviews per `(user, review_item)` from `review/models.py`.
 - Reuse `get_filtered_review_objects` for list query behavior instead of duplicating filters in views.
 - For a new review category: update `CATEGORY_TO_API` in `review/views.py` and add a matching `ReviewItemAPIBase` subclass in `review/utils/api_utils.py`.
-- Current categories include OMDb (`movie`), RAWG (`game`), and Jikan (`anime`, `manga`) via `CATEGORY_TO_API` in `review/views.py`.
+- Current categories include OMDb (`movie`), RAWG (`game`), and MyAnimeList (`anime`, `manga`) via `CATEGORY_TO_API` in `review/views.py`.
 - Keep review content text-first; no file/media upload flows are implemented.
 
 ## Integration Points
-- External item providers are OMDb, RAWG, and Jikan in `review/utils/api_utils.py`.
-- Required env vars include `SECRET_KEY`, database `DB_*`, `OMDB_API_KEY`, and `RAWG_API_KEY`.
+- External item providers are OMDb, RAWG, and MyAnimeList in `review/utils/api_utils.py`.
+- Required env vars include `SECRET_KEY`, database `DB_*`, `OMDB_API_KEY`, `RAWG_API_KEY`, and `MAL_CLIENT_ID`.
 - Compose production mounts static files via `./static:/critic/static` and uses `postgres_data` (`docker-compose.yml`).
 - Deployment targets include Docker Compose and k3s manifests in `k8s/` (see `docs/DEPLOYMENT.md`).
 

@@ -175,7 +175,7 @@ class Command(BaseCommand):
         if category == 'game':
             return 'rawg'
         if category in ('anime', 'manga'):
-            return 'jikan'
+            return 'mal'
         return normalize_provider(category)
 
     def _build_provider(self, category):
@@ -185,9 +185,9 @@ class Command(BaseCommand):
             if category == 'game':
                 return api_utils.RAWGItemAPI()
             if category == 'anime':
-                return api_utils.JikanItemAPI('anime')
+                return api_utils.MALItemAPI('anime')
             if category == 'manga':
-                return api_utils.JikanItemAPI('manga')
+                return api_utils.MALItemAPI('manga')
         except RuntimeError as ex:
             self.stderr.write(self.style.WARNING(f'Provider init failed for {category}: {ex}'))
             return None

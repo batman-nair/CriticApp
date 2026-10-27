@@ -40,6 +40,7 @@ Required keys:
 - `DB_PORT`
 - `OMDB_API_KEY`
 - `RAWG_API_KEY`
+- `MAL_CLIENT_ID`
 
 Apply it:
 
