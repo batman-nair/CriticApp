@@ -12,6 +12,14 @@ ORDERING_DICT = {
     '-date': '-modified_date',
 }
 
+# Filters narrower than a category, used as "<category>:<subcategory>" in the
+# category filters. Anime keeps the MAL (earlier Jikan) media type in attr3.
+_ANIME_MOVIE = Q(review_item__category='anime', review_item__attr3__iexact='movie')
+SUBCATEGORY_FILTERS = {
+    'anime:series': Q(review_item__category='anime') & ~Q(review_item__attr3__iexact='movie'),
+    'anime:movie': _ANIME_MOVIE,
+}
+
 
 def _normalize_categories(values: Optional[list]) -> list:
     if not values:
@@ -23,6 +31,18 @@ def _normalize_categories(values: Optional[list]) -> list:
         parts = [part.strip() for part in str(value).split(',') if part.strip()]
         normalized.extend(parts)
     return normalized
+
+
+def _categories_to_q(categories: list) -> Optional[Q]:
+    plain_categories = [category for category in categories if ':' not in category]
+    query_obj = Q(review_item__category__in=plain_categories) if plain_categories else None
+    for category in categories:
+        if ':' not in category:
+            continue
+        # Unknown subcategories match nothing, like unknown categories do.
+        sub_query_obj = SUBCATEGORY_FILTERS.get(category, Q(pk__in=[]))
+        query_obj = sub_query_obj if query_obj is None else query_obj | sub_query_obj
+    return query_obj
 
 
 def get_filtered_review_objects(
@@ -62,13 +82,13 @@ def get_filtered_review_objects(
     explicit_exclude_categories = _normalize_categories(exclude_categories)
 
     if include_categories:
-        reviews = reviews.filter(review_item__category__in=include_categories)
+        reviews = reviews.filter(_categories_to_q(include_categories))
 
     if legacy_exclude_categories:
-        reviews = reviews.exclude(review_item__category__in=legacy_exclude_categories)
+        reviews = reviews.exclude(_categories_to_q(legacy_exclude_categories))
 
     if explicit_exclude_categories:
-        reviews = reviews.exclude(review_item__category__in=explicit_exclude_categories)
+        reviews = reviews.exclude(_categories_to_q(explicit_exclude_categories))
 
     ordering = ORDERING_DICT.get(ordering, '')
     if ordering in ('review_item__title', '-review_item__title'):

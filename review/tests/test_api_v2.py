@@ -104,6 +104,20 @@ class ReviewV2Phase2Test(APITestCase):
         categories = {row['review_item']['category'] for row in json_data['data']}
         self.assertEqual(categories, {'movie'})
 
+    def test_v2_exclude_categories_accepts_anime_subcategories(self):
+        for item_id, attr3 in (('jikan_anime_1', 'tv'), ('jikan_anime_2', 'movie')):
+            item = ReviewItem.objects.create(
+                item_id=item_id, category='anime', title=item_id, image_url='https://example.com/a.png',
+                year='2020', attr1='A', attr2='B', attr3=attr3, description='D', rating='8.0',
+            )
+            Review.objects.create(user=self.user, review_item=item, review_rating=Decimal('8.0'))
+
+        response = self.client.get('/api/v2/reviews/', {'exclude_categories': 'movie,game,anime:movie'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        item_ids = [row['review_item']['item_id'] for row in response.json()['data']]
+        self.assertEqual(item_ids, ['jikan_anime_1'])
+
     # --- item_id filter (replaces get_user_review) ---
 
     def test_v2_review_list_filter_by_item_id(self):

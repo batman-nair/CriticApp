@@ -64,6 +64,7 @@ Versioning options:
   - `item_id` — filter by review item ID (use with `username` to check if a user reviewed a specific item)
   - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`; accepts comma-separated values or repeated params
   - `exclude_categories` — exclude list; accepts comma-separated values or repeated params
+  - Both lists also accept `anime:series` and `anime:movie` to include or exclude only anime series (TV, ONA, OVA, specials, …) or anime movies
   - `ordering` — `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`
   - `limit` — page size (default 20)
   - `offset` — pagination offset

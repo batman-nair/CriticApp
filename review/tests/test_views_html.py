@@ -14,6 +14,11 @@ class HTMLViewSmokeTest(TestCase):
         response = self.client.get('/')
         self.assertContains(response, 'id="filter-series"')
 
+    def test_view_reviews_page_lists_anime_subcategory_filters(self):
+        response = self.client.get('/')
+        self.assertContains(response, 'value="anime:series"')
+        self.assertContains(response, 'value="anime:movie"')
+
     def test_add_review_page_offers_series(self):
         get_user_model().objects.create_user(username='adduser', password='pass12345')
         self.client.login(username='adduser', password='pass12345')

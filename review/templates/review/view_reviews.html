@@ -109,7 +109,7 @@
             <span class="visually-hidden">Categories</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="category-filter-dropdown">
-            {% for category in categories %}
+            {% for category, subcategories in categories %}
             <li>
                 <div class="dropdown-item">
                     <input class="form-check-input filter-category" type="checkbox" checked value="{{ category }}"
@@ -119,6 +119,17 @@
                     </label>
                 </div>
             </li>
+            {% for subcategory, label in subcategories %}
+            <li>
+                <div class="dropdown-item ps-5">
+                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ subcategory }}"
+                        onchange="updateReviews()" id="filter-{{ subcategory|slugify }}">
+                    <label class="form-check-label filter-category-label w-100" for="filter-{{ subcategory|slugify }}">
+                        {{ label }}
+                    </label>
+                </div>
+            </li>
+            {% endfor %}
             {% endfor %}
         </ul>
     </div>

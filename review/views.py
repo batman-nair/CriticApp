@@ -29,6 +29,16 @@ CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'manga': api_utils.MALItemAPI('manga'),
 }
 
+# Each category with the (value, label) subcategory filters shown under it.
+FILTER_CATEGORIES = [
+    (category, [
+        (subcategory, subcategory.split(':', 1)[1])
+        for subcategory in review_utils.SUBCATEGORY_FILTERS
+        if subcategory.startswith(category + ':')
+    ])
+    for category in CATEGORY_TO_API
+]
+
 
 def _build_search_result_from_item(item_data):
     return {
@@ -50,7 +60,7 @@ def metrics_endpoint(request):
     return metrics.metrics_http_response()
 
 def view_reviews(request):
-    return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys()})
+    return render(request, 'review/view_reviews.html', {'categories': FILTER_CATEGORIES})
 
 @login_required
 def add_review(request):
@@ -63,7 +73,7 @@ def profile_redirect(request):
     return redirect('review:profile', username=request.user.username)
 
 def view_profile(request, username):
-    return render(request, 'review/view_reviews.html', {'categories': CATEGORY_TO_API.keys(), 'username': username})
+    return render(request, 'review/view_reviews.html', {'categories': FILTER_CATEGORIES, 'username': username})
 
 
 # ============================================================================
@@ -101,8 +111,8 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
             OpenApiParameter('query', str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('username', str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('item_id', str, OpenApiParameter.QUERY, required=False, description='Filter by review item ID'),
-            OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list'),
-            OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list'),
+            OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list. Also accepts anime:series and anime:movie'),
+            OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list. Also accepts anime:series and anime:movie'),
             OpenApiParameter('ordering', str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('offset', int, OpenApiParameter.QUERY, required=False),
