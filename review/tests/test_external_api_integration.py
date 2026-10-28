@@ -8,7 +8,7 @@ _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
 
 @pytest.mark.integration
-class UtilAPITest:
+class TestUtilAPI:
     """Integration tests that hit real external APIs (OMDb, RAWG, MyAnimeList).
 
     Skipped in CI by default. Run with: pytest -m integration

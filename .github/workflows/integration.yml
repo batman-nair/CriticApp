@@ -1,0 +1,54 @@
+name: Integration tests
+
+# Hits the real OMDb/RAWG/MyAnimeList APIs, so it runs on a schedule rather
+# than on every PR. Catches upstream API changes that the mocked tests can't.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: critic.settings.test
+      SECRET_KEY: ci-dummy-secret-key-not-for-production
+      OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+      RAWG_API_KEY: ${{ secrets.RAWG_API_KEY }}
+      MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check API keys are configured
+        run: |
+          for name in OMDB_API_KEY RAWG_API_KEY MAL_CLIENT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name secret is required"
+              exit 1
+            fi
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install system packages for psycopg2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc libpq-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run integration tests
+        run: python -m pytest -m integration -v
