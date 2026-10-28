@@ -62,8 +62,9 @@ Versioning options:
   - `query` — free-text search across title, tags, description, attributes, year
   - `username` — filter by reviewer username
   - `item_id` — filter by review item ID (use with `username` to check if a user reviewed a specific item)
-  - `categories` — include list of `movie`, `game`, `anime`, `manga`; accepts comma-separated values or repeated params
+  - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`; accepts comma-separated values or repeated params
   - `exclude_categories` — exclude list; accepts comma-separated values or repeated params
+  - Both lists also accept `anime:series` and `anime:movie` to include or exclude only anime series (TV, ONA, OVA, specials, …) or anime movies
   - `ordering` — `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`
   - `limit` — page size (default 20)
   - `offset` — pagination offset
@@ -98,10 +99,10 @@ Versioning options:
 - Method: `GET`
 - Path: `/api/v2/lookup/search/<category>/?q=<search_term>`
 - Auth: required
-- Categories: `movie`, `game`, `anime`, `manga`
+- Categories: `movie`, `series`, `game`, `anime`, `manga`
 - Notes:
   - `q` accepts normal title search text for all categories.
-  - For `movie`, `q` can also be a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
+  - For `movie` and `series`, `q` can also be a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
   - IMDb title URLs are normalized to the existing `omdb_tt...` item ID and returned as a single exact-match result.
 - Response: `{ "data": [{ "item_id": "...", "title": "...", ... }], "meta": { "version": "2.0" } }`
 - Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`
@@ -110,9 +111,10 @@ Versioning options:
 - Method: `GET`
 - Path: `/api/v2/lookup/item/<category>/<item_id>/`
 - Auth: required
-- Categories: `movie`, `game`, `anime`, `manga`
+- Categories: `movie`, `series`, `game`, `anime`, `manga`
 - Response: `{ "data": { "item_id": "...", "title": "...", ... }, "meta": { "version": "2.0" } }`
 - Behavior: returns cached item from DB if available, otherwise fetches from external provider and persists
+- `movie` and `series` both use OMDb. Searches only return titles of that type, and fetching a series under `movie` (or a non-series under `series`) returns `UPSTREAM_ERROR`.
 - Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`, 400 `SERIALIZATION_ERROR`
 
 ## Public Endpoints

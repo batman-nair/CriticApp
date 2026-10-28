@@ -10,6 +10,21 @@ class HTMLViewSmokeTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'review/view_reviews.html')
 
+    def test_view_reviews_page_lists_series_filter(self):
+        response = self.client.get('/')
+        self.assertContains(response, 'id="filter-series"')
+
+    def test_view_reviews_page_lists_anime_subcategory_filters(self):
+        response = self.client.get('/')
+        self.assertContains(response, 'value="anime:series"')
+        self.assertContains(response, 'value="anime:movie"')
+
+    def test_add_review_page_offers_series(self):
+        get_user_model().objects.create_user(username='adduser', password='pass12345')
+        self.client.login(username='adduser', password='pass12345')
+        response = self.client.get('/add')
+        self.assertContains(response, 'data-category="series"')
+
     def test_add_review_requires_login(self):
         response = self.client.get('/add')
         self.assertEqual(response.status_code, 302)

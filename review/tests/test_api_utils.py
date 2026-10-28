@@ -6,6 +6,7 @@ import requests
 from review.utils.api_utils import (
     MISSING_PREFIX_RESPONSE,
     MALItemAPI,
+    OMDBItemAPI,
     normalize_imdb_title_url_to_item_id,
     request_json_with_retry,
 )
@@ -191,6 +192,68 @@ class MALItemAPITest(SimpleTestCase):
 
         self.assertEqual(result, MISSING_PREFIX_RESPONSE)
         get_mock.assert_not_called()
+
+
+def _omdb_title(type_='movie', **extra):
+    data = {
+        'Response': 'True',
+        'imdbID': 'tt0903747',
+        'Title': 'Breaking Bad',
+        'Poster': 'https://img/bb.jpg',
+        'Year': '2008–2013',
+        'Genre': 'Crime, Drama',
+        'Director': 'N/A',
+        'Writer': 'Vince Gilligan',
+        'Actors': 'Bryan Cranston',
+        'Type': type_,
+        'Plot': 'A chemistry teacher turns to crime.',
+        'imdbRating': '9.5',
+    }
+    data.update(extra)
+    return data
+
+
+@mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123'})
+class OMDBItemAPITest(SimpleTestCase):
+    def test_rejects_unknown_type(self):
+        with self.assertRaises(RuntimeError):
+            OMDBItemAPI('episode')
+
+    def test_search_filters_by_type(self):
+        search_json = {'Response': 'True', 'Search': [_omdb_title('series')]}
+        for type_ in ('movie', 'series'):
+            with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=search_json)) as get_mock:
+                OMDBItemAPI(type_).search('breaking')
+            self.assertIn('&type={}&'.format(type_), get_mock.call_args.args[0])
+
+    def test_series_details_for_series(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title('series'))):
+            result = OMDBItemAPI('series').get_details('omdb_tt0903747')
+
+        self.assertEqual(result['response'], 'True')
+        self.assertEqual(result['item_id'], 'omdb_tt0903747')
+        self.assertEqual(result['attr3'], 'series')
+
+    def test_movie_details_reject_series(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title('series'))):
+            result = OMDBItemAPI('movie').get_details('omdb_tt0903747')
+
+        self.assertEqual(result['response'], 'False')
+        self.assertEqual(result['error'], 'This title is a series. Pick the Series category.')
+
+    def test_series_details_reject_movie(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title('movie'))):
+            result = OMDBItemAPI('series').get_details('omdb_tt0903747')
+
+        self.assertEqual(result['response'], 'False')
+        self.assertEqual(result['error'], 'This title is not a series. Pick the Movie category.')
+
+    def test_movie_details_accept_other_types(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title('episode'))):
+            result = OMDBItemAPI('movie').get_details('omdb_tt0903747')
+
+        self.assertEqual(result['response'], 'True')
+        self.assertEqual(result['attr3'], 'episode')
 
 
 def test_normalize_imdb_title_url_to_item_id_accepts_title_url():

@@ -170,7 +170,7 @@ class Command(BaseCommand):
                 )
 
     def _provider_name_for_category(self, category):
-        if category == 'movie':
+        if category in ('movie', 'series'):
             return 'omdb'
         if category == 'game':
             return 'rawg'
@@ -180,8 +180,8 @@ class Command(BaseCommand):
 
     def _build_provider(self, category):
         try:
-            if category == 'movie':
-                return api_utils.OMDBItemAPI()
+            if category in ('movie', 'series'):
+                return api_utils.OMDBItemAPI(category)
             if category == 'game':
                 return api_utils.RAWGItemAPI()
             if category == 'anime':

@@ -165,3 +165,12 @@ class RefreshReviewItemsCommandTest(TestCase):
         self.assertEqual(kwargs['skipped'], 0)
         self.assertIn('omdb', kwargs['provider_totals'])
         self.assertEqual(kwargs['provider_totals']['omdb']['processed'], 1)
+
+    @mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123'})
+    def test_series_items_use_series_omdb_provider(self):
+        from review.management.commands.refresh_review_items import Command
+
+        provider = Command()._build_provider('series')
+
+        self.assertEqual(provider.type_, 'series')
+        self.assertEqual(Command()._provider_name_for_category('series'), 'omdb')
