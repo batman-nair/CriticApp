@@ -22,7 +22,8 @@ from .permissions import IsOwnerOrReadOnly
 from .response_formatters import success_response, error_response
 
 CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
-    'movie': api_utils.OMDBItemAPI(),
+    'movie': api_utils.OMDBItemAPI('movie'),
+    'series': api_utils.OMDBItemAPI('series'),
     'game': api_utils.RAWGItemAPI(),
     'anime': api_utils.MALItemAPI('anime'),
     'manga': api_utils.MALItemAPI('manga'),
@@ -267,7 +268,7 @@ class SearchItemV2(APIView):
 
         api_obj = CATEGORY_TO_API[category]
         normalized_item_id = None
-        if category == 'movie':
+        if category in ('movie', 'series'):
             normalized_item_id = api_utils.normalize_imdb_title_url_to_item_id(search_term)
 
         if normalized_item_id is not None:

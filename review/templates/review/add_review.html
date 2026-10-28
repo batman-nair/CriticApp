@@ -18,6 +18,10 @@
       <span class="category-icon" aria-hidden="true">🎬</span>
       <span class="category-label">Movie</span>
     </button>
+    <button class="category-card" data-category="series" aria-pressed="false">
+      <span class="category-icon" aria-hidden="true">📺</span>
+      <span class="category-label">Series</span>
+    </button>
     <button class="category-card" data-category="game" aria-pressed="false">
       <span class="category-icon" aria-hidden="true">🎮</span>
       <span class="category-label">Game</span>
@@ -137,8 +141,8 @@
       // Show search section
       searchSection.classList.add('revealed');
 
-      // IMDb hint only for movies
-      if (selectedCategory === 'movie') {
+      // IMDb hint only for movies and series
+      if (selectedCategory === 'movie' || selectedCategory === 'series') {
         imdbHint.removeAttribute('hidden');
       } else {
         imdbHint.setAttribute('hidden', '');
@@ -211,7 +215,7 @@
       selectedCategory = urlCategory;
       categoryInput.value = urlCategory;
       searchSection.classList.add('revealed');
-      if (urlCategory === 'movie') imdbHint.removeAttribute('hidden');
+      if (urlCategory === 'movie' || urlCategory === 'series') imdbHint.removeAttribute('hidden');
     }
     validateAndPopulateReviewItemData(urlCategory, item_id).then(() => {
       reviewFormSection.classList.add('revealed');

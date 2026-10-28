@@ -104,7 +104,11 @@ class ReviewItemAPIBase(ABC):
 
 
 class OMDBItemAPI(ReviewItemAPIBase):
-    def __init__(self):
+    def __init__(self, type: str='movie'):
+        if type not in ['movie', 'series']:
+            raise RuntimeError('OMDB API should be of type "movie" or "series".')
+        self.type_ = type
+        # Movies and series share the prefix, so ids from before the split stay valid.
         self.prefix = 'omdb_'
         self._api_key = os.environ.get('OMDB_API_KEY', None)
         if not self._api_key:
@@ -112,7 +116,8 @@ class OMDBItemAPI(ReviewItemAPIBase):
         self._base_url = 'http://www.omdbapi.com/?apikey={}'.format(self._api_key)
 
     def search(self, query) -> dict:
-        search_url = '{base_url}&s={movie_name}'.format(base_url=self._base_url, movie_name=query)
+        search_url = '{base_url}&type={type}&s={movie_name}'.format(
+            base_url=self._base_url, type=self.type_, movie_name=query)
         omdb_json, response = request_json_with_retry(search_url, source_name='OMDB API')
         if response:
             response["query"] = query
@@ -126,6 +131,14 @@ class OMDBItemAPI(ReviewItemAPIBase):
         info_url = '{base_url}&i={imdb_id}'.format(base_url=self._base_url, imdb_id=item_id)
         omdb_json, response = request_json_with_retry(info_url, source_name='OMDB API')
         if response:
+            response["item_id"] = item_id
+            return response
+        if omdb_json.get("Response") == "True" and (omdb_json.get("Type") == "series") != (self.type_ == "series"):
+            response = NOT_OK_RESPONSE.copy()
+            if self.type_ == "series":
+                response["error"] = "This title is not a series. Pick the Movie category."
+            else:
+                response["error"] = "This title is a series. Pick the Series category."
             response["item_id"] = item_id
             return response
         return self._convert_to_review(omdb_json)

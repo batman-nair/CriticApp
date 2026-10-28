@@ -208,6 +208,7 @@ class LookupV2Test(APITestCase):
         from review import views
         self._original_category_to_api = dict(views.CATEGORY_TO_API)
         views.CATEGORY_TO_API['movie'] = _FakeLookupAPI()
+        views.CATEGORY_TO_API['series'] = _FakeLookupAPI()
         views.CATEGORY_TO_API['game'] = _FakeLookupAPI()
 
     # --- SearchItemV2 ---
@@ -246,6 +247,14 @@ class LookupV2Test(APITestCase):
         self.assertEqual(len(json_data['data']), 1)
         self.assertEqual(json_data['data'][0]['item_id'], 'omdb_tt9999999')
         self.assertEqual(json_data['data'][0]['title'], 'Title')
+
+    def test_search_v2_series_imdb_url_returns_exact_result(self):
+        self._patch_category_api()
+        response = self.client.get('/api/v2/lookup/search/series/', {'q': 'https://www.imdb.com/title/tt0903747/'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        json_data = response.json()
+        self.assertEqual(len(json_data['data']), 1)
+        self.assertEqual(json_data['data'][0]['item_id'], 'omdb_tt0903747')
 
     def test_search_v2_invalid_category(self):
         response = self.client.get('/api/v2/lookup/search/invalid/', {'q': 'test'})
@@ -293,6 +302,12 @@ class LookupV2Test(APITestCase):
         response = self.client.get('/api/v2/lookup/item/movie/omdb_tt8888888/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(ReviewItem.objects.filter(item_id='omdb_tt8888888').exists())
+
+    def test_get_item_info_v2_saves_series_category(self):
+        self._patch_category_api()
+        response = self.client.get('/api/v2/lookup/item/series/omdb_tt0903747/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(ReviewItem.objects.get(item_id='omdb_tt0903747').category, 'series')
 
     def test_get_item_info_v2_invalid_category(self):
         response = self.client.get('/api/v2/lookup/item/invalid/test_id/')
