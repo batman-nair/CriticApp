@@ -14,6 +14,7 @@ class ReviewItem(models.Model):
     attr1 = models.CharField(max_length=300)
     attr2 = models.CharField(max_length=300)
     attr3 = models.CharField(max_length=300)
+    language = models.CharField(max_length=300, blank=True, default='')
     description = models.TextField()
     rating = models.CharField(max_length=5)
     last_refreshed_at = models.DateTimeField(null=True, blank=True, db_index=True)

@@ -136,6 +136,9 @@ async function updateReviewItem(category, itemID, reviewCard) {
     setImageWithFallback(imageDOM, data["image_url"], ["review-add-image-placeholder"]);
     yearDOM.innerText = data["year"];
     reviewCard.querySelector(".review-attr1").innerText = data["attr1"];
+    const languageDOM = reviewCard.querySelector(".review-language");
+    languageDOM.innerText = data["language"];
+    languageDOM.parentElement.hidden = !data["language"];
     let descriptionDOM = reviewCard.querySelector(".review-description");
     let descriptionDOMBelow = reviewCard.querySelector(".review-description-below");
     if (imageDOM.width > imageDOM.height || data["description"].length > 300) {
@@ -232,6 +235,7 @@ function buildReviewGridItem(review) {
         { cls: 'description', val: review.review_item.description, isDiv: true },
         { cls: 'attr2', val: review.review_item.attr2 },
         { cls: 'attr3', val: review.review_item.attr3 },
+        { cls: 'language', val: review.review_item.language },
         { cls: 'review-tags', val: review.review_tags },
     ];
 
@@ -270,6 +274,7 @@ function getReviewDataFromCard(reviewObject) {
         attr1: reviewObject.querySelector(".attr1").textContent,
         attr2: reviewObject.querySelector(".attr2").textContent,
         attr3: reviewObject.querySelector(".attr3").textContent,
+        language: reviewObject.querySelector(".language").textContent,
         item_id: reviewObject.querySelector(".item-id").textContent,
         category: reviewObject.querySelector(".category").textContent,
         review_tags: reviewObject.querySelector(".review-tags").textContent,
@@ -287,6 +292,7 @@ function populateModalFromReviewData(modalObj, reviewData) {
     modalObj.querySelector(".attr1").innerText = reviewData.attr1;
     modalObj.querySelector(".attr2").innerText = reviewData.attr2;
     modalObj.querySelector(".attr3").innerText = reviewData.attr3;
+    modalObj.querySelector(".language").innerText = reviewData.language;
     modalObj.querySelector(".review-data").innerText = reviewData.review_data;
     modalObj.querySelector(".review-rating").innerText = reviewData.review_rating;
     modalObj.querySelector(".description").innerText = reviewData.description;
