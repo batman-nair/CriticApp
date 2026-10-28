@@ -145,6 +145,7 @@ class Command(BaseCommand):
                 item.attr1 = details.get('attr1', item.attr1)
                 item.attr2 = details.get('attr2', item.attr2)
                 item.attr3 = details.get('attr3', item.attr3)
+                item.language = details.get('language', item.language)
                 item.description = details.get('description', item.description)
                 item.rating = str(details.get('rating', item.rating))
                 item.last_refreshed_at = now

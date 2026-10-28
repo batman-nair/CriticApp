@@ -174,3 +174,30 @@ class RefreshReviewItemsCommandTest(TestCase):
 
         self.assertEqual(provider.type_, 'series')
         self.assertEqual(Command()._provider_name_for_category('series'), 'omdb')
+
+    def test_refresh_fills_language(self):
+        item = self._create_item('omdb_lang')
+        provider = _ProviderStub({
+            'omdb_lang': {
+                'response': 'True',
+                'title': 'Old Title',
+                'attr3': 'movie',
+                'language': 'Japanese, English',
+            },
+        })
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        item.refresh_from_db()
+        self.assertEqual(item.language, 'Japanese, English')
+
+    def test_refresh_keeps_language_when_provider_has_none(self):
+        item = self._create_item('rawg_lang', category='game', language='English')
+        provider = _ProviderStub({'rawg_lang': {'response': 'True', 'title': 'Old Title'}})
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        item.refresh_from_db()
+        self.assertEqual(item.language, 'English')

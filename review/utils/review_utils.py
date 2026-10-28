@@ -63,6 +63,7 @@ def get_filtered_review_objects(
         word_query_obj |= Q(review_item__attr2__icontains=word)
         word_query_obj |= Q(review_item__year__icontains=word)
         word_query_obj |= Q(review_item__attr3__icontains=word)
+        word_query_obj |= Q(review_item__language__icontains=word)
         if query_obj is None:
             query_obj = word_query_obj
         else:

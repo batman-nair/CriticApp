@@ -59,7 +59,7 @@ Versioning options:
 - Path: `/api/v2/reviews/`
 - Auth: optional (public)
 - Query params:
-  - `query` — free-text search across title, tags, description, attributes, year
+  - `query` — free-text search across title, tags, description, attributes, language, year
   - `username` — filter by reviewer username
   - `item_id` — filter by review item ID (use with `username` to check if a user reviewed a specific item)
   - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`; accepts comma-separated values or repeated params

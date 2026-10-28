@@ -173,6 +173,8 @@ class OMDBItemAPI(ReviewItemAPIBase):
         crew.discard("N/A")
         json_data["attr2"] = ', '.join(crew)
         json_data["attr3"] = omdb_json["Type"]
+        language = omdb_json.get("Language", "")
+        json_data["language"] = "" if language == "N/A" else language
         json_data["description"] = omdb_json["Plot"]
         json_data["rating"] = omdb_json["imdbRating"]
         return json_data

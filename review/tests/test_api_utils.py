@@ -208,6 +208,7 @@ def _omdb_title(type_='movie', **extra):
         'Type': type_,
         'Plot': 'A chemistry teacher turns to crime.',
         'imdbRating': '9.5',
+        'Language': 'English, Spanish',
     }
     data.update(extra)
     return data
@@ -233,6 +234,13 @@ class OMDBItemAPITest(SimpleTestCase):
         self.assertEqual(result['response'], 'True')
         self.assertEqual(result['item_id'], 'omdb_tt0903747')
         self.assertEqual(result['attr3'], 'series')
+        self.assertEqual(result['language'], 'English, Spanish')
+
+    def test_details_without_language(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title(Language='N/A'))):
+            result = OMDBItemAPI('movie').get_details('omdb_tt0903747')
+
+        self.assertEqual(result['language'], '')
 
     def test_movie_details_reject_series(self):
         with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data=_omdb_title('series'))):

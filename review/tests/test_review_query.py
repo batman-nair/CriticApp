@@ -43,6 +43,12 @@ class ReviewQueryTest(TestCase):
         reviews = review_utils.get_filtered_review_objects(query='Cool but not title')
         self.assertFalse(len(reviews), 'Partial match shouldnt show up')
 
+    def test_language_query_filter(self):
+        item = create_review_item(item_id='test_lang', title='Other title', language='Japanese, English')
+        Review.objects.create(user=self.user, review_item=item, review_rating=8)
+        reviews = review_utils.get_filtered_review_objects(query='japanese')
+        self.assertEqual([review.review_item.item_id for review in reviews], ['test_lang'])
+
     def test_username_filter(self):
         reviews = review_utils.get_filtered_review_objects(username='testuser')
         self.assertTrue(len(reviews))
