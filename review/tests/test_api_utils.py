@@ -36,8 +36,9 @@ class RequestJsonRetryTest(SimpleTestCase):
         sleep_mock.assert_called_once_with(1)
 
     def test_returns_status_reason_on_final_failure(self):
-        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(503, reason='Service Unavailable')):
-            json_data, error = request_json_with_retry('https://example.com', source_name='Test API')
+        with mock.patch('review.utils.api_utils.time.sleep'):
+            with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(503, reason='Service Unavailable')):
+                json_data, error = request_json_with_retry('https://example.com', source_name='Test API')
 
         self.assertEqual(json_data, {})
         self.assertEqual(error['response'], 'False')
