@@ -113,6 +113,7 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
             OpenApiParameter('item_id', str, OpenApiParameter.QUERY, required=False, description='Filter by review item ID'),
             OpenApiParameter('categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated include list. Also accepts anime:series and anime:movie'),
             OpenApiParameter('exclude_categories', str, OpenApiParameter.QUERY, required=False, description='Comma-separated exclude list. Also accepts anime:series and anime:movie'),
+            OpenApiParameter('languages', str, OpenApiParameter.QUERY, required=False, description='Comma-separated. Matches reviews whose item lists any of these languages'),
             OpenApiParameter('ordering', str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False),
             OpenApiParameter('offset', int, OpenApiParameter.QUERY, required=False),
@@ -126,6 +127,7 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
         filter_categories = request.GET.getlist('filter_categories')
         categories = request.GET.getlist('categories')
         exclude_categories = request.GET.getlist('exclude_categories')
+        languages = request.GET.getlist('languages')
         ordering = request.GET.get('ordering', '')
         reviews = review_utils.get_filtered_review_objects(
             query,
@@ -135,6 +137,7 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
             categories,
             exclude_categories,
             item_id,
+            languages=languages,
         )
 
         paginator_class = api_settings.DEFAULT_PAGINATION_CLASS
