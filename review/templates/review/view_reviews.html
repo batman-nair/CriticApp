@@ -162,7 +162,10 @@
 </div>
 
 <div class="text-center my-4" id="load-more-container" hidden>
-    <button class="btn btn-outline-primary" id="load-more-button" onclick="loadMore()">Load More</button>
+    <div class="text-muted" id="load-more-indicator" role="status" hidden>
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading…
+    </div>
+    <button class="btn btn-outline-primary" id="load-more-button" onclick="loadMore()" hidden>Load More</button>
 </div>
 
 <script src="{% static 'review/js/review.js' %}"></script>
@@ -176,10 +179,33 @@
     const pageLimit = 20;
     var currentOffset = 0;
     var totalCount = 0;
+    var isLoadingReviews = false;
+    var requestToken = 0;
+    var loadMoreFailed = false;
     const masonry = new Masonry('#review-container', options = {
         percentPosition: true,
         horizontalOrder: false,
     });
+
+    // Load the next page when the bottom of the list comes near the viewport.
+    const loadMoreContainer = document.querySelector("#load-more-container");
+    const supportsAutoLoad = 'IntersectionObserver' in window;
+    const loadMoreObserver = supportsAutoLoad ? new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+            loadMore();
+        }
+    }, { rootMargin: '0px 0px 400px 0px' }) : null;
+    if (loadMoreObserver) {
+        loadMoreObserver.observe(loadMoreContainer);
+    }
+
+    // Re-observing makes the observer report the current position again, so a
+    // list that still doesn't fill the viewport keeps loading.
+    function recheckAutoLoad() {
+        if (!loadMoreObserver) return;
+        loadMoreObserver.unobserve(loadMoreContainer);
+        loadMoreObserver.observe(loadMoreContainer);
+    }
 
 
     ORDERING_STRING_MAP = {
@@ -211,46 +237,92 @@
         document.querySelector("#review-loading-message").setAttribute("hidden", "");
         document.querySelector("#review-container").removeAttribute("hidden");
     }
+    // Each new list (search, filter, sort) bumps requestToken. Responses that
+    // carry an older token are dropped so they can't change the current list.
     function updateReviewsImpl() {
-        currentOffset = 0;
+        const token = ++requestToken;
+        isLoadingReviews = true;
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
         getReviews(queryString, username, filterCategories, ordering, pageLimit, 0)
             .then(({ reviews, pagination }) => {
+                if (token !== requestToken) return;
+                currentOffset = 0;
+                loadMoreFailed = false;
                 totalCount = pagination.count;
                 showReviewLoading();
+                loadMoreContainer.setAttribute("hidden", "");
                 populateReviewCards('#review-container', reviews);
-                updateLoadMoreButton();
                 imagesLoaded('#review-container', () => {
+                    if (token !== requestToken) return;
                     hideReviewLoading();
                     masonry.reloadItems();
                     masonry.layout();
+                    updateLoadMoreButton();
+                    isLoadingReviews = false;
+                    recheckAutoLoad();
                 })
             })
+            .catch(() => {
+                if (token !== requestToken) return;
+                isLoadingReviews = false;
+                // The cards on screen don't match the new search, so stop paging them.
+                totalCount = 0;
+                updateLoadMoreButton();
+                // A dropped response may have left its cards behind "Loading reviews...".
+                if (document.querySelector("#review-container").children.length) {
+                    imagesLoaded('#review-container', () => {
+                        if (token !== requestToken) return;
+                        hideReviewLoading();
+                        masonry.reloadItems();
+                        masonry.layout();
+                    })
+                }
+            });
     }
 
     function loadMore() {
-        currentOffset += pageLimit;
+        if (isLoadingReviews) return;
+        const token = requestToken;
+        const nextOffset = currentOffset + pageLimit;
+        isLoadingReviews = true;
+        loadMoreFailed = false;
+        updateLoadMoreButton();
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
-        getReviews(queryString, username, filterCategories, ordering, pageLimit, currentOffset)
+        getReviews(queryString, username, filterCategories, ordering, pageLimit, nextOffset)
             .then(({ reviews, pagination }) => {
+                if (token !== requestToken) return;
+                currentOffset = nextOffset;
                 totalCount = pagination.count;
                 appendReviewCards('#review-container', reviews);
                 updateLoadMoreButton();
                 imagesLoaded('#review-container', () => {
+                    if (token !== requestToken) return;
                     masonry.reloadItems();
                     masonry.layout();
+                    isLoadingReviews = false;
+                    recheckAutoLoad();
                 })
             })
+            .catch(() => {
+                if (token !== requestToken) return;
+                isLoadingReviews = false;
+                loadMoreFailed = true;
+                updateLoadMoreButton();
+            });
     }
 
+    // While more reviews remain, show the loading indicator. Fall back to the
+    // "Load More" button after a failed load or without IntersectionObserver.
     function updateLoadMoreButton() {
-        const container = document.querySelector("#load-more-container");
         if (currentOffset + pageLimit < totalCount) {
-            container.removeAttribute("hidden");
+            const showButton = !supportsAutoLoad || loadMoreFailed;
+            document.querySelector("#load-more-button").toggleAttribute("hidden", !showButton);
+            document.querySelector("#load-more-indicator").toggleAttribute("hidden", showButton);
+            loadMoreContainer.removeAttribute("hidden");
         } else {
-            container.setAttribute("hidden", "");
+            loadMoreContainer.setAttribute("hidden", "");
         }
     }
     const updateReviews = debounce(updateReviewsImpl);

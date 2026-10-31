@@ -19,6 +19,12 @@ class HTMLViewSmokeTest(TestCase):
         self.assertContains(response, 'value="anime:series"')
         self.assertContains(response, 'value="anime:movie"')
 
+    def test_view_reviews_page_has_load_more_sentinel(self):
+        response = self.client.get('/')
+        self.assertContains(response, 'id="load-more-container"')
+        self.assertContains(response, 'id="load-more-indicator"')
+        self.assertContains(response, 'id="load-more-button"')
+
     def test_add_review_page_offers_series(self):
         get_user_model().objects.create_user(username='adduser', password='pass12345')
         self.client.login(username='adduser', password='pass12345')
