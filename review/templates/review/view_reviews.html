@@ -183,6 +183,26 @@
         horizontalOrder: false,
     });
 
+    // Load the next page when the bottom of the list comes near the viewport.
+    const loadMoreContainer = document.querySelector("#load-more-container");
+    const supportsAutoLoad = 'IntersectionObserver' in window;
+    const loadMoreObserver = supportsAutoLoad ? new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !isLoadingReviews) {
+            loadMore();
+        }
+    }, { rootMargin: '0px 0px 400px 0px' }) : null;
+    if (loadMoreObserver) {
+        loadMoreObserver.observe(loadMoreContainer);
+    }
+
+    // Re-observing makes the observer report the current position again, so a
+    // list that still doesn't fill the viewport keeps loading.
+    function recheckAutoLoad() {
+        if (!loadMoreObserver) return;
+        loadMoreObserver.unobserve(loadMoreContainer);
+        loadMoreObserver.observe(loadMoreContainer);
+    }
+
 
     ORDERING_STRING_MAP = {
         "sort-date": "-date",
@@ -234,6 +254,7 @@
                     masonry.reloadItems();
                     masonry.layout();
                     isLoadingReviews = false;
+                    recheckAutoLoad();
                 })
             })
             .catch(() => {
@@ -261,6 +282,7 @@
                     masonry.reloadItems();
                     masonry.layout();
                     isLoadingReviews = false;
+                    recheckAutoLoad();
                 })
             })
             .catch(() => {
