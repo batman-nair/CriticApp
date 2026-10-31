@@ -498,8 +498,8 @@ function deleteReview(reviewId) {
                     // Start masonry removal animation if available or just remove
                     masonry.remove(reviewCardWrapper);
                     masonry.layout();
+                    document.dispatchEvent(new CustomEvent('review-deleted'));
                 }
-                document.dispatchEvent(new CustomEvent('review-deleted'));
 
                 // Close the modals
                 const deleteModalEl = document.querySelector('#delete-modal');

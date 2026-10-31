@@ -136,6 +136,8 @@ class LanguageFilterTest(TestCase):
     def test_matches_whole_entries_only(self):
         self.assertEqual(self._item_ids(languages=['English']), ['omdb_ja_first', 'omdb_ja_last'])
         self.assertEqual(self._item_ids(languages=['Old English']), ['omdb_old_en'])
+        # Every picked language is matched as a whole entry, not just the first one.
+        self.assertEqual(self._item_ids(languages=['Korean', 'English']), ['omdb_ja_first', 'omdb_ja_last', 'omdb_ko'])
 
     def test_case_insensitive(self):
         self.assertEqual(self._item_ids(languages=['japanese']), ['omdb_ja_first', 'omdb_ja_last'])
