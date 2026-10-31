@@ -29,14 +29,15 @@ CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'manga': api_utils.MALItemAPI('manga'),
 }
 
-# Each category with the (value, label) subcategory filters shown under it.
+# (value, label) of each category chip on the reviews page. Anime is split
+# into its series and movie subcategories, which together cover every anime.
 FILTER_CATEGORIES = [
-    (category, [
-        (subcategory, subcategory.split(':', 1)[1])
-        for subcategory in review_utils.SUBCATEGORY_FILTERS
-        if subcategory.startswith(category + ':')
-    ])
-    for category in CATEGORY_TO_API
+    ('movie', 'Movies'),
+    ('series', 'Series'),
+    ('game', 'Games'),
+    ('anime:series', 'Anime series'),
+    ('anime:movie', 'Anime movies'),
+    ('manga', 'Manga'),
 ]
 
 
@@ -60,7 +61,10 @@ def metrics_endpoint(request):
     return metrics.metrics_http_response()
 
 def view_reviews(request):
-    return render(request, 'review/view_reviews.html', {'categories': FILTER_CATEGORIES})
+    return render(request, 'review/view_reviews.html', {
+        'categories': FILTER_CATEGORIES,
+        'languages': review_utils.get_review_languages(),
+    })
 
 @login_required
 def add_review(request):
@@ -73,7 +77,11 @@ def profile_redirect(request):
     return redirect('review:profile', username=request.user.username)
 
 def view_profile(request, username):
-    return render(request, 'review/view_reviews.html', {'categories': FILTER_CATEGORIES, 'username': username})
+    return render(request, 'review/view_reviews.html', {
+        'categories': FILTER_CATEGORIES,
+        'languages': review_utils.get_review_languages(username),
+        'username': username,
+    })
 
 
 # ============================================================================
