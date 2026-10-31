@@ -54,10 +54,6 @@
     margin: 0;
     flex-shrink: 0;
 }
-.filter-chip-language .dropdown-item-text {
-    width: 16rem;
-    white-space: normal;
-}
 @media (max-width: 575.98px) {
     .filter-chip-language {
         margin-left: 0;

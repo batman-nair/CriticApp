@@ -146,9 +146,6 @@
                 </div>
             </li>
             {% endfor %}
-            <li><hr class="dropdown-divider"></li>
-            <li><span class="dropdown-item-text small text-muted">Only movies and series have a language. Other
-                    reviews are hidden while one is picked.</span></li>
         </ul>
     </div>
     {% endif %}
@@ -280,6 +277,8 @@
             languageChip.textContent = `${picked.length} languages`;
         }
         languageChip.classList.toggle("is-set", picked.length > 0);
+        // The label changes the chip's width, so re-align the open menu with it.
+        bootstrap.Dropdown.getInstance(languageChip)?.update();
     }
     for (const box of languageBoxes) {
         box.addEventListener("change", () => {
