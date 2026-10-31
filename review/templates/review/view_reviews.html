@@ -176,6 +176,8 @@
     const pageLimit = 20;
     var currentOffset = 0;
     var totalCount = 0;
+    var isLoadingReviews = false;
+    var requestToken = 0;
     const masonry = new Masonry('#review-container', options = {
         percentPosition: true,
         horizontalOrder: false,
@@ -211,38 +213,60 @@
         document.querySelector("#review-loading-message").setAttribute("hidden", "");
         document.querySelector("#review-container").removeAttribute("hidden");
     }
+    // Each new list (search, filter, sort) bumps requestToken. Responses that
+    // carry an older token are dropped so they can't change the current list.
     function updateReviewsImpl() {
-        currentOffset = 0;
+        const token = ++requestToken;
+        isLoadingReviews = true;
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
         getReviews(queryString, username, filterCategories, ordering, pageLimit, 0)
             .then(({ reviews, pagination }) => {
+                if (token !== requestToken) return;
+                currentOffset = 0;
                 totalCount = pagination.count;
                 showReviewLoading();
                 populateReviewCards('#review-container', reviews);
                 updateLoadMoreButton();
                 imagesLoaded('#review-container', () => {
+                    if (token !== requestToken) return;
                     hideReviewLoading();
                     masonry.reloadItems();
                     masonry.layout();
+                    isLoadingReviews = false;
                 })
             })
+            .catch(() => {
+                if (token !== requestToken) return;
+                isLoadingReviews = false;
+            });
     }
 
     function loadMore() {
-        currentOffset += pageLimit;
+        if (isLoadingReviews) return;
+        const token = requestToken;
+        const nextOffset = currentOffset + pageLimit;
+        isLoadingReviews = true;
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
-        getReviews(queryString, username, filterCategories, ordering, pageLimit, currentOffset)
+        getReviews(queryString, username, filterCategories, ordering, pageLimit, nextOffset)
             .then(({ reviews, pagination }) => {
+                if (token !== requestToken) return;
+                currentOffset = nextOffset;
                 totalCount = pagination.count;
                 appendReviewCards('#review-container', reviews);
                 updateLoadMoreButton();
                 imagesLoaded('#review-container', () => {
+                    if (token !== requestToken) return;
                     masonry.reloadItems();
                     masonry.layout();
+                    isLoadingReviews = false;
                 })
             })
+            .catch(() => {
+                if (token !== requestToken) return;
+                isLoadingReviews = false;
+            });
     }
 
     function updateLoadMoreButton() {
