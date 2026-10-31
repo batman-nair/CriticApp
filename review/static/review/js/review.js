@@ -499,6 +499,7 @@ function deleteReview(reviewId) {
                     masonry.remove(reviewCardWrapper);
                     masonry.layout();
                 }
+                document.dispatchEvent(new CustomEvent('review-deleted'));
 
                 // Close the modals
                 const deleteModalEl = document.querySelector('#delete-modal');
