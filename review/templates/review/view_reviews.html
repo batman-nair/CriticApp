@@ -162,7 +162,10 @@
 </div>
 
 <div class="text-center my-4" id="load-more-container" hidden>
-    <button class="btn btn-outline-primary" id="load-more-button" onclick="loadMore()">Load More</button>
+    <div class="text-muted" id="load-more-indicator" role="status" hidden>
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading…
+    </div>
+    <button class="btn btn-outline-primary" id="load-more-button" onclick="loadMore()" hidden>Load More</button>
 </div>
 
 <script src="{% static 'review/js/review.js' %}"></script>
@@ -178,6 +181,7 @@
     var totalCount = 0;
     var isLoadingReviews = false;
     var requestToken = 0;
+    var loadMoreFailed = false;
     const masonry = new Masonry('#review-container', options = {
         percentPosition: true,
         horizontalOrder: false,
@@ -244,6 +248,7 @@
             .then(({ reviews, pagination }) => {
                 if (token !== requestToken) return;
                 currentOffset = 0;
+                loadMoreFailed = false;
                 totalCount = pagination.count;
                 showReviewLoading();
                 populateReviewCards('#review-container', reviews);
@@ -268,6 +273,8 @@
         const token = requestToken;
         const nextOffset = currentOffset + pageLimit;
         isLoadingReviews = true;
+        loadMoreFailed = false;
+        updateLoadMoreButton();
         populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
         getReviews(queryString, username, filterCategories, ordering, pageLimit, nextOffset)
@@ -288,12 +295,19 @@
             .catch(() => {
                 if (token !== requestToken) return;
                 isLoadingReviews = false;
+                loadMoreFailed = true;
+                updateLoadMoreButton();
             });
     }
 
+    // While more reviews remain, show the loading indicator. Fall back to the
+    // "Load More" button after a failed load or without IntersectionObserver.
     function updateLoadMoreButton() {
-        const container = document.querySelector("#load-more-container");
+        const container = loadMoreContainer;
         if (currentOffset + pageLimit < totalCount) {
+            const showButton = !supportsAutoLoad || loadMoreFailed;
+            document.querySelector("#load-more-button").toggleAttribute("hidden", !showButton);
+            document.querySelector("#load-more-indicator").toggleAttribute("hidden", showButton);
             container.removeAttribute("hidden");
         } else {
             container.setAttribute("hidden", "");
