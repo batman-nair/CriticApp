@@ -271,9 +271,12 @@
                 updateLoadMoreButton();
                 // A dropped response may have left its cards behind "Loading reviews...".
                 if (document.querySelector("#review-container").children.length) {
-                    hideReviewLoading();
-                    masonry.reloadItems();
-                    masonry.layout();
+                    imagesLoaded('#review-container', () => {
+                        if (token !== requestToken) return;
+                        hideReviewLoading();
+                        masonry.reloadItems();
+                        masonry.layout();
+                    })
                 }
             });
     }
