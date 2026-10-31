@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 
 from model_bakery import baker
 
-from review.models import Review
+from review.models import Review, ReviewItem
 from review.utils import review_utils
 from review.tests.factories import create_review_item
 
@@ -156,6 +156,13 @@ class LanguageFilterTest(TestCase):
             review_utils.get_review_languages(),
             ['English', 'Japanese', 'German', 'Korean', 'Old English'],
         )
+
+    def test_review_languages_count_every_review_of_an_item(self):
+        korean_item = ReviewItem.objects.get(item_id='omdb_ko')
+        for username in ('ko1', 'ko2'):
+            user = get_user_model().objects.create_user(username=username, password='123test123')
+            Review.objects.create(user=user, review_item=korean_item, review_rating=7)
+        self.assertEqual(review_utils.get_review_languages()[0], 'Korean')
 
     def test_review_languages_for_user(self):
         self.assertEqual(

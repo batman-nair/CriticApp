@@ -1,7 +1,7 @@
 import re
 from collections import Counter
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from typing import Optional
 from review.serializers import ReviewSerializer
 from review.models import Review
@@ -51,12 +51,9 @@ def _categories_to_q(categories: list) -> Optional[Q]:
 def _languages_to_q(languages: list) -> Q:
     # language holds a comma-separated list ("Korean, English"). Match whole
     # entries in any position, so "English" doesn't match "Old English".
-    query_obj = None
-    for language in languages:
-        pattern = r'(^|,)\s*' + re.escape(language) + r'\s*(,|$)'
-        language_query_obj = Q(review_item__language__iregex=pattern)
-        query_obj = language_query_obj if query_obj is None else query_obj | language_query_obj
-    return query_obj
+    # languages must not be empty.
+    alternatives = '|'.join(re.escape(language) for language in languages)
+    return Q(review_item__language__iregex=r'(^|,)\s*(' + alternatives + r')\s*(,|$)')
 
 
 def get_filtered_review_objects(
@@ -125,8 +122,12 @@ def get_review_languages(username: str='') -> list[str]:
     if username:
         reviews = reviews.filter(user__username=username)
     counts = Counter()
-    for language_list in reviews.values_list('review_item__language', flat=True):
-        counts.update(part.strip() for part in language_list.split(',') if part.strip())
+    # One row per distinct language string, not per review.
+    rows = reviews.values_list('review_item__language').annotate(review_count=Count('id')).order_by()
+    for language_list, review_count in rows:
+        for part in language_list.split(','):
+            if part.strip():
+                counts[part.strip()] += review_count
     return sorted(counts, key=lambda language: (-counts[language], language))
 
 def convert_reviews_to_json(reviews: list) -> dict:
