@@ -145,6 +145,16 @@ PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', '').rstrip('/')
 PUSHGATEWAY_JOB_NAME = os.environ.get('PUSHGATEWAY_JOB_NAME', 'critic_refresh_review_items')
 PUSHGATEWAY_TIMEOUT_SECONDS = int(os.environ.get('PUSHGATEWAY_TIMEOUT_SECONDS', '5'))
 
+# Free-tier request quotas: provider -> (period, limit). Periods are UTC days/months.
+UPSTREAM_API_QUOTAS = {
+    'omdb': ('day', 1000),
+    'rawg': ('month', 20000),
+}
+# Send one alert when a provider's usage reaches each of these percentages of its quota.
+UPSTREAM_API_QUOTA_WARN_AT = (80, 100)
+ALERT_TELEGRAM_BOT_TOKEN = os.environ.get('ALERT_TELEGRAM_BOT_TOKEN', '')
+ALERT_TELEGRAM_CHAT_ID = os.environ.get('ALERT_TELEGRAM_CHAT_ID', '')
+
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
