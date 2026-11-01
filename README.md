@@ -8,8 +8,8 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 
 ## What It Does
 
-- Stores personal reviews across movie, series, game, anime, and manga categories
-- Fetches item metadata from OMDb, RAWG, and MyAnimeList
+- Stores personal reviews across movie, series, game, anime, manga, and book categories
+- Fetches item metadata from OMDb, RAWG, MyAnimeList, and Open Library
 - Supports user profiles and searchable review lists
 - Exposes API endpoints for review CRUD and item lookups
 - Includes monitoring with Prometheus metrics and Grafana dashboards

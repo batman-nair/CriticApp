@@ -62,7 +62,7 @@ Versioning options:
   - `query` — free-text search across title, tags, description, attributes, language, year
   - `username` — filter by reviewer username
   - `item_id` — filter by review item ID (use with `username` to check if a user reviewed a specific item)
-  - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`; accepts comma-separated values or repeated params
+  - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`, `book`; accepts comma-separated values or repeated params
   - `exclude_categories` — exclude list; accepts comma-separated values or repeated params
   - Both lists also accept `anime:series` and `anime:movie` to include or exclude only anime series (TV, ONA, OVA, specials, …) or anime movies
   - `languages` — reviews whose item lists any of these languages (e.g. `Japanese,Korean`), case-insensitive; accepts comma-separated values or repeated params. Only movies and series have a language
@@ -100,7 +100,7 @@ Versioning options:
 - Method: `GET`
 - Path: `/api/v2/lookup/search/<category>/?q=<search_term>`
 - Auth: required
-- Categories: `movie`, `series`, `game`, `anime`, `manga`
+- Categories: `movie`, `series`, `game`, `anime`, `manga`, `book`
 - Notes:
   - `q` accepts normal title search text for all categories.
   - For `movie` and `series`, `q` can also be a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
@@ -112,7 +112,7 @@ Versioning options:
 - Method: `GET`
 - Path: `/api/v2/lookup/item/<category>/<item_id>/`
 - Auth: required
-- Categories: `movie`, `series`, `game`, `anime`, `manga`
+- Categories: `movie`, `series`, `game`, `anime`, `manga`, `book`
 - Response: `{ "data": { "item_id": "...", "title": "...", ... }, "meta": { "version": "2.0" } }`
 - Behavior: returns cached item from DB if available, otherwise fetches from external provider and persists
 - `movie` and `series` both use OMDb. Searches only return titles of that type, and fetching a series under `movie` (or a non-series under `series`) returns `UPSTREAM_ERROR`.
