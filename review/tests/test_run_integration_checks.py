@@ -55,8 +55,7 @@ class RunIntegrationChecksTest(SimpleTestCase):
                 self._call()
 
         cmd = run.call_args.args[0]
-        self.assertEqual(cmd[1:3], ['-m', 'pytest'])
-        self.assertIn('integration', cmd[cmd.index('-m', 2) + 1])
+        self.assertEqual(cmd[1:5], ['-m', 'pytest', '-m', 'integration'])
         self.assertEqual(cmd[cmd.index('--ds') + 1], 'critic.settings.test')
         self.assertEqual(run.call_args.kwargs['env']['DJANGO_SETTINGS_MODULE'], 'critic.settings.test')
 
@@ -79,12 +78,38 @@ class RunIntegrationChecksTest(SimpleTestCase):
 
         send_alert.assert_called_once_with('CriticApp: prod integration test run errored (pytest exit code 5).')
 
-    def test_timeout_alerts(self, send_alert):
-        with mock.patch(f'{COMMAND}.subprocess.run', side_effect=subprocess.TimeoutExpired('pytest', 900)):
+    def test_timeout_alerts_and_keeps_partial_output(self, send_alert):
+        timeout = subprocess.TimeoutExpired('pytest', 900, output=b'test_search PASSED\ntest_details ')
+        out = StringIO()
+        with mock.patch(f'{COMMAND}.subprocess.run', side_effect=timeout):
+            with self.assertRaises(CommandError):
+                call_command('run_integration_checks', stdout=out, stderr=StringIO())
+
+        send_alert.assert_called_once_with('CriticApp: prod integration tests timed out after 15 minutes.')
+        self.assertIn('test_details', out.getvalue())
+
+    def test_missing_api_key_alerts_without_running_tests(self, send_alert):
+        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
+            with mock.patch(f'{COMMAND}.subprocess.run') as run:
+                with self.assertRaises(CommandError):
+                    self._call()
+
+        run.assert_not_called()
+        send_alert.assert_called_once_with(
+            'CriticApp: prod integration tests not run, missing API keys: RAWG_API_KEY.')
+
+    def test_collection_error_is_named_without_stray_dot(self, send_alert):
+        report = (
+            '<testsuites><testsuite tests="1">'
+            '<testcase classname="" name="review.tests.test_external_api_integration">'
+            '<error message="collection failure">t</error></testcase>'
+            '</testsuite></testsuites>'
+        )
+        with mock.patch(f'{COMMAND}.subprocess.run', side_effect=_fake_run(2, report)):
             with self.assertRaises(CommandError):
                 self._call()
 
-        send_alert.assert_called_once_with('CriticApp: prod integration tests timed out after 15 minutes.')
+        self.assertIn('\n- review.tests.test_external_api_integration: collection failure', send_alert.call_args.args[0])
 
     def test_long_alert_is_truncated(self, send_alert):
         cases = ''.join(
