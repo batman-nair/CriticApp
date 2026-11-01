@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 
 from model_bakery import baker
 
-from review.models import Review
+from review.models import Review, ReviewItem
 from review.utils import review_utils
 from review.tests.factories import create_review_item
 
@@ -105,3 +105,70 @@ class AnimeSubcategoryFilterTest(TestCase):
     def test_unknown_subcategory_matches_nothing(self):
         self.assertEqual(self._item_ids(categories=['anime:musical']), [])
         self.assertEqual(len(self._item_ids(exclude_categories=['anime:musical'])), 5)
+
+
+class LanguageFilterTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username='polyglot', password='123test123')
+        other_user = get_user_model().objects.create_user(username='other', password='123test123')
+        items = [
+            ('omdb_ja_first', 'movie', 'Japanese, English', self.user),
+            ('omdb_ja_last', 'series', 'English, Japanese', self.user),
+            ('omdb_ko', 'movie', 'Korean', self.user),
+            ('omdb_old_en', 'movie', 'Old English', self.user),
+            ('rawg_game', 'game', '', self.user),
+            ('omdb_de', 'series', 'German', other_user),
+        ]
+        for item_id, category, language, user in items:
+            item = create_review_item(item_id=item_id, title=item_id, category=category, language=language)
+            Review.objects.create(user=user, review_item=item, review_rating=8)
+
+    def _item_ids(self, **kwargs):
+        return sorted(review.review_item.item_id for review in review_utils.get_filtered_review_objects(**kwargs))
+
+    def test_matches_language_in_any_position(self):
+        self.assertEqual(self._item_ids(languages=['Japanese']), ['omdb_ja_first', 'omdb_ja_last'])
+
+    def test_multiple_languages_match_any(self):
+        self.assertEqual(self._item_ids(languages=['Korean', 'German']), ['omdb_de', 'omdb_ko'])
+        self.assertEqual(self._item_ids(languages=['Korean,German']), ['omdb_de', 'omdb_ko'])
+
+    def test_matches_whole_entries_only(self):
+        self.assertEqual(self._item_ids(languages=['English']), ['omdb_ja_first', 'omdb_ja_last'])
+        self.assertEqual(self._item_ids(languages=['Old English']), ['omdb_old_en'])
+        # Every picked language is matched as a whole entry, not just the first one.
+        self.assertEqual(self._item_ids(languages=['Korean', 'English']), ['omdb_ja_first', 'omdb_ja_last', 'omdb_ko'])
+
+    def test_case_insensitive(self):
+        self.assertEqual(self._item_ids(languages=['japanese']), ['omdb_ja_first', 'omdb_ja_last'])
+
+    def test_items_without_language(self):
+        self.assertNotIn('rawg_game', self._item_ids(languages=['English']))
+        self.assertIn('rawg_game', self._item_ids())
+
+    def test_combines_with_categories(self):
+        self.assertEqual(self._item_ids(languages=['Japanese'], categories=['series']), ['omdb_ja_last'])
+
+    def test_works_with_alpha_ordering(self):
+        reviews = review_utils.get_filtered_review_objects(languages=['Japanese', 'Korean'], ordering='alpha')
+        self.assertEqual([review.review_item.item_id for review in reviews], ['omdb_ja_first', 'omdb_ja_last', 'omdb_ko'])
+
+    def test_review_languages_sorted_by_count_then_name(self):
+        self.assertEqual(
+            review_utils.get_review_languages(),
+            ['English', 'Japanese', 'German', 'Korean', 'Old English'],
+        )
+
+    def test_review_languages_count_every_review_of_an_item(self):
+        korean_item = ReviewItem.objects.get(item_id='omdb_ko')
+        for username in ('ko1', 'ko2'):
+            user = get_user_model().objects.create_user(username=username, password='123test123')
+            Review.objects.create(user=user, review_item=korean_item, review_rating=7)
+        self.assertEqual(review_utils.get_review_languages()[0], 'Korean')
+
+    def test_review_languages_for_user(self):
+        self.assertEqual(
+            review_utils.get_review_languages('polyglot'),
+            ['English', 'Japanese', 'Korean', 'Old English'],
+        )
+        self.assertEqual(review_utils.get_review_languages('other'), ['German'])

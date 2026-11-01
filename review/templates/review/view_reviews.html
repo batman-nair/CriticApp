@@ -95,44 +95,9 @@
 </div>
 
 
-<div class="filter-bar input-group my-3">
+<div class="filter-bar input-group mt-3 mb-2">
     <input type="search" id="filter-text" class="form-control" placeholder="Type to filter reviews"
         aria-label="Filter Reviews" />
-    <div class="btn-group">
-        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="category-filter-dropdown"
-            data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filter"
-                viewBox="0 0 16 16">
-                <path
-                    d="M6 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
-            </svg>
-            <span class="visually-hidden">Categories</span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="category-filter-dropdown">
-            {% for category, subcategories in categories %}
-            <li>
-                <div class="dropdown-item">
-                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ category }}"
-                        onchange="updateReviews()" id="filter-{{ category }}">
-                    <label class="form-check-label filter-category-label w-100" for="filter-{{ category }}">
-                        {{ category }}
-                    </label>
-                </div>
-            </li>
-            {% for subcategory, label in subcategories %}
-            <li>
-                <div class="dropdown-item ps-5">
-                    <input class="form-check-input filter-category" type="checkbox" checked value="{{ subcategory }}"
-                        onchange="updateReviews()" id="filter-{{ subcategory|slugify }}">
-                    <label class="form-check-label filter-category-label w-100" for="filter-{{ subcategory|slugify }}">
-                        {{ label }}
-                    </label>
-                </div>
-            </li>
-            {% endfor %}
-            {% endfor %}
-        </ul>
-    </div>
     <div class="btn-group">
         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="sort-dropdown"
             data-bs-toggle="dropdown" aria-expanded="false">
@@ -152,6 +117,45 @@
                     High</a></li>
         </ul>
     </div>
+</div>
+
+<div class="filter-chips" role="group" aria-label="Categories">
+    <button type="button" class="filter-chip" data-category="" aria-pressed="true">All</button>
+    {% for value, label in categories %}
+    <button type="button" class="filter-chip" data-category="{{ value }}" aria-pressed="false">{{ label }}</button>
+    {% endfor %}
+    {% if languages %}
+    <div class="dropdown filter-chip-language">
+        <button type="button" class="filter-chip dropdown-toggle" id="language-chip" data-bs-toggle="dropdown"
+            data-bs-auto-close="outside" aria-expanded="false">Any language</button>
+        <ul class="dropdown-menu dropdown-menu-end" id="language-menu" aria-labelledby="language-chip">
+            <li>
+                <div class="dropdown-item">
+                    <input class="form-check-input filter-language" type="checkbox" checked value=""
+                        id="filter-language-any">
+                    <label class="form-check-label w-100" for="filter-language-any">Any language</label>
+                </div>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            {% for language in languages %}
+            <li>
+                <div class="dropdown-item">
+                    <input class="form-check-input filter-language" type="checkbox" value="{{ language }}"
+                        id="filter-language-{{ forloop.counter }}">
+                    <label class="form-check-label w-100" for="filter-language-{{ forloop.counter }}">{{ language }}</label>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+
+<p class="review-count" id="review-count" aria-live="polite"></p>
+
+<div class="review-empty" id="review-empty" hidden>
+    <p id="review-empty-message"></p>
+    <button type="button" class="btn btn-outline-secondary" id="clear-filters">Show all reviews</button>
 </div>
 
 <div class="text-center my-4" id="review-loading-message">
@@ -174,7 +178,10 @@
 
 <script>
     var reviewsData;
-    var queryString = '', username = '{{ username }}', filterCategories = [], orderName = 'sort-date';
+    var queryString = '', username = '{{ username }}', orderName = 'sort-date';
+    // Empty sets mean "All" categories and "Any language".
+    const selectedCategories = new Set();
+    const selectedLanguages = new Set();
     const currentUsername = "{{ user.username }}";
     const pageLimit = 20;
     var currentOffset = 0;
@@ -221,13 +228,92 @@
         updateReviews();
     }
 
-    function populateFilterCategories() {
-        filterCategories = [];
-        for (var element of document.querySelectorAll(".filter-category")) {
-            if (!element.checked) {
-                filterCategories.push(element.value);
-            }
+    // Category chips. From All, a tap shows only that category; later taps add
+    // or remove categories. Removing the last one, or selecting every one, is All.
+    const categoryChips = document.querySelectorAll(".filter-chip[data-category]");
+    function syncCategoryChips() {
+        for (const chip of categoryChips) {
+            const value = chip.dataset.category;
+            const pressed = value ? selectedCategories.has(value) : selectedCategories.size === 0;
+            chip.setAttribute("aria-pressed", String(pressed));
         }
+    }
+    for (const chip of categoryChips) {
+        chip.addEventListener("click", () => {
+            const value = chip.dataset.category;
+            if (!value && selectedCategories.size === 0) return;
+            if (!value) {
+                selectedCategories.clear();
+            } else if (selectedCategories.has(value)) {
+                selectedCategories.delete(value);
+            } else {
+                selectedCategories.add(value);
+            }
+            // categoryChips includes the All chip.
+            if (selectedCategories.size === categoryChips.length - 1) {
+                selectedCategories.clear();
+            }
+            syncCategoryChips();
+            updateReviews();
+        });
+    }
+
+    // Language menu (only rendered when the page has languages). A review
+    // matches if it has any of the picked languages.
+    const languageChip = document.querySelector("#language-chip");
+    const languageBoxes = document.querySelectorAll(".filter-language");
+    function syncLanguageMenu() {
+        if (!languageChip) return;
+        const picked = [];
+        for (const box of languageBoxes) {
+            box.checked = box.value ? selectedLanguages.has(box.value) : selectedLanguages.size === 0;
+            if (box.value && box.checked) picked.push(box.value);
+        }
+        if (picked.length === 0) {
+            languageChip.textContent = "Any language";
+        } else if (picked.length <= 2) {
+            languageChip.textContent = picked.join(", ");
+        } else {
+            languageChip.textContent = `${picked.length} languages`;
+        }
+        languageChip.classList.toggle("is-set", picked.length > 0);
+        // The label changes the chip's width, so re-align the open menu with it.
+        bootstrap.Dropdown.getInstance(languageChip)?.update();
+    }
+    for (const box of languageBoxes) {
+        box.addEventListener("change", () => {
+            if (!box.value && selectedLanguages.size === 0) {
+                // Already "Any language": keep it checked, nothing to reload.
+                syncLanguageMenu();
+                return;
+            }
+            if (!box.value) {
+                selectedLanguages.clear();
+            } else if (box.checked) {
+                selectedLanguages.add(box.value);
+            } else {
+                selectedLanguages.delete(box.value);
+            }
+            syncLanguageMenu();
+            updateReviews();
+        });
+    }
+
+    function hasActiveFilters() {
+        return selectedCategories.size > 0 || selectedLanguages.size > 0 || queryString.trim() !== '';
+    }
+    // Shows the count of a new list, or the empty state when nothing matched.
+    function showReviewCount(filtered) {
+        const countText = totalCount === 1 ? "1 review" : `${totalCount} reviews`;
+        document.querySelector("#review-count").textContent = totalCount > 0 ? countText : "";
+        document.querySelector("#review-empty").toggleAttribute("hidden", totalCount > 0);
+        document.querySelector("#review-empty-message").textContent =
+            filtered ? "No reviews match these filters." : "No reviews yet.";
+        document.querySelector("#clear-filters").toggleAttribute("hidden", !filtered);
+    }
+    function hideReviewCount() {
+        document.querySelector("#review-count").textContent = "";
+        document.querySelector("#review-empty").setAttribute("hidden", "");
     }
     function showReviewLoading() {
         document.querySelector("#review-container").setAttribute("hidden", "");
@@ -242,20 +328,22 @@
     function updateReviewsImpl() {
         const token = ++requestToken;
         isLoadingReviews = true;
-        populateFilterCategories();
+        const filtered = hasActiveFilters();
         ordering = ORDERING_STRING_MAP[orderName];
-        getReviews(queryString, username, filterCategories, ordering, pageLimit, 0)
+        getReviews(queryString, username, [...selectedCategories], [...selectedLanguages], ordering, pageLimit, 0)
             .then(({ reviews, pagination }) => {
                 if (token !== requestToken) return;
                 currentOffset = 0;
                 loadMoreFailed = false;
                 totalCount = pagination.count;
                 showReviewLoading();
+                hideReviewCount();
                 loadMoreContainer.setAttribute("hidden", "");
                 populateReviewCards('#review-container', reviews);
                 imagesLoaded('#review-container', () => {
                     if (token !== requestToken) return;
                     hideReviewLoading();
+                    showReviewCount(filtered);
                     masonry.reloadItems();
                     masonry.layout();
                     updateLoadMoreButton();
@@ -269,6 +357,7 @@
                 // The cards on screen don't match the new search, so stop paging them.
                 totalCount = 0;
                 updateLoadMoreButton();
+                hideReviewCount();
                 // A dropped response may have left its cards behind "Loading reviews...".
                 if (document.querySelector("#review-container").children.length) {
                     imagesLoaded('#review-container', () => {
@@ -288,9 +377,8 @@
         isLoadingReviews = true;
         loadMoreFailed = false;
         updateLoadMoreButton();
-        populateFilterCategories();
         ordering = ORDERING_STRING_MAP[orderName];
-        getReviews(queryString, username, filterCategories, ordering, pageLimit, nextOffset)
+        getReviews(queryString, username, [...selectedCategories], [...selectedLanguages], ordering, pageLimit, nextOffset)
             .then(({ reviews, pagination }) => {
                 if (token !== requestToken) return;
                 currentOffset = nextOffset;
@@ -331,6 +419,22 @@
     queryTextBox.addEventListener('input', (e) => {
         queryString = e.target.value;
         updateReviews();
+    });
+
+    document.querySelector("#clear-filters").addEventListener("click", () => {
+        selectedCategories.clear();
+        selectedLanguages.clear();
+        queryString = '';
+        queryTextBox.value = '';
+        syncCategoryChips();
+        syncLanguageMenu();
+        updateReviews();
+    });
+
+    // deleteReview (review.js) removes the card; keep the count and empty state in step.
+    document.addEventListener("review-deleted", () => {
+        totalCount = Math.max(0, totalCount - 1);
+        showReviewCount(hasActiveFilters());
     });
 
     const reviewDetailModal = document.querySelector("#review-detail-modal");

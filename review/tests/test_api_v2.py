@@ -118,6 +118,20 @@ class ReviewV2Phase2Test(APITestCase):
         item_ids = [row['review_item']['item_id'] for row in response.json()['data']]
         self.assertEqual(item_ids, ['jikan_anime_1'])
 
+    def test_v2_languages_filter_matches_any_language(self):
+        for item_id, language in (('omdb_ko', 'Korean, English'), ('omdb_de', 'German'), ('omdb_ja', 'Japanese')):
+            item = ReviewItem.objects.create(
+                item_id=item_id, category='movie', title=item_id, image_url='https://example.com/a.png',
+                year='2020', attr1='A', attr2='B', attr3='C', description='D', rating='8.0', language=language,
+            )
+            Review.objects.create(user=self.user, review_item=item, review_rating=Decimal('8.0'))
+
+        for params in ({'languages': 'Korean,German'}, {'languages': ['Korean', 'German']}):
+            response = self.client.get('/api/v2/reviews/', params)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            item_ids = sorted(row['review_item']['item_id'] for row in response.json()['data'])
+            self.assertEqual(item_ids, ['omdb_de', 'omdb_ko'])
+
     # --- item_id filter (replaces get_user_review) ---
 
     def test_v2_review_list_filter_by_item_id(self):

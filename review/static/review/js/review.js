@@ -155,7 +155,7 @@ async function updateReviewItem(category, itemID, reviewCard) {
     reviewCard.removeAttribute("hidden");
 }
 
-async function getReviews(query = '', username = '', exclude_categories = [], ordering = '', limit = 20, offset = 0) {
+async function getReviews(query = '', username = '', categories = [], languages = [], ordering = '', limit = 20, offset = 0) {
     const reviewUrl = new URL(`${baseUrl}/api/v2/reviews/`);
     if (query) {
         reviewUrl.searchParams.append('query', query);
@@ -163,8 +163,11 @@ async function getReviews(query = '', username = '', exclude_categories = [], or
     if (username) {
         reviewUrl.searchParams.append('username', username);
     }
-    if (exclude_categories.length) {
-        reviewUrl.searchParams.append('exclude_categories', exclude_categories.join(','));
+    if (categories.length) {
+        reviewUrl.searchParams.append('categories', categories.join(','));
+    }
+    if (languages.length) {
+        reviewUrl.searchParams.append('languages', languages.join(','));
     }
     if (ordering) {
         reviewUrl.searchParams.append('ordering', ordering);
@@ -495,6 +498,7 @@ function deleteReview(reviewId) {
                     // Start masonry removal animation if available or just remove
                     masonry.remove(reviewCardWrapper);
                     masonry.layout();
+                    document.dispatchEvent(new CustomEvent('review-deleted'));
                 }
 
                 // Close the modals

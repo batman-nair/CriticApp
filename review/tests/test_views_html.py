@@ -1,5 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
+
+from review import views
+from review.models import Review
+from review.tests.factories import create_review_item
+from review.utils import review_utils
 
 
 class HTMLViewSmokeTest(TestCase):
@@ -10,14 +15,35 @@ class HTMLViewSmokeTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'review/view_reviews.html')
 
-    def test_view_reviews_page_lists_series_filter(self):
+    def test_view_reviews_page_lists_category_chips(self):
         response = self.client.get('/')
-        self.assertContains(response, 'id="filter-series"')
+        self.assertContains(response, 'data-category="series"')
+        self.assertContains(response, 'data-category="anime:series"')
+        self.assertContains(response, 'data-category="anime:movie"')
+        self.assertNotContains(response, 'data-category="anime"')
 
-    def test_view_reviews_page_lists_anime_subcategory_filters(self):
+    def test_view_reviews_page_hides_language_menu_without_languages(self):
         response = self.client.get('/')
-        self.assertContains(response, 'value="anime:series"')
-        self.assertContains(response, 'value="anime:movie"')
+        self.assertNotContains(response, 'id="language-chip"')
+
+    def test_view_reviews_page_lists_review_languages(self):
+        user = get_user_model().objects.create_user(username='languser', password='pass12345')
+        item = create_review_item(item_id='omdb_lang', language='Korean, English')
+        Review.objects.create(user=user, review_item=item, review_rating=8)
+        response = self.client.get('/')
+        self.assertContains(response, 'id="language-chip"')
+        self.assertContains(response, 'value="Korean"')
+        self.assertContains(response, 'value="English"')
+
+    def test_profile_page_lists_only_that_users_languages(self):
+        user = get_user_model().objects.create_user(username='kofan', password='pass12345')
+        other = get_user_model().objects.create_user(username='defan', password='pass12345')
+        for owner, item_id, language in ((user, 'omdb_ko', 'Korean'), (other, 'omdb_de', 'German')):
+            item = create_review_item(item_id=item_id, language=language)
+            Review.objects.create(user=owner, review_item=item, review_rating=8)
+        response = self.client.get('/u/kofan')
+        self.assertContains(response, 'value="Korean"')
+        self.assertNotContains(response, 'value="German"')
 
     def test_view_reviews_page_has_load_more_sentinel(self):
         response = self.client.get('/')
@@ -55,3 +81,10 @@ class HTMLViewSmokeTest(TestCase):
         response = self.client.get('/health/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b'OK')
+
+
+class FilterCategoriesTest(SimpleTestCase):
+    def test_chips_cover_every_category(self):
+        chip_values = {value for value, _ in views.FILTER_CATEGORIES}
+        expected = (set(views.CATEGORY_TO_API) - {'anime'}) | set(review_utils.SUBCATEGORY_FILTERS)
+        self.assertEqual(chip_values, expected)
