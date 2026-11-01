@@ -172,7 +172,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'CriticApp API',
-    'DESCRIPTION': 'Review and item lookup APIs for movies, games, anime, and manga.',
+    'DESCRIPTION': 'Review and item lookup APIs for movies, games, anime, manga, and books.',
     'VERSION': '2.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'TAGS': [

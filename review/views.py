@@ -27,6 +27,7 @@ CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
     'game': api_utils.RAWGItemAPI(),
     'anime': api_utils.MALItemAPI('anime'),
     'manga': api_utils.MALItemAPI('manga'),
+    'book': api_utils.OpenLibraryItemAPI(),
 }
 
 # (value, label) of each category chip on the reviews page. Anime is split
@@ -38,6 +39,7 @@ FILTER_CATEGORIES = [
     ('anime:series', 'Anime series'),
     ('anime:movie', 'Anime movies'),
     ('manga', 'Manga'),
+    ('book', 'Books'),
 ]
 
 

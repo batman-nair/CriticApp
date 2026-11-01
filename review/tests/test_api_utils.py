@@ -7,6 +7,7 @@ from review.utils.api_utils import (
     MISSING_PREFIX_RESPONSE,
     MALItemAPI,
     OMDBItemAPI,
+    OpenLibraryItemAPI,
     normalize_imdb_title_url_to_item_id,
     request_json_with_retry,
 )
@@ -262,6 +263,207 @@ class OMDBItemAPITest(SimpleTestCase):
 
         self.assertEqual(result['response'], 'True')
         self.assertEqual(result['attr3'], 'episode')
+
+
+def ol_search_doc(work_id='OL27482W', **extra):
+    doc = {
+        'key': '/works/{}'.format(work_id),
+        'title': 'The Hobbit',
+        'author_name': ['J.R.R. Tolkien'],
+        'first_publish_year': 1937,
+        'cover_i': 14627509,
+        'ratings_average': 4.2978306,
+        'number_of_pages_median': 310,
+    }
+    doc.update(extra)
+    return {key: value for key, value in doc.items() if value is not None}
+
+
+def ol_work(**extra):
+    work = {
+        'key': '/works/OL27482W',
+        'title': 'The Hobbit',
+        'description': 'A tale of high adventure.',
+        'subjects': ['Fantasy', 'Open Library Staff Picks', 'nyt:young-adult=2012', 'Dragons', 'Wizards', 'Dwarves', 'Elves', 'Trolls'],
+    }
+    work.update(extra)
+    return {key: value for key, value in work.items() if value is not None}
+
+
+def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=200):
+    """Fake requests.get answering the Open Library search and work URLs."""
+    def fake_get(url, **kwargs):
+        if '/search.json' in url:
+            return _ResponseStub(search_status, json_data={'docs': search_docs if search_docs is not None else [ol_search_doc()]})
+        if '/works/' in url and url.endswith('.json'):
+            return _ResponseStub(work_status, json_data=work if work is not None else ol_work())
+        raise AssertionError('Unexpected URL {}'.format(url))
+    return fake_get
+
+
+class OpenLibraryItemAPITest(SimpleTestCase):
+    def test_search_maps_works(self):
+        docs = [ol_search_doc(), ol_search_doc('OL219602W', title='The Hobbit (graphic novel)', cover_i=None, first_publish_year=None)]
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=docs)) as get_mock:
+            result = OpenLibraryItemAPI().search('the hobbit & co')
+
+        url = get_mock.call_args.args[0]
+        self.assertTrue(url.startswith('https://openlibrary.org/search.json?q=the%20hobbit%20%26%20co&limit=10&'))
+        self.assertEqual(result['response'], 'True')
+        self.assertEqual(result['results'], [
+            {
+                'item_id': 'olib_OL27482W',
+                'title': 'The Hobbit',
+                'image_url': 'https://covers.openlibrary.org/b/id/14627509-M.jpg',
+                'year': '1937',
+            },
+            {
+                'item_id': 'olib_OL219602W',
+                'title': 'The Hobbit (graphic novel)',
+                'image_url': 'N/A',
+                'year': 'N/A',
+            },
+        ])
+
+    def test_requests_identify_the_app(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()) as get_mock:
+            OpenLibraryItemAPI().search('hobbit')
+            OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(get_mock.call_count, 3)
+        for call in get_mock.call_args_list:
+            self.assertEqual(call.kwargs['headers']['User-Agent'], OpenLibraryItemAPI.USER_AGENT)
+        self.assertIn('github.com/batman-nair/CriticApp', OpenLibraryItemAPI.USER_AGENT)
+
+    def test_search_without_results(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[])):
+            result = OpenLibraryItemAPI().search('zzzzzz')
+
+        self.assertEqual(result, {'response': 'False', 'error': 'Book not found!'})
+
+    def test_search_upstream_error(self):
+        with mock.patch('review.utils.api_utils.time.sleep'):
+            with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_status=503)):
+                result = OpenLibraryItemAPI().search('hobbit')
+
+        self.assertEqual(result['response'], 'False')
+        self.assertEqual(result['query'], 'hobbit')
+        self.assertEqual(result['source'], 'Open Library API')
+
+    def test_details(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()) as get_mock:
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        urls = [call.args[0] for call in get_mock.call_args_list]
+        self.assertTrue(urls[0].startswith('https://openlibrary.org/search.json?q=key:/works/OL27482W&'))
+        self.assertEqual(urls[1], 'https://openlibrary.org/works/OL27482W.json')
+        self.assertEqual(result, {
+            'item_id': 'olib_OL27482W',
+            'title': 'The Hobbit',
+            'image_url': 'https://covers.openlibrary.org/b/id/14627509-L.jpg',
+            'year': '1937',
+            'attr1': 'Fantasy, Dragons, Wizards, Dwarves, Elves',
+            'attr2': 'J.R.R. Tolkien',
+            'attr3': '310 pages',
+            'language': '',
+            'description': 'A tale of high adventure.',
+            'rating': '8.6',
+            'response': 'True',
+        })
+
+    def test_details_accept_typed_description(self):
+        work = ol_work(description={'type': '/type/text', 'value': ' A tale of high adventure. '})
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(work=work)):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['description'], 'A tale of high adventure.')
+
+    def test_details_with_missing_optional_fields(self):
+        doc = ol_search_doc(author_name=None, cover_i=None, first_publish_year=None, ratings_average=None, number_of_pages_median=None)
+        for description in (None, '', '   ', {'type': '/type/text', 'value': ''}):
+            work = ol_work(description=description, subjects=None)
+            with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+                result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+            self.assertEqual(result['response'], 'True')
+            self.assertEqual(result['image_url'], 'https://covers.openlibrary.org/w/olid/OL27482W-L.jpg?default=false')
+            self.assertEqual(result['year'], 'N/A')
+            self.assertEqual(result['attr1'], 'N/A')
+            self.assertEqual(result['attr2'], 'N/A')
+            self.assertEqual(result['attr3'], 'N/A')
+            self.assertEqual(result['description'], 'N/A')
+            self.assertEqual(result['rating'], 'N/A')
+
+    def test_details_truncate_to_column_sizes(self):
+        doc = ol_search_doc(title='T' * 150, author_name=['Author {}'.format(i) for i in range(60)])
+        work = ol_work(subjects=['S' * 200, 'U' * 200])
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['title'], 'T' * 100)
+        # Whole entries only: the second subject doesn't fit, and no author is cut.
+        self.assertEqual(result['attr1'], 'S' * 200)
+        authors = result['attr2'].split(', ')
+        self.assertLessEqual(len(result['attr2']), 300)
+        self.assertEqual(authors, ['Author {}'.format(i) for i in range(len(authors))])
+        # The next author would not have fit.
+        self.assertGreater(len(result['attr2'] + ', Author {}'.format(len(authors))), 300)
+
+    def test_details_cut_a_single_overlong_entry(self):
+        doc = ol_search_doc(author_name=['A' * 350, 'Second Author'])
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc])):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['attr2'], 'A' * 300)
+
+    def test_details_dedupe_genres_and_authors(self):
+        doc = ol_search_doc(author_name=['Roald Dahl', 'Quentin Blake', 'Roald Dahl'])
+        work = ol_work(subjects=['Fiction', 'fiction', "Children's stories, English", 'Foxes', 'FICTION', 'Animals'])
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['attr1'], 'Fiction, Foxes, Animals')
+        self.assertEqual(result['attr2'], 'Roald Dahl, Quentin Blake')
+
+    def test_search_skips_docs_that_are_not_works(self):
+        docs = [{'key': '/books/OL1M', 'title': 'An edition'}, {'title': 'No key'}, ol_search_doc()]
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=docs)):
+            result = OpenLibraryItemAPI().search('hobbit')
+
+        self.assertEqual([item['item_id'] for item in result['results']], ['olib_OL27482W'])
+
+    def test_details_requires_prefix(self):
+        with mock.patch('review.utils.api_utils.requests.get') as get_mock:
+            result = OpenLibraryItemAPI().get_details('jikan_manga_2')
+
+        self.assertEqual(result, MISSING_PREFIX_RESPONSE)
+        get_mock.assert_not_called()
+
+    def test_details_reject_invalid_work_id(self):
+        for item_id in ('olib_OL1M', 'olib_*', 'olib_OL1W OR key:*', 'olib_'):
+            with mock.patch('review.utils.api_utils.requests.get') as get_mock:
+                result = OpenLibraryItemAPI().get_details(item_id)
+
+            self.assertEqual(result['response'], 'False')
+            self.assertEqual(result['error'], 'Invalid book id.')
+            get_mock.assert_not_called()
+
+    def test_details_for_unknown_work(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[])) as get_mock:
+            result = OpenLibraryItemAPI().get_details('olib_OL1W')
+
+        self.assertEqual(result, {'response': 'False', 'error': 'Book not found!', 'item_id': 'OL1W'})
+        self.assertEqual(get_mock.call_count, 1)
+
+    def test_details_upstream_errors(self):
+        for statuses in ((503, 200), (200, 404)):
+            with mock.patch('review.utils.api_utils.time.sleep'):
+                with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_status=statuses[0], work_status=statuses[1])):
+                    result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+            self.assertEqual(result['response'], 'False')
+            self.assertEqual(result['item_id'], 'OL27482W')
+            self.assertEqual(result['source'], 'Open Library API')
 
 
 def test_normalize_imdb_title_url_to_item_id_accepts_title_url():

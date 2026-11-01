@@ -352,3 +352,132 @@ class MALItemAPI(ReviewItemAPIBase):
         json_data["description"] = mal_json.get("synopsis", "")
         json_data["rating"] = mal_json.get("mean", "N/A")
         return json_data
+
+
+class OpenLibraryItemAPI(ReviewItemAPIBase):
+    # Open Library allows a higher request rate to clients that identify themselves.
+    USER_AGENT = 'CriticApp/1.0 (+https://github.com/batman-nair/CriticApp)'
+    _SEARCH_FIELDS = 'key,title,author_name,first_publish_year,cover_i'
+    _DETAIL_FIELDS = _SEARCH_FIELDS + ',ratings_average,number_of_pages_median'
+    _WORK_ID_RE = re.compile(r'OL\d+W')
+    _COVER_URL = 'https://covers.openlibrary.org/b/id/{cover_id}-{size}.jpg'
+    # Without a cover this URL 404s instead of returning a blank image, so the
+    # page shows its placeholder.
+    _MISSING_COVER_URL = 'https://covers.openlibrary.org/w/olid/{work_id}-L.jpg?default=false'
+    # Catalogue tags that Open Library mixes into a work's subjects.
+    _IGNORED_SUBJECTS = {'open library staff picks', 'accessible book', 'protected daisy', 'in library', 'lending library'}
+    _MAX_GENRES = 5
+    # Column sizes of ReviewItem.
+    _MAX_TITLE_LENGTH = 100
+    _MAX_ATTR_LENGTH = 300
+
+    def __init__(self):
+        self.prefix = 'olib_'
+        self._headers = {'User-Agent': self.USER_AGENT}
+        self._base_url = 'https://openlibrary.org'
+
+    def search(self, query: str) -> dict:
+        search_url = '{base_url}/search.json?q={search_term}&limit=10&fields={fields}'.format(
+            base_url=self._base_url, search_term=quote(query), fields=self._SEARCH_FIELDS)
+        ol_json, response = request_json_with_retry(search_url, source_name='Open Library API', headers=self._headers)
+        if response:
+            response["query"] = query
+            return response
+        results = [self._convert_doc_to_review(doc) for doc in ol_json.get("docs", []) if self._work_id(doc)]
+        if len(results) == 0:
+            return {
+                "response": "False",
+                "error": "Book not found!",
+            }
+        return {"results": results[:10], "response": "True"}
+
+    def get_details(self, item_id: str) -> dict:
+        if not item_id.startswith(self.prefix):
+            return MISSING_PREFIX_RESPONSE.copy()
+        work_id = item_id[len(self.prefix):]
+        # The id goes into a search query, so only accept real work ids.
+        if not self._WORK_ID_RE.fullmatch(work_id):
+            response = NOT_OK_RESPONSE.copy()
+            response["error"] = "Invalid book id."
+            response["item_id"] = work_id
+            return response
+        search_url = '{base_url}/search.json?q=key:/works/{work_id}&fields={fields}'.format(
+            base_url=self._base_url, work_id=work_id, fields=self._DETAIL_FIELDS)
+        search_json, response = request_json_with_retry(search_url, source_name='Open Library API', headers=self._headers)
+        if response:
+            response["item_id"] = work_id
+            return response
+        docs = search_json.get("docs", [])
+        if len(docs) == 0:
+            return {
+                "response": "False",
+                "error": "Book not found!",
+                "item_id": work_id,
+            }
+        # The search index has author names, ratings and page counts; only the
+        # work itself has the description and the full subject list.
+        work_url = '{base_url}/works/{work_id}.json'.format(base_url=self._base_url, work_id=work_id)
+        work_json, response = request_json_with_retry(work_url, source_name='Open Library API', headers=self._headers)
+        if response:
+            response["item_id"] = work_id
+            return response
+        json_data = self._convert_doc_to_review(docs[0], detailed=True)
+        json_data["item_id"] = self.prefix + work_id
+        if not docs[0].get("cover_i"):
+            json_data["image_url"] = self._MISSING_COVER_URL.format(work_id=work_id)
+        # Keyed by lower case to drop repeats like "Fiction"/"fiction". Subjects
+        # with commas would read as several genres in the comma-separated list.
+        genres = {}
+        for subject in (self._text(entry) for entry in work_json.get("subjects") or []):
+            if subject and ':' not in subject and ',' not in subject and subject.lower() not in self._IGNORED_SUBJECTS:
+                genres.setdefault(subject.lower(), subject)
+        json_data["attr1"] = self._join(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH)
+        json_data["description"] = self._text(work_json.get("description")) or "N/A"
+        json_data["response"] = "True"
+        return json_data
+
+    def _work_id(self, doc: dict) -> str:
+        work_id = (doc.get("key") or "").rsplit('/', 1)[-1]
+        return work_id if self._WORK_ID_RE.fullmatch(work_id) else ""
+
+    @staticmethod
+    def _text(value) -> str:
+        # Text is either a plain string or {"type": "/type/text", "value": "..."}.
+        if isinstance(value, dict):
+            value = value.get("value")
+        return value.strip() if isinstance(value, str) else ""
+
+    @staticmethod
+    def _truncate(value: str, max_length: int) -> str:
+        return value[:max_length] if value else "N/A"
+
+    @staticmethod
+    def _join(values: list, max_length: int) -> str:
+        # Join whole entries while they fit, so no name is cut in half.
+        joined = ''
+        for value in values:
+            candidate = '{}, {}'.format(joined, value) if joined else value
+            if len(candidate) > max_length:
+                joined = joined or value[:max_length]
+                break
+            joined = candidate
+        return joined or "N/A"
+
+    def _convert_doc_to_review(self, doc: dict, detailed: bool=False) -> dict:
+        json_data = dict()
+        json_data["item_id"] = self.prefix + self._work_id(doc)
+        json_data["title"] = self._truncate(self._text(doc.get("title")), self._MAX_TITLE_LENGTH)
+        cover_id = doc.get("cover_i")
+        json_data["image_url"] = self._COVER_URL.format(cover_id=cover_id, size='L' if detailed else 'M') if cover_id else "N/A"
+        year = doc.get("first_publish_year")
+        json_data["year"] = str(year) if year else "N/A"
+        if not detailed:
+            return json_data
+        authors = [name for name in (self._text(entry) for entry in doc.get("author_name") or []) if name]
+        json_data["attr2"] = self._join(list(dict.fromkeys(authors)), self._MAX_ATTR_LENGTH)
+        pages = doc.get("number_of_pages_median")
+        json_data["attr3"] = '{} pages'.format(pages) if pages else "N/A"
+        json_data["language"] = ""
+        rating = doc.get("ratings_average")
+        json_data["rating"] = str(round(rating * 2, 1)) if rating else "N/A"
+        return json_data

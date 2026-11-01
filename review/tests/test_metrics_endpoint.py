@@ -42,3 +42,9 @@ def test_normalize_provider_maps_mal_source():
     assert normalize_provider('MAL API') == 'mal'
     assert normalize_provider('OMDB API') == 'omdb'
     assert normalize_provider('animal') == 'animal'
+
+
+def test_normalize_provider_maps_open_library_source():
+    from review.utils.metrics import normalize_provider
+
+    assert normalize_provider('Open Library API') == 'openlibrary'

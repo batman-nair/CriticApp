@@ -177,6 +177,8 @@ class Command(BaseCommand):
             return 'rawg'
         if category in ('anime', 'manga'):
             return 'mal'
+        if category == 'book':
+            return 'openlibrary'
         return normalize_provider(category)
 
     def _build_provider(self, category):
@@ -189,6 +191,8 @@ class Command(BaseCommand):
                 return api_utils.MALItemAPI('anime')
             if category == 'manga':
                 return api_utils.MALItemAPI('manga')
+            if category == 'book':
+                return api_utils.OpenLibraryItemAPI()
         except RuntimeError as ex:
             self.stderr.write(self.style.WARNING(f'Provider init failed for {category}: {ex}'))
             return None

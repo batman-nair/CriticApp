@@ -135,6 +135,8 @@ def normalize_provider(source_name: str) -> str:
         return 'rawg'
     if lowered.startswith('mal ') or lowered == 'mal' or 'myanimelist' in lowered:
         return 'mal'
+    if 'open library' in lowered or 'openlibrary' in lowered:
+        return 'openlibrary'
     return lowered.replace(' ', '_') or 'unknown'
 
 
