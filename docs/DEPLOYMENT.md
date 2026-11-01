@@ -232,7 +232,10 @@ When either key is empty, quota alerts are skipped and only logged.
 
 Install the hub and the agent on the host with the official scripts, which set up systemd services. See the [hub](https://beszel.dev/guide/hub-installation) and [agent](https://beszel.dev/guide/agent-installation) installation guides. Note the version you install, and update with the built-in `update` command described there.
 
-- Keep the hub (default port 8090) off the public internet. Reach it over Tailscale or an SSH tunnel (`ssh -L 8090:localhost:8090 <host>`), not through an ingress.
+- Keep the hub (default port 8090) off the public internet. Reach it over Tailscale or an SSH tunnel (`ssh -L 8090:localhost:8090 <host>`), not through an ingress. The hub may listen on all interfaces by default. Check with `sudo ss -tlnp | grep 8090`, and if it shows `0.0.0.0` or `*`, do one of these:
+  - Bind it to localhost (or your tailnet IP) by changing the `--http` address in its systemd unit (`sudo systemctl edit --full beszel-hub`) and restarting it.
+  - Block the port in the firewall, e.g. `sudo ufw deny 8090`.
+  Do the same for the agent port 45876 if the hub and agent are on the same box.
 - In the hub, add the system using the key the hub shows. The agent listens on port 45876 by default.
 - Under Settings > Notifications, add the same Telegram bot (Beszel supports Telegram URLs), then add alerts for the system:
   - CPU above 90% for 10 minutes
