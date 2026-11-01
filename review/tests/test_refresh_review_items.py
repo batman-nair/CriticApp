@@ -175,6 +175,13 @@ class RefreshReviewItemsCommandTest(TestCase):
         self.assertEqual(provider.type_, 'series')
         self.assertEqual(Command()._provider_name_for_category('series'), 'omdb')
 
+    def test_book_items_use_open_library_provider(self):
+        from review.management.commands.refresh_review_items import Command
+        from review.utils.api_utils import OpenLibraryItemAPI
+
+        self.assertIsInstance(Command()._build_provider('book'), OpenLibraryItemAPI)
+        self.assertEqual(Command()._provider_name_for_category('book'), 'openlibrary')
+
     def test_refresh_fills_language(self):
         item = self._create_item('omdb_lang')
         provider = _ProviderStub({
