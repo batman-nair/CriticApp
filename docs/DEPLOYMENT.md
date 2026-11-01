@@ -217,6 +217,7 @@ Monitoring is lean on purpose: kube-prometheus-stack used about 1 GB of RAM on a
 - **Machine health** (CPU, memory, disk, disk I/O, network, load) comes from [Beszel](https://beszel.dev), installed on the host, outside k3s.
 - **External API usage** (OMDb, RAWG, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it at `https://<APP_DOMAIN>/usage/` (staff only).
 - **Quota alerts:** the app sends one Telegram message when OMDb reaches 80% and 100% of 1,000 requests per day, and when RAWG reaches 80% and 100% of 20,000 requests per month. The quotas live in `UPSTREAM_API_QUOTAS` in `critic/settings/common.py`. Check them against your API accounts.
+- **Prod integration tests:** a daily CronJob runs the integration test suite against the real APIs with prod's keys, and sends one Telegram message naming the failed tests (see below).
 - **Box down:** Beszel's hub runs on the same machine, so it can't report the machine being down. Use an outside check (below).
 
 ### One-time removal of the old Prometheus/Grafana stack
@@ -240,9 +241,9 @@ Then delete the `GRAFANA_DOMAIN` and `PUSHGATEWAY_URL` GitHub Actions secrets an
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
 2. Send the bot a message, then get your chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`message.chat.id`).
-3. Add `ALERT_TELEGRAM_BOT_TOKEN` and `ALERT_TELEGRAM_CHAT_ID` to `criticapp-secrets`, then restart: `kubectl rollout restart deployment/criticapp-web -n criticapp`. The refresh CronJob picks the keys up on its next run.
+3. Add `ALERT_TELEGRAM_BOT_TOKEN` and `ALERT_TELEGRAM_CHAT_ID` to `criticapp-secrets`, then restart: `kubectl rollout restart deployment/criticapp-web -n criticapp`. The refresh and integration-test CronJobs pick the keys up on their next run.
 
-When either key is empty, quota alerts are skipped and only logged.
+When either key is empty, alerts are skipped and only logged.
 
 ### Beszel (machine monitoring)
 
@@ -260,6 +261,24 @@ Install the hub and the agent on the host with the official scripts, which set u
   - "Status" (optional): this only catches a dead agent, because the hub is on the same box.
 - Beszel doesn't report connection counts.
 - On k3s, Beszel sees host-level stats only, because per-container stats need Docker or Podman. For per-pod usage, use `kubectl top pods -n criticapp`.
+
+### Daily prod integration tests
+
+CronJob manifest: `k8s/integration-cronjob.yaml`, applied by the deploy workflow. It runs `python manage.py run_integration_checks` daily at 06:30 UTC. That command runs `pytest -m integration` in the prod image with prod's API keys but under `critic.settings.test`, so it never touches the prod database. If any test fails, errors or the run times out, it sends one Telegram message listing the failed tests and exits non-zero. A passing run sends nothing. Failed runs aren't retried, so there's one alert per failure.
+
+Run it now and read the result:
+
+```bash
+kubectl create job --from=cronjob/criticapp-integration-tests criticapp-integration-manual -n criticapp
+kubectl logs -n criticapp job/criticapp-integration-manual -f
+kubectl delete job criticapp-integration-manual -n criticapp
+```
+
+Notes:
+
+- It makes about 20 real API calls a day. They aren't counted on `/usage/`, because counting needs the database and the tests run without it.
+- If the job's pod can't start at all (bad image, k3s down), nothing reports it. UptimeRobot covers k3s and the box going down.
+- The GitHub Actions integration run (03:00 UTC) stays. It runs even when the box is down, and separates "the APIs changed" from "prod is broken".
 
 ### Outside check for the box being down
 
