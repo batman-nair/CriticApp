@@ -12,6 +12,8 @@ from review.utils.api_utils import (
     request_json_with_retry,
 )
 
+RECORD_USAGE = 'review.utils.api_utils.api_usage.record_upstream_request'
+
 
 class _ResponseStub:
     def __init__(self, status_code, json_data=None, headers=None, reason=''):
@@ -25,6 +27,11 @@ class _ResponseStub:
 
 
 class RequestJsonRetryTest(SimpleTestCase):
+    def setUp(self):
+        patcher = mock.patch(RECORD_USAGE)
+        self.record_usage = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_retries_then_succeeds(self):
         with mock.patch('review.utils.api_utils.time.sleep') as sleep_mock:
             with mock.patch('review.utils.api_utils.requests.get', side_effect=[
@@ -36,6 +43,7 @@ class RequestJsonRetryTest(SimpleTestCase):
         self.assertEqual(json_data, {'ok': True})
         self.assertEqual(error, {})
         sleep_mock.assert_called_once_with(1)
+        self.assertEqual(self.record_usage.call_count, 2)
 
     def test_returns_status_reason_on_final_failure(self):
         with mock.patch('review.utils.api_utils.time.sleep'):
@@ -58,6 +66,8 @@ class RequestJsonRetryTest(SimpleTestCase):
         self.assertEqual(error['exception_type'], 'ConnectionError')
         self.assertEqual(error['source'], 'Test API')
         self.assertEqual(sleep_mock.call_count, 2)
+        self.assertEqual(self.record_usage.call_count, 3)
+        self.record_usage.assert_called_with('Test API')
 
     def test_extra_headers_are_merged_with_defaults(self):
         with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data={})) as get_mock:
@@ -66,6 +76,24 @@ class RequestJsonRetryTest(SimpleTestCase):
         headers = get_mock.call_args.kwargs['headers']
         self.assertEqual(headers['X-Test'], 'yes')
         self.assertEqual(headers['User-Agent'], 'CriticApp/1.0')
+
+    def test_counts_one_request_on_immediate_success(self):
+        with mock.patch('review.utils.api_utils.requests.get', return_value=_ResponseStub(200, json_data={})):
+            request_json_with_retry('https://example.com', source_name='OMDB API')
+
+        self.record_usage.assert_called_once_with('OMDB API')
+
+    def test_counts_every_retry_attempt(self):
+        with mock.patch('review.utils.api_utils.time.sleep'):
+            with mock.patch('review.utils.api_utils.requests.get', side_effect=[
+                _ResponseStub(503),
+                _ResponseStub(503),
+                _ResponseStub(200, json_data={'ok': True}),
+            ]):
+                json_data, _ = request_json_with_retry('https://example.com', source_name='RAWG API')
+
+        self.assertEqual(json_data, {'ok': True})
+        self.assertEqual(self.record_usage.call_count, 3)
 
 
 def _mal_node(mal_id, mean=8.5, **extra):
@@ -82,6 +110,7 @@ def _mal_node(mal_id, mean=8.5, **extra):
     return node
 
 
+@mock.patch(RECORD_USAGE, new=mock.Mock())
 @mock.patch.dict('os.environ', {'MAL_CLIENT_ID': 'client-123'})
 class MALItemAPITest(SimpleTestCase):
     def test_requires_client_id(self):
@@ -215,6 +244,7 @@ def _omdb_title(type_='movie', **extra):
     return data
 
 
+@mock.patch(RECORD_USAGE, new=mock.Mock())
 @mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123'})
 class OMDBItemAPITest(SimpleTestCase):
     def test_rejects_unknown_type(self):
@@ -301,6 +331,7 @@ def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=
     return fake_get
 
 
+@mock.patch(RECORD_USAGE, new=mock.Mock())
 class OpenLibraryItemAPITest(SimpleTestCase):
     def test_search_maps_works(self):
         docs = [ol_search_doc(), ol_search_doc('OL219602W', title='The Hobbit (graphic novel)', cover_i=None, first_publish_year=None)]
