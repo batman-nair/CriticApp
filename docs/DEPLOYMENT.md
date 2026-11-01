@@ -264,7 +264,7 @@ Install the hub and the agent on the host with the official scripts, which set u
 
 ### Daily prod integration tests
 
-CronJob manifest: `k8s/integration-cronjob.yaml`, applied by the deploy workflow. It runs `python manage.py run_integration_checks` daily at 06:30 UTC. That command runs `pytest -m integration` in the prod image with prod's API keys but under `critic.settings.test`, so it never touches the prod database. If any test fails, errors or the run times out, it sends one Telegram message listing the failed tests and exits non-zero. A passing run sends nothing. Failed runs aren't retried, so there's one alert per failure.
+CronJob manifest: `k8s/integration-cronjob.yaml`. The deploy workflow applies it after a successful web rollout, pinned to the deployed commit's image tag, so it tests the image that is live. A plain `kubectl apply -f` of the file uses `:latest` instead. If any of `OMDB_API_KEY`, `RAWG_API_KEY` or `MAL_CLIENT_ID` is missing from `criticapp-secrets`, it alerts about the missing keys without running the tests. It runs `python manage.py run_integration_checks` daily at 06:30 UTC. That command runs `pytest -m integration` in the prod image with prod's API keys but under `critic.settings.test`, so it never touches the prod database. If any test fails, errors or the run times out, it sends one Telegram message listing the failed tests and exits non-zero. A passing run sends nothing. Failed runs aren't retried, so there's one alert per failure.
 
 Run it now and read the result:
 

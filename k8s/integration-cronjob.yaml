@@ -9,6 +9,7 @@ metadata:
 spec:
   # 06:30 UTC: away from the hourly refresh job and the 03:00 GitHub integration run.
   schedule: "30 6 * * *"
+  timeZone: "Etc/UTC"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 2
   failedJobsHistoryLimit: 3
@@ -26,8 +27,9 @@ spec:
           restartPolicy: Never
           containers:
             - name: integration-tests
+              # The deploy workflow replaces this with the deployed commit's tag.
               image: ghcr.io/batman-nair/criticapp:latest
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent
               command:
                 - python
                 - manage.py
