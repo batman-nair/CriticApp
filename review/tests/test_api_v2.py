@@ -1,10 +1,12 @@
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from review.models import Review, ReviewItem
+from review.tests.test_api_utils import ol_requests_get, ol_search_doc, ol_work
 
 
 class _FakeLookupAPI:
@@ -347,4 +349,37 @@ class LookupV2Test(APITestCase):
         self.client.logout()
         response = self.client.get('/api/v2/lookup/item/movie/omdb_tt1111111/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    # --- Books (real Open Library client, HTTP mocked) ---
+
+    def test_search_v2_book(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()):
+            response = self.client.get('/api/v2/lookup/search/book/', {'q': 'the hobbit'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['data'][0]['item_id'], 'olib_OL27482W')
+
+    def test_get_item_info_v2_saves_book(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()):
+            response = self.client.get('/api/v2/lookup/item/book/olib_OL27482W/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item = ReviewItem.objects.get(item_id='olib_OL27482W')
+        self.assertEqual(item.category, 'book')
+        self.assertEqual(item.title, 'The Hobbit')
+        self.assertEqual(item.attr2, 'J.R.R. Tolkien')
+        self.assertEqual(item.rating, '8.6')
+
+    def test_get_item_info_v2_saves_book_without_optional_fields(self):
+        doc = ol_search_doc(author_name=None, cover_i=None, first_publish_year=None, ratings_average=None, number_of_pages_median=None)
+        work = ol_work(description=None, subjects=None)
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+            response = self.client.get('/api/v2/lookup/item/book/olib_OL27482W/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        self.assertTrue(ReviewItem.objects.filter(item_id='olib_OL27482W', category='book').exists())
+
+    def test_get_item_info_v2_book_unknown_work(self):
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[])):
+            response = self.client.get('/api/v2/lookup/item/book/olib_OL1W/')
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
+        self.assertFalse(ReviewItem.objects.filter(item_id='olib_OL1W').exists())
 

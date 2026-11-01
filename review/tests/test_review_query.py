@@ -59,6 +59,12 @@ class ReviewQueryTest(TestCase):
         reviews = review_utils.get_filtered_review_objects(filter_categories=['movie'])
         self.assertTrue(all([review.review_item.category != 'movie' for review in reviews]))
 
+    def test_book_category_filter(self):
+        item = create_review_item(item_id='olib_OL27482W', category='book', title='The Hobbit')
+        Review.objects.create(user=self.user, review_item=item, review_rating=8)
+        reviews = review_utils.get_filtered_review_objects(categories=['book'])
+        self.assertEqual([review.review_item.item_id for review in reviews], ['olib_OL27482W'])
+
     def test_ordering_filter(self):
         reviews = review_utils.get_filtered_review_objects(ordering='alpha')
         reviews = list(reviews)

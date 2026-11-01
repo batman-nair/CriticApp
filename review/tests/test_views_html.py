@@ -20,6 +20,7 @@ class HTMLViewSmokeTest(TestCase):
         self.assertContains(response, 'data-category="series"')
         self.assertContains(response, 'data-category="anime:series"')
         self.assertContains(response, 'data-category="anime:movie"')
+        self.assertContains(response, 'data-category="book"')
         self.assertNotContains(response, 'data-category="anime"')
 
     def test_view_reviews_page_hides_language_menu_without_languages(self):
