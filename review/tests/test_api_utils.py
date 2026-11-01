@@ -401,9 +401,36 @@ class OpenLibraryItemAPITest(SimpleTestCase):
             result = OpenLibraryItemAPI().get_details('olib_OL27482W')
 
         self.assertEqual(result['title'], 'T' * 100)
-        self.assertEqual(len(result['attr1']), 300)
-        self.assertEqual(len(result['attr2']), 300)
-        self.assertTrue(result['attr2'].startswith('Author 0, Author 1, '))
+        # Whole entries only: the second subject doesn't fit, and no author is cut.
+        self.assertEqual(result['attr1'], 'S' * 200)
+        authors = result['attr2'].split(', ')
+        self.assertLessEqual(len(result['attr2']), 300)
+        self.assertEqual(authors, ['Author {}'.format(i) for i in range(len(authors))])
+        # The next author would not have fit.
+        self.assertGreater(len(result['attr2'] + ', Author {}'.format(len(authors))), 300)
+
+    def test_details_cut_a_single_overlong_entry(self):
+        doc = ol_search_doc(author_name=['A' * 350, 'Second Author'])
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc])):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['attr2'], 'A' * 300)
+
+    def test_details_dedupe_genres_and_authors(self):
+        doc = ol_search_doc(author_name=['Roald Dahl', 'Quentin Blake', 'Roald Dahl'])
+        work = ol_work(subjects=['Fiction', 'fiction', "Children's stories, English", 'Foxes', 'FICTION', 'Animals'])
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+            result = OpenLibraryItemAPI().get_details('olib_OL27482W')
+
+        self.assertEqual(result['attr1'], 'Fiction, Foxes, Animals')
+        self.assertEqual(result['attr2'], 'Roald Dahl, Quentin Blake')
+
+    def test_search_skips_docs_that_are_not_works(self):
+        docs = [{'key': '/books/OL1M', 'title': 'An edition'}, {'title': 'No key'}, ol_search_doc()]
+        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=docs)):
+            result = OpenLibraryItemAPI().search('hobbit')
+
+        self.assertEqual([item['item_id'] for item in result['results']], ['olib_OL27482W'])
 
     def test_details_requires_prefix(self):
         with mock.patch('review.utils.api_utils.requests.get') as get_mock:

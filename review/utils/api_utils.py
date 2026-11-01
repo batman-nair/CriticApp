@@ -425,11 +425,13 @@ class OpenLibraryItemAPI(ReviewItemAPIBase):
         json_data["item_id"] = self.prefix + work_id
         if not docs[0].get("cover_i"):
             json_data["image_url"] = self._MISSING_COVER_URL.format(work_id=work_id)
-        genres = [
-            subject for subject in (self._text(entry) for entry in work_json.get("subjects") or [])
-            if subject and ':' not in subject and subject.lower() not in self._IGNORED_SUBJECTS
-        ]
-        json_data["attr1"] = self._truncate(', '.join(genres[:self._MAX_GENRES]), self._MAX_ATTR_LENGTH)
+        # Keyed by lower case to drop repeats like "Fiction"/"fiction". Subjects
+        # with commas would read as several genres in the comma-separated list.
+        genres = {}
+        for subject in (self._text(entry) for entry in work_json.get("subjects") or []):
+            if subject and ':' not in subject and ',' not in subject and subject.lower() not in self._IGNORED_SUBJECTS:
+                genres.setdefault(subject.lower(), subject)
+        json_data["attr1"] = self._join(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH)
         json_data["description"] = self._text(work_json.get("description")) or "N/A"
         json_data["response"] = "True"
         return json_data
@@ -449,6 +451,18 @@ class OpenLibraryItemAPI(ReviewItemAPIBase):
     def _truncate(value: str, max_length: int) -> str:
         return value[:max_length] if value else "N/A"
 
+    @staticmethod
+    def _join(values: list, max_length: int) -> str:
+        # Join whole entries while they fit, so no name is cut in half.
+        joined = ''
+        for value in values:
+            candidate = '{}, {}'.format(joined, value) if joined else value
+            if len(candidate) > max_length:
+                joined = joined or value[:max_length]
+                break
+            joined = candidate
+        return joined or "N/A"
+
     def _convert_doc_to_review(self, doc: dict, detailed: bool=False) -> dict:
         json_data = dict()
         json_data["item_id"] = self.prefix + self._work_id(doc)
@@ -460,7 +474,7 @@ class OpenLibraryItemAPI(ReviewItemAPIBase):
         if not detailed:
             return json_data
         authors = [name for name in (self._text(entry) for entry in doc.get("author_name") or []) if name]
-        json_data["attr2"] = self._truncate(', '.join(dict.fromkeys(authors)), self._MAX_ATTR_LENGTH)
+        json_data["attr2"] = self._join(list(dict.fromkeys(authors)), self._MAX_ATTR_LENGTH)
         pages = doc.get("number_of_pages_median")
         json_data["attr3"] = '{} pages'.format(pages) if pages else "N/A"
         json_data["language"] = ""
