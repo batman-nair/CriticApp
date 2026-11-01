@@ -9,6 +9,3 @@ data:
   SESSION_COOKIE_SECURE: "True"
   CSRF_COOKIE_SECURE: "True"
   WHITENOISE_MAX_AGE: "31536000"
-  PUSHGATEWAY_URL: "http://criticapp-pushgateway.criticapp.svc.cluster.local:9091"
-  PUSHGATEWAY_JOB_NAME: "critic_refresh_review_items"
-  PUSHGATEWAY_TIMEOUT_SECONDS: "5"
