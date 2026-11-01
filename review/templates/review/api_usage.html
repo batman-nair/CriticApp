@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}<title>API usage | Critic App</title>{% endblock title %}
+
+{% block content %}
+<div class="my-4">
+  <h1>API usage</h1>
+  <p class="text-muted">External API requests counted per UTC day, including retries. Today is {{ today|date:"Y-m-d" }}.</p>
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Provider</th>
+          <th scope="col" class="text-end">Today</th>
+          <th scope="col" class="text-end">This month</th>
+          <th scope="col" class="text-end">Quota</th>
+          <th scope="col" class="text-end">Used</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for provider in providers %}
+        <tr{% if provider.level %} class="table-{{ provider.level }}"{% endif %}>
+          <th scope="row">{{ provider.label }}</th>
+          <td class="text-end">{{ provider.today }}</td>
+          <td class="text-end">{{ provider.month }}</td>
+          <td class="text-end">{% if provider.quota %}{{ provider.quota }} / {{ provider.period }}{% else %}&ndash;{% endif %}</td>
+          <td class="text-end">{% if provider.percent is not None %}{{ provider.percent }}%{% else %}&ndash;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="h4 mt-4">Last 30 days</h2>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th scope="col">Date</th>
+          {% for label in labels %}<th scope="col" class="text-end">{{ label }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in daily %}
+        <tr>
+          <th scope="row">{{ row.date|date:"Y-m-d" }}</th>
+          {% for count in row.counts %}<td class="text-end">{{ count }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock content %}

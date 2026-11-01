@@ -2,6 +2,7 @@ from django.db import IntegrityError
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer, ExternalLookupSerializer
-from .utils import api_utils, review_utils, metrics
+from .utils import api_usage, api_utils, review_utils, metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
 from .response_formatters import success_response, error_response
@@ -72,6 +73,11 @@ def view_reviews(request):
 def add_review(request):
     form = ReviewForm()
     return render(request, 'review/add_review.html', {'form': form})
+
+
+@staff_member_required
+def api_usage_view(request):
+    return render(request, 'review/api_usage.html', api_usage.usage_summary())
 
 
 @login_required

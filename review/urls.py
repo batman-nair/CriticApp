@@ -19,6 +19,7 @@ lookup_patterns_v2 = [
 urlpatterns = [
     path('health/', views.health_check, name='health_check'),
     path('metrics/', views.metrics_endpoint, name='metrics_endpoint'),
+    path('usage/', views.api_usage_view, name='api_usage'),
     # v2 API routes (new)
     path('api/v2/reviews/', include((review_patterns_v2, 'reviews_v2'))),
     # v2 lookup routes
