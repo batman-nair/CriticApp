@@ -177,5 +177,8 @@ jobs:
           kubectl_cmd set image deployment/criticapp-web web="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
           kubectl_cmd rollout status deployment/criticapp-web -n "$KUBE_NAMESPACE" --timeout=300s
 
+          # After a successful rollout, so the daily checks test the image that is live.
+          sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/integration-cronjob.yaml" | kubectl_cmd apply -f -
+
           rm -rf "$REMOTE_DIR"
           EOF

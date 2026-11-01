@@ -1,0 +1,41 @@
+# Runs the integration test suite against the real external APIs with prod's keys,
+# and sends one Telegram alert when anything fails. Tests run under test settings,
+# so they never touch the prod database.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: criticapp-integration-tests
+  namespace: criticapp
+spec:
+  # 06:30 UTC: away from the hourly refresh job and the 03:00 GitHub integration run.
+  schedule: "30 6 * * *"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retries: a rerun would make the same API calls and send the same alert again.
+      backoffLimit: 0
+      activeDeadlineSeconds: 1200
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: criticapp-integration-tests
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: integration-tests
+              # The deploy workflow replaces this with the deployed commit's tag.
+              image: ghcr.io/batman-nair/criticapp:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - manage.py
+                - run_integration_checks
+              envFrom:
+                - configMapRef:
+                    name: criticapp-config
+                - secretRef:
+                    name: criticapp-secrets
