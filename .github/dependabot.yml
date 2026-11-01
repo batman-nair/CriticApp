@@ -22,8 +22,8 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # Django major upgrades are done by hand: they can need a newer Python
-      # or PostgreSQL (Django 6.1 needs Python 3.12+ and PostgreSQL 15+).
+      # Stay on the Django LTS series. Major upgrades are done by hand, from one
+      # LTS to the next (5.2 -> 6.2), and can need a newer Python or PostgreSQL.
       - dependency-name: "Django"
         update-types:
           - "version-update:semver-major"
