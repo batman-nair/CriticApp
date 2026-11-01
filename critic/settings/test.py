@@ -35,7 +35,6 @@ else:
 
 ALLOWED_HOSTS = ['*']
 
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 WHITENOISE_USE_FINDERS = True
 
 # The default PBKDF2 hasher is deliberately slow (~1s per create_user/login),
