@@ -194,6 +194,22 @@ kubectl get jobs -n criticapp --sort-by=.metadata.creationTimestamp
 kubectl logs -n criticapp job/<latest-job-name>
 ```
 
+### Postgres Backup and Restore
+
+Backup:
+
+```bash
+kubectl exec -n criticapp deploy/criticapp-postgres -- \
+  pg_dump -U criticuser -d criticdb -Fc > criticapp_$(date +%Y%m%d_%H%M%S).dump
+```
+
+Restore:
+
+```bash
+kubectl exec -i -n criticapp deploy/criticapp-postgres -- \
+  pg_restore -U criticuser -d criticdb --clean --if-exists < criticapp_backup.dump
+```
+
 ## Monitoring
 
 Monitoring is lean on purpose: kube-prometheus-stack used about 1 GB of RAM on a ~4 GB box.
@@ -248,22 +264,6 @@ Install the hub and the agent on the host with the official scripts, which set u
 ### Outside check for the box being down
 
 Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/health/` (5-minute interval) with email or app notifications.
-
-### Postgres Backup and Restore
-
-Backup:
-
-```bash
-kubectl exec -n criticapp deploy/criticapp-postgres -- \
-  pg_dump -U criticuser -d criticdb -Fc > criticapp_$(date +%Y%m%d_%H%M%S).dump
-```
-
-Restore:
-
-```bash
-kubectl exec -i -n criticapp deploy/criticapp-postgres -- \
-  pg_restore -U criticuser -d criticdb --clean --if-exists < criticapp_backup.dump
-```
 
 ## Troubleshooting
 
