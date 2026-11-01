@@ -14,7 +14,7 @@ CriticApp runs on the following production components:
 - Postgres in-cluster deployment and service
 - Django app deployment served by Gunicorn
 - WhiteNoise for static asset delivery from app containers
-- Prometheus scrape endpoints from the app and Pushgateway
+- Beszel on the host for machine monitoring, and a staff-only API usage page with Telegram quota alerts (see [Monitoring](#monitoring))
 - GitHub Actions workflow at `.github/workflows/deploy-k8s.yml`
 
 ## Prerequisites
@@ -42,6 +42,11 @@ Required keys:
 - `RAWG_API_KEY`
 - `MAL_CLIENT_ID`
 
+Optional keys (quota alerts, see [Monitoring](#monitoring)):
+
+- `ALERT_TELEGRAM_BOT_TOKEN`
+- `ALERT_TELEGRAM_CHAT_ID`
+
 Apply it:
 
 ```bash
@@ -64,8 +69,6 @@ The deployment workflow requires:
 - `ALLOWED_HOSTS` (optional but recommended)
 - `CSRF_TRUSTED_ORIGINS` (optional but recommended)
 - `LETSENCRYPT_EMAIL` (required if workflow should apply ClusterIssuer)
-- `GRAFANA_DOMAIN` (optional)
-- `PUSHGATEWAY_URL` (optional)
 
 ## First Deployment (Manual Bootstrap)
 
@@ -84,10 +87,7 @@ Apply base manifests:
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/secret.yaml
 kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/pushgateway.yaml
 kubectl apply -f k8s/service.yaml
-kubectl apply -f k8s/servicemonitor.yaml
-kubectl apply -f k8s/pushgateway-servicemonitor.yaml
 kubectl apply -f k8s/middleware.yaml
 ```
 
@@ -98,9 +98,6 @@ kubectl create configmap criticapp-config -n criticapp \
   --from-literal=DJANGO_SETTINGS_MODULE=critic.settings.production \
   --from-literal=ALLOWED_HOSTS="reviews.example.com,127.0.0.1,localhost,criticapp-web,criticapp-web.criticapp.svc.cluster.local" \
   --from-literal=CSRF_TRUSTED_ORIGINS="https://reviews.example.com" \
-  --from-literal=PUSHGATEWAY_URL="http://criticapp-pushgateway.criticapp.svc.cluster.local:9091" \
-  --from-literal=PUSHGATEWAY_JOB_NAME="critic_refresh_review_items" \
-  --from-literal=PUSHGATEWAY_TIMEOUT_SECONDS="5" \
   --from-literal=SECURE_SSL_REDIRECT="True" \
   --from-literal=SESSION_COOKIE_SECURE="True" \
   --from-literal=CSRF_COOKIE_SECURE="True" \
@@ -115,12 +112,6 @@ Apply issuer and ingress with your domains:
 ```bash
 sed "s|__LETSENCRYPT_EMAIL__|you@example.com|g" k8s/clusterissuer.yaml | kubectl apply -f -
 sed "s|__APP_DOMAIN__|reviews.example.com|g" k8s/ingress.yaml | kubectl apply -f -
-```
-
-Optional Grafana ingress:
-
-```bash
-sed "s|__GRAFANA_DOMAIN__|grafana.example.com|g" k8s/grafana-ingress.yaml | kubectl apply -f -
 ```
 
 Run migrations:
@@ -148,7 +139,7 @@ On every push to `master`, `.github/workflows/deploy-k8s.yml` does the following
 2. Uploads `k8s/` manifests to the target server over SSH
 3. Applies core Kubernetes resources
 4. Creates or updates `criticapp-config` ConfigMap from workflow values
-5. Applies ingress resources and optional ClusterIssuer/Grafana ingress
+5. Applies ingress resources and optional ClusterIssuer
 6. Runs migration job with the new image
 7. Rolls out `criticapp-web` with zero-downtime strategy
 
@@ -174,7 +165,8 @@ Recommended operational rule:
 Application endpoints:
 
 - `/health/` for readiness and liveness
-- `/metrics/` for Prometheus scraping
+- `/metrics/` Prometheus-format metrics (blocked at the ingress; nothing scrapes it since the move to Beszel)
+- `/usage/` staff-only page with external API usage against quotas
 
 Useful checks:
 
@@ -201,6 +193,58 @@ kubectl get cronjob criticapp-refresh-review-items -n criticapp
 kubectl get jobs -n criticapp --sort-by=.metadata.creationTimestamp
 kubectl logs -n criticapp job/<latest-job-name>
 ```
+
+## Monitoring
+
+Monitoring is lean on purpose: kube-prometheus-stack used about 1 GB of RAM on a ~4 GB box.
+
+- **Machine health** (CPU, memory, disk, disk I/O, network, load) comes from [Beszel](https://beszel.dev), installed on the host, outside k3s.
+- **External API usage** (OMDb, RAWG, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it at `https://<APP_DOMAIN>/usage/` (staff only).
+- **Quota alerts:** the app sends one Telegram message when OMDb reaches 80% and 100% of 1,000 requests per day, and when RAWG reaches 80% and 100% of 20,000 requests per month. The quotas live in `UPSTREAM_API_QUOTAS` in `critic/settings/common.py`. Check them against your API accounts.
+- **Box down:** Beszel's hub runs on the same machine, so it can't report the machine being down. Use an outside check (below).
+
+### One-time removal of the old Prometheus/Grafana stack
+
+Run once, in this order, on a cluster that still has the old stack:
+
+```bash
+kubectl delete servicemonitor --all -n criticapp
+kubectl delete deploy,svc criticapp-pushgateway -n criticapp
+helm uninstall kube-prometheus-stack -n monitoring
+# Required: the deploy workflow (not Helm) created the Grafana ingress and the
+# dashboard ConfigMap here, and helm uninstall leaves them behind.
+kubectl delete namespace monitoring
+# Optional: Helm also leaves the Prometheus operator CRDs behind.
+kubectl get crd -o name | grep monitoring.coreos.com | xargs kubectl delete
+```
+
+Then delete the `GRAFANA_DOMAIN` and `PUSHGATEWAY_URL` GitHub Actions secrets and the Grafana DNS record.
+
+### Telegram bot for alerts
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
+2. Send the bot a message, then get your chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`message.chat.id`).
+3. Add `ALERT_TELEGRAM_BOT_TOKEN` and `ALERT_TELEGRAM_CHAT_ID` to `criticapp-secrets`, then restart: `kubectl rollout restart deployment/criticapp-web -n criticapp`. The refresh CronJob picks the keys up on its next run.
+
+When either key is empty, quota alerts are skipped and only logged.
+
+### Beszel (machine monitoring)
+
+Install the hub and the agent on the host with the official scripts, which set up systemd services. See the [hub](https://beszel.dev/guide/hub-installation) and [agent](https://beszel.dev/guide/agent-installation) installation guides. Note the version you install, and update with the built-in `update` command described there.
+
+- Keep the hub (default port 8090) off the public internet. Reach it over Tailscale or an SSH tunnel (`ssh -L 8090:localhost:8090 <host>`), not through an ingress.
+- In the hub, add the system using the key the hub shows. The agent listens on port 45876 by default.
+- Under Settings > Notifications, add the same Telegram bot (Beszel supports Telegram URLs), then add alerts for the system:
+  - CPU above 90% for 10 minutes
+  - Memory above 90%
+  - Disk above 85%
+  - "Status" (optional): this only catches a dead agent, because the hub is on the same box.
+- Beszel doesn't report connection counts.
+- On k3s, Beszel sees host-level stats only, because per-container stats need Docker or Podman. For per-pod usage, use `kubectl top pods -n criticapp`.
+
+### Outside check for the box being down
+
+Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/health/` (5-minute interval) with email or app notifications.
 
 ### Postgres Backup and Restore
 
