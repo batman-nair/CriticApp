@@ -40,3 +40,7 @@ WHITENOISE_USE_FINDERS = True
 # The default PBKDF2 hasher is deliberately slow (~1s per create_user/login),
 # which dominated the suite's runtime. Tests don't need real password hashing.
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
+# Never send real quota alerts from tests, even if .env has Telegram credentials.
+ALERT_TELEGRAM_BOT_TOKEN = ''
+ALERT_TELEGRAM_CHAT_ID = ''
