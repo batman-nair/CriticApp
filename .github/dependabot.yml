@@ -1,0 +1,29 @@
+# Weekly version updates for the pip packages in requirements.txt.
+# Dependabot only opens PRs; they are reviewed and merged by hand, because
+# every merge to master deploys to production.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Only propose releases that have been out for at least two weeks.
+    # Security updates are not delayed by this.
+    cooldown:
+      default-days: 14
+    groups:
+      # Minor and patch bumps arrive together in one PR; each major bump
+      # gets its own PR.
+      python-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Stay on Django 5.2 LTS: Django 6 needs Python 3.12+, and the project
+      # runs on Python 3.11.
+      - dependency-name: "Django"
+        update-types:
+          - "version-update:semver-major"
