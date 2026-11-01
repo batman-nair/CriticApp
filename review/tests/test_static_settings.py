@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.template.loader import get_template
 from django.templatetags.static import static
 from django.test import override_settings
+from django.urls import get_resolver
 
 
 PRODUCTION_SETTINGS = 'critic.settings.production'
@@ -19,7 +20,7 @@ def production_settings(monkeypatch):
     """The production settings module, evaluated with the env vars it requires.
 
     Importing it doesn't change the active (test) settings. It is removed from
-    sys.modules afterwards so no other test sees this test-env copy.
+    sys.modules afterwards so a later import runs it again.
     """
     monkeypatch.setenv('DB_NAME', 'test')
     monkeypatch.setenv('DB_USER', 'test')
@@ -60,9 +61,14 @@ def _project_template_names():
 def test_templates_render_with_production_static_storage(tmp_path, production_settings):
     # The manifest storage raises for any {% static %} path that collectstatic
     # didn't produce, which would be a 500 in production. Tests otherwise use
-    # plain storage, so render every template against a real manifest here.
+    # plain storage, so render every template (with an empty context) against
+    # a real manifest here.
     template_names = _project_template_names()
     assert 'base.html' in template_names
+
+    # critic/urls.py resolves the favicon URL from the static storage when it
+    # is first loaded; load it now so the hashed name doesn't leak into later tests.
+    get_resolver().url_patterns
 
     with override_settings(STORAGES=production_settings.STORAGES, STATIC_ROOT=tmp_path):
         call_command('collectstatic', interactive=False, verbosity=0)
