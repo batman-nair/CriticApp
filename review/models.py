@@ -43,3 +43,18 @@ class Review(models.Model):
 
     def __str__(self):
         return '{}'.format(self.review_item.title)
+
+
+class UpstreamApiUsage(models.Model):
+    provider = models.CharField(max_length=32)
+    date = models.DateField()
+    requests = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['-date', 'provider']
+        constraints = [
+            models.UniqueConstraint(fields=['provider', 'date'], name='unique upstream usage per day')
+            ]
+
+    def __str__(self):
+        return '{} {}: {}'.format(self.provider, self.date, self.requests)

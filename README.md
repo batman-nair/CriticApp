@@ -12,7 +12,7 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 - Fetches item metadata from OMDb, RAWG, MyAnimeList, and Open Library
 - Supports user profiles and searchable review lists
 - Exposes API endpoints for review CRUD and item lookups
-- Includes monitoring with Prometheus metrics and Grafana dashboards
+- Includes an API usage page with Telegram quota alerts, and machine monitoring via Beszel
 
 ## Technical Stuff
 

@@ -1,8 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
 from review import views
-from review.models import Review
+from review.models import Review, UpstreamApiUsage
 from review.tests.factories import create_review_item
 from review.utils import review_utils
 
@@ -88,6 +89,29 @@ class HTMLViewSmokeTest(TestCase):
         response = self.client.get('/health/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b'OK')
+
+    def test_api_usage_page_redirects_anonymous_users(self):
+        response = self.client.get('/usage/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/admin/login/', response['Location'])
+
+    def test_api_usage_page_redirects_non_staff_users(self):
+        get_user_model().objects.create_user(username='plainuser', password='pass12345')
+        self.client.login(username='plainuser', password='pass12345')
+        response = self.client.get('/usage/')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/admin/login/', response['Location'])
+
+    def test_api_usage_page_shows_counts_for_staff(self):
+        UpstreamApiUsage.objects.create(provider='omdb', date=timezone.now().date(), requests=812)
+        get_user_model().objects.create_user(username='staffuser', password='pass12345', is_staff=True)
+        self.client.login(username='staffuser', password='pass12345')
+        response = self.client.get('/usage/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'review/api_usage.html')
+        self.assertContains(response, '812')
+        self.assertContains(response, '1000 / today')
+        self.assertContains(response, 'table-warning')
 
 
 class FilterCategoriesTest(SimpleTestCase):

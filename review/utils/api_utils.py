@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
 
-from . import metrics
+from . import api_usage, metrics
 
 load_dotenv(find_dotenv())
 MISSING_PREFIX_RESPONSE = {"response": "False", "error": "Missing prefix in item id."}
@@ -35,6 +35,7 @@ def normalize_imdb_title_url_to_item_id(value: str) -> Optional[str]:
 def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES, headers: Optional[dict]=None) -> tuple[dict, dict]:
     request_headers = {**DEFAULT_REQUEST_HEADERS, **(headers or {})}
     for attempt in range(retries):
+        api_usage.record_upstream_request(source_name)
         try:
             response_obj = requests.get(
                 url,
