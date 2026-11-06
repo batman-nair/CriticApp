@@ -169,7 +169,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     # Only throttle classes read these two, and only v3 views set
-    # throttle_classes (ScopedRateThrottle), so v2 is unaffected. Counts are
+    # throttle_classes (ScopedRateThrottle), so v2 is unaffected. Rates apply
+    # per user when logged in, otherwise per client IP. Counts are
     # kept in the default in-memory cache: correct with 1 pod and 1 gunicorn
     # worker; more processes or pods need a shared cache.
     'DEFAULT_THROTTLE_RATES': {
