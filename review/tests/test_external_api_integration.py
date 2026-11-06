@@ -1,10 +1,15 @@
 import pytest
 
-from review.utils import api_utils
+from review.providers import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider
+from review.providers.mal import MALProvider
+from review.providers.omdb import OMDbProvider
+from review.providers.openlibrary import OpenLibraryProvider
+from review.providers.rawg import RAWGProvider
 
 import time
 
 _JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
+_REVIEW_ITEM_COLUMNS = ["item_id", "category", "title", "image_url", "year", "attr1", "attr2", "attr3", "description", "rating"]
 
 
 @pytest.mark.integration
@@ -15,11 +20,11 @@ class TestUtilAPI:
     """
 
     def setup_method(self):
-        self.omdb_api = api_utils.OMDBItemAPI()
-        self.rawg_api = api_utils.RAWGItemAPI()
-        self.mal_anime_api = api_utils.MALItemAPI('anime')
-        self.mal_manga_api = api_utils.MALItemAPI('manga')
-        self.open_library_api = api_utils.OpenLibraryItemAPI()
+        self.omdb_api = OMDbProvider()
+        self.rawg_api = RAWGProvider()
+        self.mal_anime_api = MALProvider('anime')
+        self.mal_manga_api = MALProvider('manga')
+        self.open_library_api = OpenLibraryProvider()
 
     def test_search(self):
         self._test_search_api(self.omdb_api, 'Breaking Bad')
@@ -30,18 +35,13 @@ class TestUtilAPI:
         self._test_search_api(self.mal_manga_api, 'Berserk')
         self._test_search_api(self.open_library_api, 'The Hobbit')
 
-    def _test_search_api(self, api_obj: api_utils.ReviewItemAPIBase, success_query: str):
-        search_json = api_obj.search(success_query)
-        self._check_review_search_json(search_json)
-        search_json = api_obj.search(_JUNK_DATA)
-        self._check_invalid_response(search_json)
-
-    def _check_review_search_json(self, search_json: str):
-        assert "results" in search_json, "Expected entry 'results' but got {}".format(search_json)
-        assert search_json["response"] == "True"
-        review_search_result = search_json["results"][0]
-        review_search_params = ["title", "item_id", "image_url", "year"]
-        assert all(param in review_search_result for param in review_search_params)
+    def _test_search_api(self, api_obj: Provider, success_query: str):
+        results = api_obj.search(success_query)
+        assert len(results) > 0, "Expected search results for {!r}".format(success_query)
+        assert all(isinstance(result, ItemSummary) for result in results)
+        assert set(results[0].to_search_result()) == {"title", "item_id", "image_url", "year"}
+        with pytest.raises(ItemNotFound):
+            api_obj.search(_JUNK_DATA)
 
     def test_details(self):
         self._test_details_api(self.omdb_api, 'omdb_tt3896198')
@@ -50,16 +50,10 @@ class TestUtilAPI:
         self._test_details_api(self.mal_manga_api, 'jikan_manga_2')
         self._test_details_api(self.open_library_api, 'olib_OL27482W')
 
-    def _test_details_api(self, api_obj: api_utils.ReviewItemAPIBase, success_id: str):
-        details_json = api_obj.get_details(success_id)
-        self._check_review_info_json(details_json)
-        details_json = api_obj.get_details(_JUNK_DATA)
-        self._check_invalid_response(details_json)
-
-    def _check_review_info_json(self, info_json):
-        assert info_json["response"] == "True"
-        review_info_params = ["title", "item_id", "image_url", "year", "attr1", "attr2", "attr3", "description", "rating"]
-        assert all(param in info_json for param in review_info_params)
-
-    def _check_invalid_response(self, json_data: dict):
-        assert json_data["response"] == "False"
+    def _test_details_api(self, api_obj: Provider, success_id: str):
+        details = api_obj.get_details(success_id)
+        assert isinstance(details, ItemDetails)
+        fields = details.to_review_item_fields()
+        assert all(column in fields for column in _REVIEW_ITEM_COLUMNS), "Missing columns in {}".format(fields)
+        with pytest.raises(InvalidItemId):
+            api_obj.get_details(_JUNK_DATA)

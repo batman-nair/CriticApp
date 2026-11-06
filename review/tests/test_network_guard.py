@@ -3,7 +3,7 @@ import socket
 import pytest
 import requests
 
-from review.utils.api_utils import request_json_with_retry
+from review.providers.base import request_json_with_retry
 
 
 def test_requests_to_external_host_are_blocked():

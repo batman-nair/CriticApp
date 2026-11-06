@@ -117,5 +117,5 @@ class HTMLViewSmokeTest(TestCase):
 class FilterCategoriesTest(SimpleTestCase):
     def test_chips_cover_every_category(self):
         chip_values = {value for value, _ in views.FILTER_CATEGORIES}
-        expected = (set(views.CATEGORY_TO_API) - {'anime'}) | set(review_utils.SUBCATEGORY_FILTERS)
+        expected = (set(views.CATEGORIES) - {'anime'}) | set(review_utils.SUBCATEGORY_FILTERS)
         self.assertEqual(chip_values, expected)
