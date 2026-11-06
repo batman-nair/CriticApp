@@ -168,6 +168,17 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # Only throttle classes read these two, and only v3 views set
+    # throttle_classes (ScopedRateThrottle), so v2 is unaffected. Counts are
+    # kept in the default in-memory cache: correct with 1 pod and 1 gunicorn
+    # worker; more processes or pods need a shared cache.
+    'DEFAULT_THROTTLE_RATES': {
+        'search': '30/min',
+        'login': '5/min',
+    },
+    # Traefik is the one proxy in front of gunicorn in prod. The client IP is
+    # the last X-Forwarded-For entry, so a forged prefix can't pick a bucket.
+    'NUM_PROXIES': 1,
 }
 
 SIMPLE_JWT = {
@@ -185,6 +196,8 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Review and item lookup APIs for movies, games, anime, manga, and books.',
     'VERSION': '2.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # This is the v2 schema; v3 has its own (critic.api.schema).
+    'PREPROCESSING_HOOKS': ['critic.api.schema.exclude_v3_paths'],
     'TAGS': [
         {'name': 'reviews', 'description': 'CRUD operations for reviews'},
         {'name': 'lookup', 'description': 'External item search and details lookup'},
