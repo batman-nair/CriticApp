@@ -17,19 +17,12 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from .forms import ReviewForm
 from .serializers import ReviewItemSerializer, ReviewSerializer, ExternalLookupSerializer
-from .utils import api_usage, api_utils, review_utils, metrics
+from .providers import CATEGORIES, ProviderError, get_provider
+from .providers.omdb import normalize_imdb_title_url_to_item_id
+from .utils import api_usage, review_utils, metrics
 from .models import ReviewItem, Review
 from .permissions import IsOwnerOrReadOnly
 from .response_formatters import success_response, error_response
-
-CATEGORY_TO_API: dict[str, api_utils.ReviewItemAPIBase] = {
-    'movie': api_utils.OMDBItemAPI('movie'),
-    'series': api_utils.OMDBItemAPI('series'),
-    'game': api_utils.RAWGItemAPI(),
-    'anime': api_utils.MALItemAPI('anime'),
-    'manga': api_utils.MALItemAPI('manga'),
-    'book': api_utils.OpenLibraryItemAPI(),
-}
 
 # (value, label) of each category chip on the reviews page. Anime is split
 # into its series and movie subcategories, which together cover every anime.
@@ -43,14 +36,6 @@ FILTER_CATEGORIES = [
     ('book', 'Books'),
 ]
 
-
-def _build_search_result_from_item(item_data):
-    return {
-        'item_id': item_data['item_id'],
-        'title': item_data['title'],
-        'image_url': item_data['image_url'],
-        'year': item_data['year'],
-    }
 
 def health_check(request):
     """Health check endpoint for k8s probes. Returns 200 OK."""
@@ -274,7 +259,7 @@ class SearchItemV2(APIView):
         responses={200: dict, 400: dict, 403: dict, 502: dict},
     )
     def get(self, request, category):
-        if category not in CATEGORY_TO_API:
+        if category not in CATEGORIES:
             return Response(
                 error_response(
                     code='INVALID_CATEGORY',
@@ -295,37 +280,27 @@ class SearchItemV2(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        api_obj = CATEGORY_TO_API[category]
+        provider = get_provider(category)
         normalized_item_id = None
         if category in ('movie', 'series'):
-            normalized_item_id = api_utils.normalize_imdb_title_url_to_item_id(search_term)
+            normalized_item_id = normalize_imdb_title_url_to_item_id(search_term)
 
-        if normalized_item_id is not None:
-            result = api_obj.get_details(normalized_item_id)
-            if result.get('response') == 'False':
-                return Response(
-                    error_response(
-                        code='UPSTREAM_ERROR',
-                        message=result.get('error', 'Bad response from API.'),
-                    ),
-                    status=status.HTTP_502_BAD_GATEWAY,
-                )
-            return Response(
-                success_response([_build_search_result_from_item(result)], meta={'version': '2.0'}),
-            )
-
-        result = api_obj.search(search_term)
-        if result.get('response') == 'False':
+        try:
+            if normalized_item_id is not None:
+                results = [provider.get_details(normalized_item_id).to_search_result()]
+            else:
+                results = [item.to_search_result() for item in provider.search(search_term)]
+        except ProviderError as ex:
             return Response(
                 error_response(
                     code='UPSTREAM_ERROR',
-                    message=result.get('error', 'Bad response from API.'),
+                    message=ex.message,
                 ),
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
         return Response(
-            success_response(result.get('results', []), meta={'version': '2.0'}),
+            success_response(results, meta={'version': '2.0'}),
         )
 
 
@@ -343,7 +318,7 @@ class GetItemInfoV2(APIView):
         responses={200: dict, 400: dict, 403: dict, 502: dict},
     )
     def get(self, request, category, item_id):
-        if category not in CATEGORY_TO_API:
+        if category not in CATEGORIES:
             return Response(
                 error_response(
                     code='INVALID_CATEGORY',
@@ -371,13 +346,13 @@ class GetItemInfoV2(APIView):
         except ReviewItem.DoesNotExist:
             pass
 
-        api_obj = CATEGORY_TO_API[category]
-        item_data = api_obj.get_details(item_id)
-        if item_data.get('response') == 'False':
+        try:
+            item_data = get_provider(category).get_details(item_id).to_review_item_fields()
+        except ProviderError as ex:
             return Response(
                 error_response(
                     code='UPSTREAM_ERROR',
-                    message=item_data.get('error', 'Bad response from API.'),
+                    message=ex.message,
                 ),
                 status=status.HTTP_502_BAD_GATEWAY,
             )
