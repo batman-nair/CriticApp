@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/auth/logout/', TokenBlacklistView.as_view(), name='token-blacklist'),
     path('api/auth/me/', MeView.as_view(), name='auth-me'),
     path('api/auth/register/', RegisterView.as_view(), name='auth-register'),
+    path('api/v3/', include('critic.api.urls')),
     path('profile/', include('users.urls')),
     path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url('favicon.ico'))),
     path('', include('review.urls')),

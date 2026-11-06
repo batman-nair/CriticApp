@@ -1,0 +1,120 @@
+openapi: 3.0.3
+info:
+  title: CriticApp API v3
+  version: '3.0'
+  description: 'API for the CriticApp frontend. Successful responses are wrapped as
+    {"data": ..., "meta": {...}}; errors are RFC 9457 problem+json with a stable `code`.
+    See docs/API_V3.md.'
+paths:
+  /api/v3/categories:
+    get:
+      operationId: categories_list
+      description: Every category with its filter subcategories, data source and rating
+        label.
+      summary: List categories
+      tags:
+      - categories
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+          description: ''
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subcategory'
+        source:
+          type: string
+          description: Where item data comes from
+        rating_label:
+          type: string
+          description: Name of the source's rating, e.g. IMDb
+      required:
+      - id
+      - label
+      - rating_label
+      - source
+      - subcategories
+    CategoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          nullable: true
+        code:
+          type: string
+        message:
+          type: string
+      required:
+      - code
+      - field
+      - message
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+      required:
+      - code
+      - detail
+      - status
+      - title
+      - type
+    Subcategory:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+      required:
+      - id
+      - label
+tags:
+- name: categories
+  description: Review categories and their data sources

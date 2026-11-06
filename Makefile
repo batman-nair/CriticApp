@@ -1,4 +1,12 @@
-.PHONY: dev prod test test-local test-reset test-docker build down
+.PHONY: dev prod test test-local test-reset test-docker build down schema
+
+# Regenerate openapi/v3.yaml in the Docker image (the Python and package
+# versions CI uses), so the committed file matches what the schema test
+# generates in CI. The YAML comes out on stdout and replaces the file only
+# when generation succeeds.
+SCHEMA_IMAGE = criticapp-schema
+SCHEMA_CMD = python manage.py spectacular --urlconf critic.api.schema_urls \
+	--custom-settings critic.api.schema.V3_SCHEMA_SETTINGS --validate --fail-on-warn
 
 dev:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
@@ -23,3 +31,10 @@ build:
 
 down:
 	docker compose down
+
+schema:
+	docker build -q -t $(SCHEMA_IMAGE) . >/dev/null
+	docker run --rm -e SECRET_KEY=schema -e DJANGO_SETTINGS_MODULE=critic.settings.test \
+		$(SCHEMA_IMAGE) $(SCHEMA_CMD) > openapi/v3.yaml.tmp \
+		&& mv openapi/v3.yaml.tmp openapi/v3.yaml \
+		|| { rm -f openapi/v3.yaml.tmp; exit 1; }

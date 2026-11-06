@@ -4,6 +4,8 @@ This document is the canonical reference for the current CriticApp API surface a
 
 Application API endpoints are under `/api/v2/`. Operational and documentation endpoints remain at `/health/`, `/metrics/`, `/api/schema/`, and `/api/docs/`.
 
+API v3 (`/api/v3/`, for the new frontend) is documented separately in [API_V3.md](API_V3.md).
+
 ## Overview
 
 Successful API responses use a JSON envelope with `data` and `meta` fields.
