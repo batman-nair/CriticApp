@@ -2,6 +2,7 @@ import json
 from unittest import mock
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.signals import got_request_exception
 from django.http import Http404
 from django.test import SimpleTestCase
 from rest_framework import permissions, serializers
@@ -233,6 +234,15 @@ class TestApiError(ProblemAssertions, SimpleTestCase):
         self.assertEqual(body['title'], 'Conflict')
         self.assertEqual(body['detail'], 'You already reviewed this item.')
 
+    def test_nonstandard_status_gets_a_generic_title(self):
+        view = RaisingView.as_view(exc=ApiError(499, 'CLIENT_CLOSED', 'Gone.'))
+        body = self.assertProblem(call(view, factory.get('/x')), 499, 'CLIENT_CLOSED')
+        self.assertEqual(body['title'], 'Error')
+
+    def test_detail_must_be_a_string(self):
+        with self.assertRaises(TypeError):
+            ApiError(409, 'DUPLICATE_REVIEW', {'review_id': 12})
+
 
 class TestUnhandledException(ProblemAssertions, SimpleTestCase):
     def test_returns_500_problem_without_internals_and_logs(self):
@@ -247,3 +257,16 @@ class TestUnhandledException(ProblemAssertions, SimpleTestCase):
         self.assertEqual(len(logs.records), 1)
         self.assertIsNotNone(logs.records[0].exc_info)
         self.assertIn('RaisingView', logs.output[0])
+
+    def test_sends_got_request_exception(self):
+        received = []
+
+        def receiver(sender, request, **kwargs):
+            received.append(request.path)
+
+        got_request_exception.connect(receiver)
+        self.addCleanup(got_request_exception.disconnect, receiver)
+        view = RaisingView.as_view(exc=RuntimeError('boom'))
+        with self.assertLogs('critic.api.errors', 'ERROR'):
+            call(view, factory.get('/broken'))
+        self.assertEqual(received, ['/broken'])

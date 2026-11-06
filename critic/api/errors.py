@@ -15,6 +15,7 @@ import math
 from http import HTTPStatus
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.signals import got_request_exception
 from django.http import Http404
 from rest_framework import exceptions, serializers
 from rest_framework.response import Response
@@ -45,6 +46,8 @@ class ApiError(exceptions.APIException):
     """An endpoint's own error, e.g. ApiError(409, 'DUPLICATE_REVIEW', '...')."""
 
     def __init__(self, status, code, detail):
+        if not isinstance(detail, str):
+            raise TypeError('ApiError detail must be a string')
         self.status_code = status
         self.code = code
         super().__init__(detail=detail, code=code)
@@ -85,10 +88,18 @@ def _field_errors(detail, path=()):
         }
 
 
+def status_title(status):
+    """The HTTP status phrase, or a generic one for a status the stdlib doesn't know."""
+    try:
+        return HTTPStatus(status).phrase
+    except ValueError:
+        return 'Error'
+
+
 def problem_response(status, code, detail, errors=None, headers=None):
     body = {
         'type': 'about:blank',
-        'title': HTTPStatus(status).phrase,
+        'title': status_title(status),
         'status': status,
         'code': code,
         'detail': detail,
@@ -116,6 +127,9 @@ def v3_exception_handler(exc, context):
             request.path if request is not None else 'unknown path',
             exc_info=exc,
         )
+        # What Django does for an exception it turns into a 500, so the test
+        # client still re-raises it and error hooks still hear about it.
+        got_request_exception.send(sender=None, request=getattr(request, '_request', request))
         return problem_response(500, 'INTERNAL_ERROR', INTERNAL_ERROR_DETAIL)
 
     headers = {}
