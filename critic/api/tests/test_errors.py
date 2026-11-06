@@ -29,6 +29,16 @@ class NestedSerializer(serializers.Serializer):
     items = NameSerializer(many=True)
 
 
+class EitherSerializer(serializers.Serializer):
+    a = serializers.CharField(required=False)
+    b = serializers.CharField(required=False)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Give a or b.')
+        return attrs
+
+
 class EchoView(V3APIView):
     """GET answers 200; POST validates `serializer_class`."""
     permission_classes = [permissions.AllowAny]
@@ -111,6 +121,11 @@ class TestValidationErrors(ProblemAssertions, SimpleTestCase):
         self.assertEqual(body['errors'], [
             {'field': 'items.1.name', 'code': 'required', 'message': 'This field is required.'},
         ])
+
+    def test_non_field_error_has_no_field(self):
+        view = EchoView.as_view(serializer_class=EitherSerializer)
+        body = self.assertProblem(call(view, factory.post('/x', {}, format='json')), 400, 'VALIDATION_ERROR')
+        self.assertEqual(body['errors'], [{'field': None, 'code': 'invalid', 'message': 'Give a or b.'}])
 
     def test_bare_validation_error_has_no_field(self):
         view = RaisingView.as_view(exc=ValidationError('Bad thing.'))

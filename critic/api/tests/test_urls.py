@@ -1,4 +1,6 @@
-from django.test import TestCase
+from django.test import Client, TestCase
+
+from users.models import User
 
 
 class TestV3CatchAll(TestCase):
@@ -16,6 +18,11 @@ class TestV3CatchAll(TestCase):
     def test_unknown_path_any_method(self):
         self.assertNotFoundProblem(self.client.post('/api/v3/does-not-exist', {}, content_type='application/json'))
         self.assertNotFoundProblem(self.client.delete('/api/v3/does-not-exist'))
+
+    def test_logged_in_post_without_csrf_token_is_still_404(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(User.objects.create_user(username='someone', password='pw'))
+        self.assertNotFoundProblem(client.post('/api/v3/does-not-exist', {}, content_type='application/json'))
 
     def test_trailing_slash_is_unknown(self):
         self.assertNotFoundProblem(self.client.get('/api/v3/categories/'))
