@@ -74,8 +74,8 @@ class OMDbProvider(Provider):
         creators = []
         for role in ["Director", "Writer", "Actors"]:
             creators += _split(omdb_json[role])
-        return ItemDetails(
-            **vars(summary),
+        return ItemDetails.from_summary(
+            summary,
             genres=_split(omdb_json["Genre"]),
             creators=unique(creators),
             languages=_split(omdb_json.get("Language")),

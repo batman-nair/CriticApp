@@ -36,8 +36,8 @@ class RAWGProvider(Provider):
             if ex.status_code == 404:
                 raise ItemNotFound(ex.message) from ex
             raise
-        return ItemDetails(
-            **vars(self._summary(rawg_json)),
+        return ItemDetails.from_summary(
+            self._summary(rawg_json),
             genres=unique(entry["name"] for entry in rawg_json.get("genres") or []),
             creators=unique(entry["name"] for entry in (rawg_json.get("developers") or []) + (rawg_json.get("publishers") or [])),
             platforms=unique(entry["platform"]["name"] for entry in rawg_json.get("platforms") or []),

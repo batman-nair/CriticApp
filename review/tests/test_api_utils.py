@@ -8,6 +8,7 @@ from review.providers import (
     InvalidItemId,
     ItemDetails,
     ItemNotFound,
+    ItemSummary,
     ProviderError,
     UpstreamError,
     WrongCategory,
@@ -22,6 +23,7 @@ from review.providers.rawg import RAWGProvider
 
 RECORD_USAGE = 'review.providers.base.api_usage.record_upstream_request'
 REQUESTS_GET = 'review.providers.base.requests.get'
+REQUESTS_POST = 'review.providers.base.requests.post'
 SLEEP = 'review.providers.base.time.sleep'
 SPECIAL_QUERY = 'a & b #1 + c'
 ENCODED_SPECIAL_QUERY = 'a%20%26%20b%20%231%20%2B%20c'
@@ -118,11 +120,108 @@ class RequestJsonRetryTest(SimpleTestCase):
         self.assertEqual(json_data, {'ok': True})
         self.assertEqual(self.record_usage.call_count, 3)
 
+    def test_get_does_not_post(self):
+        with mock.patch(REQUESTS_POST) as post_mock:
+            with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'ok': True})) as get_mock:
+                json_data = request_json_with_retry('https://example.com', source_name='Test API')
+
+        self.assertEqual(json_data, {'ok': True})
+        get_mock.assert_called_once()
+        self.assertEqual(get_mock.call_args.args, ('https://example.com',))
+        self.assertEqual(set(get_mock.call_args.kwargs), {'timeout', 'headers'})
+        post_mock.assert_not_called()
+
+    def test_post_sends_data_and_headers(self):
+        with mock.patch(REQUESTS_GET) as get_mock:
+            with mock.patch(REQUESTS_POST, return_value=_ResponseStub(200, json_data=[{'id': 1}])) as post_mock:
+                json_data = request_json_with_retry(
+                    'https://example.com/v4/games', source_name='Test API', method='POST',
+                    data='fields name; limit 10;', headers={'Client-ID': 'abc'})
+
+        self.assertEqual(json_data, [{'id': 1}])
+        get_mock.assert_not_called()
+        post_mock.assert_called_once()
+        self.assertEqual(post_mock.call_args.args, ('https://example.com/v4/games',))
+        self.assertEqual(post_mock.call_args.kwargs['data'], 'fields name; limit 10;')
+        self.assertEqual(post_mock.call_args.kwargs['timeout'], 10)
+        headers = post_mock.call_args.kwargs['headers']
+        self.assertEqual(headers['Client-ID'], 'abc')
+        self.assertEqual(headers['User-Agent'], 'CriticApp/1.0')
+        self.record_usage.assert_called_once_with('Test API')
+
+    def test_post_sends_form_data(self):
+        form = {'client_id': 'id', 'grant_type': 'client_credentials'}
+        with mock.patch(REQUESTS_POST, return_value=_ResponseStub(200, json_data={'ok': True})) as post_mock:
+            request_json_with_retry('https://example.com/token', method='POST', data=form)
+
+        self.assertEqual(post_mock.call_args.kwargs['data'], form)
+
+    def test_post_retries_then_succeeds(self):
+        with mock.patch(SLEEP) as sleep_mock:
+            with mock.patch(REQUESTS_POST, side_effect=[
+                _ResponseStub(429, reason='Too Many Requests'),
+                _ResponseStub(200, json_data={'ok': True}),
+            ]) as post_mock:
+                json_data = request_json_with_retry(
+                    'https://example.com', source_name='Test API', method='POST', data='body')
+
+        self.assertEqual(json_data, {'ok': True})
+        sleep_mock.assert_called_once_with(2)
+        self.assertEqual(post_mock.call_count, 2)
+        for call in post_mock.call_args_list:
+            self.assertEqual(call.kwargs['data'], 'body')
+        self.assertEqual(self.record_usage.call_count, 2)
+
+    def test_post_final_failure_raises(self):
+        with mock.patch(REQUESTS_POST, return_value=_ResponseStub(401, reason='Unauthorized')) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                request_json_with_retry('https://example.com', source_name='Test API', method='POST', data='body')
+
+        # 401 isn't retried.
+        post_mock.assert_called_once()
+        self.assertEqual(ctx.exception.status_code, 401)
+        self.assertEqual(ctx.exception.source, 'Test API')
+
     def test_every_provider_error_is_a_provider_error(self):
         for error_class in (InvalidItemId, ItemNotFound, WrongCategory, UpstreamError):
             self.assertTrue(issubclass(error_class, ProviderError))
         # The test network guard raises a RuntimeError, which must not be caught as a provider error.
         self.assertFalse(issubclass(ProviderError, RuntimeError))
+
+
+class ItemSummaryTest(SimpleTestCase):
+    def test_genres_and_rating_default_to_unknown(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title')
+        self.assertIsNone(summary.genres)
+        self.assertIsNone(summary.provider_rating)
+
+    def test_search_result_keeps_the_v2_keys_only(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title', year='2015',
+                              genres=['Action'], provider_rating=8.7)
+        self.assertEqual(summary.to_search_result(), {
+            'item_id': 'x_1',
+            'title': 'Title',
+            'image_url': 'N/A',
+            'year': '2015',
+        })
+
+    def test_details_from_summary(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title', image_url='https://img/1.jpg',
+                              year='2015', genres=['Action'], provider_rating=8.7)
+        details = ItemDetails.from_summary(summary, provider_rating=9.0, platforms=['PC'])
+        self.assertEqual(details.item_id, 'x_1')
+        self.assertEqual(details.image_url, 'https://img/1.jpg')
+        self.assertEqual(details.year, '2015')
+        self.assertEqual(details.genres, ['Action'])
+        self.assertEqual(details.provider_rating, 9.0)
+        self.assertEqual(details.platforms, ['PC'])
+
+    def test_details_from_summary_with_unknown_genres(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title')
+        details = ItemDetails.from_summary(summary)
+        self.assertEqual(details.genres, [])
+        self.assertIsNone(details.provider_rating)
+        self.assertEqual(details.to_review_item_fields()['attr1'], '')
 
 
 def _mal_node(mal_id, mean=8.5, **extra):

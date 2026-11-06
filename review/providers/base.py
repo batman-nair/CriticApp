@@ -55,20 +55,30 @@ class UpstreamError(ProviderError):
         self.exception_type = exception_type
 
 
-def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES, headers: Optional[dict]=None) -> dict:
-    """Return the JSON body of a GET request, retrying transient failures.
+def request_json_with_retry(url: str, source_name: str='Upstream API', retries: int=DEFAULT_MAX_RETRIES, headers: Optional[dict]=None,
+                            method: str='GET', data=None) -> dict:
+    """Return the JSON body of a GET or POST request, retrying transient failures.
 
+    `data` is the POST body: a str is sent as is, a dict form-encoded.
     Raises UpstreamError when the request fails for good.
     """
     request_headers = {**DEFAULT_REQUEST_HEADERS, **(headers or {})}
     for attempt in range(retries):
         api_usage.record_upstream_request(source_name)
         try:
-            response_obj = requests.get(
-                url,
-                timeout=REQUEST_TIMEOUT_SECONDS,
-                headers=request_headers,
-            )
+            if method == 'POST':
+                response_obj = requests.post(
+                    url,
+                    data=data,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    headers=request_headers,
+                )
+            else:
+                response_obj = requests.get(
+                    url,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    headers=request_headers,
+                )
         except requests.RequestException as ex:
             if attempt < retries - 1:
                 time.sleep(attempt + 1)
@@ -115,6 +125,19 @@ def unique(values) -> list:
     return list(dict.fromkeys(value for value in values if value))
 
 
+def fit_joined(values: list, max_length: int) -> list:
+    # Keep whole entries while their comma-separated join fits the column,
+    # so no name is cut in half. A first entry that alone is too long is cut.
+    fitted = []
+    length = 0
+    for value in values:
+        length += len(value) + (2 if fitted else 0)
+        if length > max_length:
+            return fitted or [value[:max_length]]
+        fitted.append(value)
+    return fitted
+
+
 # What each ReviewItem column has always held when the provider gave nothing,
 # per category. The language column is only written for the categories listed
 # under 'language'; the others never had a language from their provider.
@@ -137,6 +160,10 @@ class ItemSummary:
     image_url: Optional[str] = None
     # Display text as stored, e.g. "2019", "2008–2013" or "2019-2020".
     year: Optional[str] = None
+    # None when the provider's search doesn't give them; [] when it gave no genres.
+    genres: Optional[list[str]] = None
+    # 0-10 scale.
+    provider_rating: Optional[float] = None
 
     def to_search_result(self) -> dict:
         """The v2 search result dict."""
@@ -161,6 +188,17 @@ class ItemDetails(ItemSummary):
     media_type: Optional[str] = None
     platforms: list[str] = field(default_factory=list)
     pages: Optional[int] = None
+
+    @classmethod
+    def from_summary(cls, summary: ItemSummary, **fields) -> 'ItemDetails':
+        """The details built on a search summary; `fields` override its values.
+
+        Summary values that are None fall back to the details defaults, so
+        unknown genres become [].
+        """
+        values = {key: value for key, value in vars(summary).items() if value is not None}
+        values.update(fields)
+        return cls(**values)
 
     def to_review_item_fields(self) -> dict:
         """The ReviewItem column values, exactly as the old dict-based wrappers stored them."""
@@ -207,5 +245,5 @@ class Provider(ABC):
             raise InvalidItemId(MISSING_PREFIX_MESSAGE)
         return item_id[len(self.prefix):]
 
-    def _request_json(self, url: str, headers: Optional[dict]=None) -> dict:
-        return request_json_with_retry(url, source_name=self.source_name, headers=headers)
+    def _request_json(self, url: str, headers: Optional[dict]=None, method: str='GET', data=None) -> dict:
+        return request_json_with_retry(url, source_name=self.source_name, headers=headers, method=method, data=data)
