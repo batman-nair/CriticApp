@@ -24,7 +24,8 @@ def _value(text: Optional[str]) -> Optional[str]:
 
 
 def _split(text: Optional[str]) -> list[str]:
-    return [part.strip() for part in (_value(text) or '').split(',') if part.strip() != "N/A"]
+    parts = (part.strip() for part in (_value(text) or '').split(','))
+    return [part for part in parts if part and part != "N/A"]
 
 
 class OMDbProvider(Provider):
