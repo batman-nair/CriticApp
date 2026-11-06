@@ -108,6 +108,10 @@ in upper case (that's where `NOT_ACCEPTABLE` comes from).
 - Timestamps are ISO 8601 with a timezone.
 - JSON only: no browsable API on v3. Request bodies must be
   `application/json`.
+- Endpoints whose response is the same for everyone (like `/categories`) set
+  `authentication_classes = []`, so a stale token or session can't turn a
+  public read into a 401. Other views keep the default authentication
+  classes: JWT must stay first for 401s to carry `WWW-Authenticate`.
 - Limit/offset pagination (`?limit=&offset=`): the default limit is 20, and the
   maximum is 100. Larger limits are cut down to 100. Invalid values fall back
   to the defaults.
@@ -117,11 +121,13 @@ in upper case (that's where `NOT_ACCEPTABLE` comes from).
 v3 views use DRF's `ScopedRateThrottle`. A view opts in with `throttle_scope`.
 The rates are in `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']`:
 
-| Scope | Rate (per client IP) |
+| Scope | Rate |
 |---|---|
 | `search` | 30/min |
 | `login` | 5/min |
 
+- Rates apply per user when the request is logged in, otherwise per client
+  IP.
 - The client IP is the last `X-Forwarded-For` entry (`NUM_PROXIES = 1`:
   Traefik is the one proxy in prod), so a forged header prefix doesn't give a
   fresh bucket.

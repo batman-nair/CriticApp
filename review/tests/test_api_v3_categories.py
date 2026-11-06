@@ -54,6 +54,10 @@ class TestV3Categories(TestCase):
         ids = {s['id'] for c in self.categories.values() for s in c['subcategories']}
         self.assertEqual(ids, set(SUBCATEGORY_FILTERS))
 
+    def test_stale_token_is_ignored(self):
+        response = self.client.get('/api/v3/categories', HTTP_AUTHORIZATION='Bearer expired-or-invalid')
+        self.assertEqual(response.status_code, 200)
+
     def test_public_and_read_only(self):
         response = self.client.post('/api/v3/categories', {}, content_type='application/json')
         self.assertEqual(response.status_code, 405)

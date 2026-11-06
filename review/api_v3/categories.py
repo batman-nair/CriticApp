@@ -56,6 +56,9 @@ class CategorySerializer(serializers.Serializer):
 
 
 class CategoryListView(V3APIView):
+    # Public and the same for everyone: no authentication, so a stale token
+    # can't turn this read into a 401.
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     @extend_schema(

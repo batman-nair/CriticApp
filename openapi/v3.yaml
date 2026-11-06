@@ -15,8 +15,6 @@ paths:
       tags:
       - categories
       security:
-      - jwtAuth: []
-      - cookieAuth: []
       - {}
       responses:
         '200':
@@ -117,15 +115,6 @@ components:
       required:
       - id
       - label
-  securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: sessionid
-    jwtAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
 tags:
 - name: categories
   description: Review categories and their data sources
