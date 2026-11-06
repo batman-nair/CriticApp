@@ -6,36 +6,49 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from review.models import Review, ReviewItem
-from review.tests.test_api_utils import ol_requests_get, ol_search_doc, ol_work
+from review.providers import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, UpstreamError, WrongCategory
+from review.tests.test_api_utils import REQUESTS_GET, ol_requests_get, ol_search_doc, ol_work
 
 
 class _FakeLookupAPI:
+    def __init__(self, category):
+        self.category = category
+
     def search(self, query):
-        return {
-            'response': 'True',
-            'results': [
-                {
-                    'item_id': 'fake_1',
-                    'title': query,
-                    'image_url': 'https://example.com/image.png',
-                    'year': '2024',
-                }
-            ],
-        }
+        return [
+            ItemSummary(
+                item_id='fake_1',
+                category=self.category,
+                title=query,
+                image_url='https://example.com/image.png',
+                year='2024',
+            )
+        ]
 
     def get_details(self, item_id):
-        return {
-            'response': 'True',
-            'item_id': item_id,
-            'title': 'Title',
-            'image_url': 'https://example.com/image.png',
-            'year': '2024',
-            'attr1': 'A',
-            'attr2': 'B',
-            'attr3': 'C',
-            'description': 'D',
-            'rating': '8.0',
-        }
+        return ItemDetails(
+            item_id=item_id,
+            category=self.category,
+            title='Title',
+            image_url='https://example.com/image.png',
+            year='2024',
+            genres=['A'],
+            creators=['B'],
+            media_type='C',
+            description='D',
+            provider_rating=8.0,
+        )
+
+
+class _FailingLookupAPI:
+    def __init__(self, error):
+        self.error = error
+
+    def search(self, query):
+        raise self.error
+
+    def get_details(self, item_id):
+        raise self.error
 
 
 class ReviewV2Phase2Test(APITestCase):
@@ -227,19 +240,40 @@ class LookupV2Test(APITestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='lookup_user', password='pass12345')
         self.client.login(username='lookup_user', password='pass12345')
-        self._original_category_to_api = None
-
-    def tearDown(self):
-        if self._original_category_to_api is not None:
-            from review import views
-            views.CATEGORY_TO_API.update(self._original_category_to_api)
 
     def _patch_category_api(self):
-        from review import views
-        self._original_category_to_api = dict(views.CATEGORY_TO_API)
-        views.CATEGORY_TO_API['movie'] = _FakeLookupAPI()
-        views.CATEGORY_TO_API['series'] = _FakeLookupAPI()
-        views.CATEGORY_TO_API['game'] = _FakeLookupAPI()
+        patcher = mock.patch('review.views.get_provider', side_effect=_FakeLookupAPI)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_provider_errors_return_upstream_error(self):
+        errors = [
+            InvalidItemId('Missing prefix in item id.'),
+            ItemNotFound('Movie not found!'),
+            WrongCategory('This title is a series. Pick the Series category.'),
+            UpstreamError('Bad response from API.', status_code=503),
+        ]
+        lookups = [
+            ('/api/v2/lookup/search/movie/', {'q': 'test'}),
+            ('/api/v2/lookup/search/movie/', {'q': 'https://www.imdb.com/title/tt9999999/'}),
+            ('/api/v2/lookup/item/movie/omdb_tt7777777/', {}),
+        ]
+        for error in errors:
+            for url, params in lookups:
+                with self.subTest(error=error.__class__.__name__, url=url, params=params):
+                    with mock.patch('review.views.get_provider', return_value=_FailingLookupAPI(error)):
+                        response = self.client.get(url, params)
+                    self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+                    self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
+                    self.assertEqual(response.json()['error']['message'], error.message)
+        self.assertFalse(ReviewItem.objects.filter(item_id='omdb_tt7777777').exists())
+
+    def test_upstream_http_failure_message(self):
+        with mock.patch(REQUESTS_GET, return_value=mock.Mock(status_code=404, reason='Not Found', headers={})):
+            response = self.client.get('/api/v2/lookup/item/game/rawg_999999999/')
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
+        self.assertEqual(response.json()['error']['message'], 'Bad response from API.')
 
     # --- SearchItemV2 ---
 
@@ -353,13 +387,13 @@ class LookupV2Test(APITestCase):
     # --- Books (real Open Library client, HTTP mocked) ---
 
     def test_search_v2_book(self):
-        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()):
+        with mock.patch(REQUESTS_GET, side_effect=ol_requests_get()):
             response = self.client.get('/api/v2/lookup/search/book/', {'q': 'the hobbit'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['data'][0]['item_id'], 'olib_OL27482W')
 
     def test_get_item_info_v2_saves_book(self):
-        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get()):
+        with mock.patch(REQUESTS_GET, side_effect=ol_requests_get()):
             response = self.client.get('/api/v2/lookup/item/book/olib_OL27482W/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         item = ReviewItem.objects.get(item_id='olib_OL27482W')
@@ -371,13 +405,13 @@ class LookupV2Test(APITestCase):
     def test_get_item_info_v2_saves_book_without_optional_fields(self):
         doc = ol_search_doc(author_name=None, cover_i=None, first_publish_year=None, ratings_average=None, number_of_pages_median=None)
         work = ol_work(description=None, subjects=None)
-        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[doc], work=work)):
+        with mock.patch(REQUESTS_GET, side_effect=ol_requests_get(search_docs=[doc], work=work)):
             response = self.client.get('/api/v2/lookup/item/book/olib_OL27482W/')
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
         self.assertTrue(ReviewItem.objects.filter(item_id='olib_OL27482W', category='book').exists())
 
     def test_get_item_info_v2_book_unknown_work(self):
-        with mock.patch('review.utils.api_utils.requests.get', side_effect=ol_requests_get(search_docs=[])):
+        with mock.patch(REQUESTS_GET, side_effect=ol_requests_get(search_docs=[])):
             response = self.client.get('/api/v2/lookup/item/book/olib_OL1W/')
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')

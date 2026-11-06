@@ -1,4 +1,5 @@
 from datetime import timedelta
+from io import StringIO
 from unittest import mock
 
 from django.core.management import call_command
@@ -6,6 +7,11 @@ from django.test import TestCase
 from django.utils import timezone
 
 from review.models import ReviewItem
+from review.providers import ItemDetails, ItemNotFound, UpstreamError
+
+
+def _details(item_id, category='movie', **fields):
+    return ItemDetails(item_id=item_id, category=category, **fields)
 
 
 class _ProviderStub:
@@ -13,7 +19,10 @@ class _ProviderStub:
         self._response_by_item_id = response_by_item_id
 
     def get_details(self, item_id):
-        return self._response_by_item_id[item_id]
+        response = self._response_by_item_id[item_id]
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class _ProviderExceptionStub:
@@ -46,28 +55,28 @@ class RefreshReviewItemsCommandTest(TestCase):
         stale_next.save(update_fields=['last_refreshed_at'])
 
         provider = _ProviderStub({
-            'omdb_a': {
-                'response': 'True',
-                'title': 'Fresh Title A',
-                'image_url': 'https://example.com/fresh-a.jpg',
-                'year': '2024',
-                'attr1': 'genre',
-                'attr2': 'crew',
-                'attr3': 'movie',
-                'description': 'fresh description',
-                'rating': '9.2',
-            },
-            'omdb_b': {
-                'response': 'True',
-                'title': 'Fresh Title B',
-                'image_url': 'https://example.com/fresh-b.jpg',
-                'year': '2025',
-                'attr1': 'genre',
-                'attr2': 'crew',
-                'attr3': 'movie',
-                'description': 'fresh description',
-                'rating': '9.5',
-            },
+            'omdb_a': _details(
+                'omdb_a',
+                title='Fresh Title A',
+                image_url='https://example.com/fresh-a.jpg',
+                year='2024',
+                genres=['genre'],
+                creators=['crew'],
+                media_type='movie',
+                description='fresh description',
+                provider_rating=9.2,
+            ),
+            'omdb_b': _details(
+                'omdb_b',
+                title='Fresh Title B',
+                image_url='https://example.com/fresh-b.jpg',
+                year='2025',
+                genres=['genre'],
+                creators=['crew'],
+                media_type='movie',
+                description='fresh description',
+                provider_rating=9.5,
+            ),
         })
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
@@ -91,10 +100,7 @@ class RefreshReviewItemsCommandTest(TestCase):
         item.save(update_fields=['last_refreshed_at', 'last_refresh_attempt_at'])
 
         provider = _ProviderStub({
-            'omdb_fail': {
-                'response': 'False',
-                'error': 'Upstream unavailable',
-            },
+            'omdb_fail': UpstreamError('Upstream unavailable'),
         })
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
@@ -114,17 +120,17 @@ class RefreshReviewItemsCommandTest(TestCase):
         item.save(update_fields=['last_refreshed_at', 'last_refresh_attempt_at'])
 
         provider = _ProviderStub({
-            'omdb_push': {
-                'response': 'True',
-                'title': 'Fresh Push Title',
-                'image_url': 'https://example.com/fresh-push.jpg',
-                'year': '2026',
-                'attr1': 'genre',
-                'attr2': 'crew',
-                'attr3': 'movie',
-                'description': 'fresh description',
-                'rating': '9.8',
-            },
+            'omdb_push': _details(
+                'omdb_push',
+                title='Fresh Push Title',
+                image_url='https://example.com/fresh-push.jpg',
+                year='2026',
+                genres=['genre'],
+                creators=['crew'],
+                media_type='movie',
+                description='fresh description',
+                provider_rating=9.8,
+            ),
         })
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
@@ -172,25 +178,25 @@ class RefreshReviewItemsCommandTest(TestCase):
 
         provider = Command()._build_provider('series')
 
-        self.assertEqual(provider.type_, 'series')
+        self.assertEqual(provider.category, 'series')
         self.assertEqual(Command()._provider_name_for_category('series'), 'omdb')
 
     def test_book_items_use_open_library_provider(self):
         from review.management.commands.refresh_review_items import Command
-        from review.utils.api_utils import OpenLibraryItemAPI
+        from review.providers.openlibrary import OpenLibraryProvider
 
-        self.assertIsInstance(Command()._build_provider('book'), OpenLibraryItemAPI)
+        self.assertIsInstance(Command()._build_provider('book'), OpenLibraryProvider)
         self.assertEqual(Command()._provider_name_for_category('book'), 'openlibrary')
 
     def test_refresh_fills_language(self):
         item = self._create_item('omdb_lang')
         provider = _ProviderStub({
-            'omdb_lang': {
-                'response': 'True',
-                'title': 'Old Title',
-                'attr3': 'movie',
-                'language': 'Japanese, English',
-            },
+            'omdb_lang': _details(
+                'omdb_lang',
+                title='Old Title',
+                media_type='movie',
+                languages=['Japanese', 'English'],
+            ),
         })
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
@@ -201,10 +207,63 @@ class RefreshReviewItemsCommandTest(TestCase):
 
     def test_refresh_keeps_language_when_provider_has_none(self):
         item = self._create_item('rawg_lang', category='game', language='English')
-        provider = _ProviderStub({'rawg_lang': {'response': 'True', 'title': 'Old Title'}})
+        provider = _ProviderStub({'rawg_lang': _details('rawg_lang', category='game', title='Old Title')})
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
             call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
 
         item.refresh_from_db()
         self.assertEqual(item.language, 'English')
+
+    def test_refreshed_fields_are_stored_as_the_columns_expect(self):
+        item = self._create_item('omdb_fields')
+        provider = _ProviderStub({
+            'omdb_fields': _details(
+                'omdb_fields',
+                title='Fresh Title',
+                year='2024',
+                genres=['Crime', 'Drama'],
+                creators=['Vince Gilligan', 'Bryan Cranston'],
+                media_type='movie',
+                description='fresh description',
+                provider_rating=9.5,
+            ),
+        })
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        item.refresh_from_db()
+        self.assertEqual(item.image_url, 'N/A')
+        self.assertEqual(item.attr1, 'Crime, Drama')
+        self.assertEqual(item.attr2, 'Vince Gilligan, Bryan Cranston')
+        self.assertEqual(item.attr3, 'movie')
+        self.assertEqual(item.language, '')
+        self.assertEqual(item.rating, '9.5')
+
+    def test_failed_refresh_reports_upstream_status_and_reason(self):
+        self._create_item('omdb_status')
+        provider = _ProviderStub({
+            'omdb_status': UpstreamError('Bad response from API.', status_code=503, upstream_reason='Service Unavailable'),
+        })
+        stderr = StringIO()
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0, stderr=stderr)
+
+        self.assertIn(
+            'Failed refresh for omdb_status: Bad response from API. status=503 reason=Service Unavailable.',
+            stderr.getvalue(),
+        )
+
+    def test_failed_refresh_reports_status_of_a_not_found_item(self):
+        self._create_item('rawg_gone', category='game')
+        not_found = ItemNotFound('Bad response from API.')
+        not_found.__cause__ = UpstreamError('Bad response from API.', status_code=404, upstream_reason='Not Found')
+        provider = _ProviderStub({'rawg_gone': not_found})
+        stderr = StringIO()
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0, stderr=stderr)
+
+        self.assertIn('Failed refresh for rawg_gone: Bad response from API. status=404 reason=Not Found.', stderr.getvalue())
