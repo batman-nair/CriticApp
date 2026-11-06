@@ -73,6 +73,10 @@ sent with `Content-Type: application/problem+json`:
 - Every exception a v3 view raises is mapped to this shape: DRF's own,
   Django's `Http404`/`PermissionDenied`, and unhandled ones (logged with the
   traceback; the response never contains internals).
+- Unhandled exceptions also send Django's `got_request_exception`, as Django
+  does for its own 500s, so the test client re-raises them. To assert on the
+  500 body in a test, use `Client(raise_request_exception=False)` or
+  `APIRequestFactory`.
 - Endpoints raise `ApiError(status, code, detail)` (`critic/api/errors.py`)
   for their own errors. **Add each new code to the table below.**
 

@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.signals import got_request_exception
 from django.http import Http404
 from django.test import SimpleTestCase
+from django.utils.translation import gettext_lazy
 from rest_framework import permissions, serializers
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -242,6 +243,11 @@ class TestApiError(ProblemAssertions, SimpleTestCase):
     def test_detail_must_be_a_string(self):
         with self.assertRaises(TypeError):
             ApiError(409, 'DUPLICATE_REVIEW', {'review_id': 12})
+
+    def test_lazy_translated_detail_is_accepted(self):
+        view = RaisingView.as_view(exc=ApiError(409, 'DUPLICATE_REVIEW', gettext_lazy('Already reviewed.')))
+        body = self.assertProblem(call(view, factory.get('/x')), 409, 'DUPLICATE_REVIEW')
+        self.assertEqual(body['detail'], 'Already reviewed.')
 
 
 class TestUnhandledException(ProblemAssertions, SimpleTestCase):

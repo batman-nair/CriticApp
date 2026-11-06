@@ -22,9 +22,11 @@ class V3ViewMixin:
     - Throttled by `throttle_scope` ('search', 'login'); views without a
       scope aren't throttled.
 
-    Keep the default authentication classes: DRF returns 401 with a
-    WWW-Authenticate header only when the first one (JWT) provides that
-    header, and turns 401s into 403s otherwise.
+    Views that use the logged-in user keep the default authentication
+    classes: DRF returns 401 with a WWW-Authenticate header only when the
+    first one (JWT) provides that header, and turns 401s into 403s otherwise.
+    Public views whose response is the same for everyone may set
+    `authentication_classes = []` (their throttles then count per IP).
     """
     versioning_class = None
     renderer_classes = [JSONRenderer]

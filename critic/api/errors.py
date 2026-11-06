@@ -17,6 +17,7 @@ from http import HTTPStatus
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.signals import got_request_exception
 from django.http import Http404
+from django.utils.functional import Promise
 from rest_framework import exceptions, serializers
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -46,7 +47,7 @@ class ApiError(exceptions.APIException):
     """An endpoint's own error, e.g. ApiError(409, 'DUPLICATE_REVIEW', '...')."""
 
     def __init__(self, status, code, detail):
-        if not isinstance(detail, str):
+        if not isinstance(detail, (str, Promise)):
             raise TypeError('ApiError detail must be a string')
         self.status_code = status
         self.code = code
