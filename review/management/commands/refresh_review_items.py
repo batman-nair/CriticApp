@@ -124,8 +124,10 @@ class Command(BaseCommand):
                         item.refresh_error_count += 1
                         item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
                     err_message = ex.message or "Unknown error"
-                    status_code = getattr(ex, 'status_code', None)
-                    upstream_reason = getattr(ex, 'upstream_reason', None)
+                    # A 404 arrives as ItemNotFound raised from the UpstreamError holding the status.
+                    upstream = ex if hasattr(ex, 'status_code') else ex.__cause__
+                    status_code = getattr(upstream, 'status_code', None)
+                    upstream_reason = getattr(upstream, 'upstream_reason', None)
                     if status_code:
                         err_message = f'{err_message} status={status_code}'
                     if upstream_reason:

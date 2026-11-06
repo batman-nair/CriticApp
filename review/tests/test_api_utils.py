@@ -264,6 +264,8 @@ class MALProviderTest(SimpleTestCase):
                 MALProvider('anime').get_details('jikan_anime_999999999')
 
         self.assertEqual(ctx.exception.message, 'Bad response from API.')
+        # The refresh command logs the status from the original error.
+        self.assertEqual(ctx.exception.__cause__.status_code, 404)
 
     def test_details_requires_prefix(self):
         with mock.patch(REQUESTS_GET) as get_mock:
@@ -352,6 +354,13 @@ class OMDbProviderTest(SimpleTestCase):
 
             self.assertEqual(ctx.exception.message, error)
             self.assertEqual(ctx.exception.source, 'OMDB API')
+
+    def test_error_payload_without_message(self):
+        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'Response': 'False'})):
+            with self.assertRaises(UpstreamError) as ctx:
+                OMDbProvider('movie').search('ab')
+
+        self.assertEqual(ctx.exception.message, 'Bad response from API.')
 
     def test_details_incorrect_id_is_not_found(self):
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'Response': 'False', 'Error': 'Incorrect IMDb ID.'})):
@@ -574,6 +583,8 @@ class RAWGProviderTest(SimpleTestCase):
                 RAWGProvider().get_details('rawg_999999999')
 
         self.assertEqual(ctx.exception.message, 'Bad response from API.')
+        # The refresh command logs the status from the original error.
+        self.assertEqual(ctx.exception.__cause__.status_code, 404)
 
     def test_details_server_error_is_upstream_error(self):
         with mock.patch(SLEEP):

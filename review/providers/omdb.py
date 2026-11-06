@@ -3,7 +3,9 @@ import re
 from typing import Optional
 from urllib.parse import quote
 
-from .base import ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, WrongCategory, unique
+from .base import (
+    BAD_RESPONSE_MESSAGE, ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, WrongCategory, unique,
+)
 
 IMDB_TITLE_URL_RE = re.compile(
     r'^https?://(?:www\.|m\.)?imdb\.com/title/(?P<imdb_id>tt\d+)(?:/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$',
@@ -85,7 +87,7 @@ class OMDbProvider(Provider):
     def _raise_for_error(self, omdb_json: dict):
         if omdb_json.get("Response") != "False":
             return
-        error = omdb_json.get("Error", "")
+        error = omdb_json.get("Error") or BAD_RESPONSE_MESSAGE
         # OMDb's own messages: "Movie not found!", "Series not found!",
         # "Incorrect IMDb ID.", "Request limit reached!", "Too many results.", ...
         if error.endswith("not found!") or error == "Incorrect IMDb ID.":

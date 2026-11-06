@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from review.models import ReviewItem
-from review.providers import ItemDetails, UpstreamError
+from review.providers import ItemDetails, ItemNotFound, UpstreamError
 
 
 def _details(item_id, category='movie', **fields):
@@ -255,3 +255,15 @@ class RefreshReviewItemsCommandTest(TestCase):
             'Failed refresh for omdb_status: Bad response from API. status=503 reason=Service Unavailable.',
             stderr.getvalue(),
         )
+
+    def test_failed_refresh_reports_status_of_a_not_found_item(self):
+        self._create_item('rawg_gone', category='game')
+        not_found = ItemNotFound('Bad response from API.')
+        not_found.__cause__ = UpstreamError('Bad response from API.', status_code=404, upstream_reason='Not Found')
+        provider = _ProviderStub({'rawg_gone': not_found})
+        stderr = StringIO()
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0, stderr=stderr)
+
+        self.assertIn('Failed refresh for rawg_gone: Bad response from API. status=404 reason=Not Found.', stderr.getvalue())
