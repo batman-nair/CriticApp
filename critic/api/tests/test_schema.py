@@ -4,7 +4,16 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
+from django.urls import path
+from drf_spectacular.generators import SchemaGenerator
+from drf_spectacular.settings import patched_settings
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
+from rest_framework.mixins import ListModelMixin
+
+from critic.api.schema import V3_SCHEMA_SETTINGS, wrapped
+from critic.api.views import V3GenericAPIView
 
 COMMITTED_SCHEMA = Path(settings.BASE_DIR) / 'openapi' / 'v3.yaml'
 
@@ -22,6 +31,52 @@ def generate_v3_schema():
             stderr=StringIO(),
         )
         return path.read_text()
+
+
+class ThingSerializer(serializers.Serializer):
+    name = serializers.CharField()
+
+
+class DeclaredThingList(ListModelMixin, V3GenericAPIView):
+    serializer_class = ThingSerializer
+
+    @extend_schema(responses={200: wrapped(ThingSerializer, paginated=True)})
+    def get(self, request):
+        return self.list(request)
+
+
+class UndeclaredThingList(ListModelMixin, V3GenericAPIView):
+    serializer_class = ThingSerializer
+
+    def get(self, request):
+        return self.list(request)
+
+
+def ok_schema(view_class):
+    # Test-only views, generated in-process: nothing is added to the real urlconf.
+    with patched_settings(V3_SCHEMA_SETTINGS):
+        generator = SchemaGenerator(patterns=[path('api/v3/things', view_class.as_view())])
+        schema = generator.get_schema(request=None, public=True)
+    content = schema['paths']['/api/v3/things']['get']['responses']['200']['content']
+    return schema, content['application/json']['schema']
+
+
+class TestWrappedHelper(SimpleTestCase):
+    def test_equivalent_calls_share_one_class(self):
+        self.assertIs(wrapped(ThingSerializer), wrapped(ThingSerializer, many=False))
+        self.assertIs(wrapped(ThingSerializer, paginated=True), wrapped(ThingSerializer, many=True, paginated=True))
+        self.assertIsNot(wrapped(ThingSerializer), wrapped(ThingSerializer, many=True))
+
+    def test_declared_page_response_is_not_wrapped_again_on_list_views(self):
+        _, ok = ok_schema(DeclaredThingList)
+        self.assertEqual(ok, {'$ref': '#/components/schemas/ThingPageResponse'})
+
+    def test_undeclared_list_view_gets_the_v3_envelope(self):
+        schema, ok = ok_schema(UndeclaredThingList)
+        component = schema['components']['schemas'][ok['$ref'].rsplit('/', 1)[1]]
+        self.assertEqual(set(component['properties']), {'data', 'meta'})
+        self.assertEqual(component['properties']['data']['type'], 'array')
+        self.assertIn('pagination', component['properties']['meta']['properties'])
 
 
 class TestV3Schema(TestCase):

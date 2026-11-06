@@ -6,12 +6,11 @@ openapi/v3.yaml) and the snapshot test alike.
 """
 
 from functools import cache
-from http import HTTPStatus
 
-from drf_spectacular.utils import OpenApiResponse, extend_schema_field
+from drf_spectacular.utils import OpenApiResponse, extend_schema_field, extend_schema_serializer
 from rest_framework import serializers
 
-from .errors import PROBLEM_CONTENT_TYPE, ProblemSerializer
+from .errors import PROBLEM_CONTENT_TYPE, ProblemSerializer, status_title
 
 V3_PATH_PREFIX = '/api/v3/'
 
@@ -60,30 +59,39 @@ def _empty_meta():
     return EmptyMetaField(help_text='Always empty for responses without pagination')
 
 
-@cache
 def wrapped(serializer_class, *, many=False, paginated=False):
     """The response component {data: <serializer>, meta: <meta>}.
 
     Named <Name>Response, <Name>ListResponse or <Name>PageResponse after the
-    serializer. Memoised, because two classes with one component name make
-    spectacular warn.
+    serializer.
     """
+    kind = 'page' if paginated else 'list' if many else 'one'
+    return _wrapped(serializer_class, kind)
+
+
+# Memoised on normalised arguments: two classes with one component name make
+# spectacular warn, and `--fail-on-warn` fails.
+@cache
+def _wrapped(serializer_class, kind):
     name = serializer_class.__name__.removesuffix('Serializer')
     # DRF orders fields by creation, so create `data` before `meta`.
-    data = serializer_class(many=many or paginated)
-    if paginated:
+    data = serializer_class(many=kind != 'one')
+    if kind == 'page':
         suffix, meta = 'PageResponse', PaginatedMetaSerializer()
-    elif many:
+    elif kind == 'list':
         suffix, meta = 'ListResponse', _empty_meta()
     else:
         suffix, meta = 'Response', _empty_meta()
-    return type(f'{name}{suffix}Serializer', (serializers.Serializer,), {'data': data, 'meta': meta})
+    envelope = type(f'{name}{suffix}Serializer', (serializers.Serializer,), {'data': data, 'meta': meta})
+    # The envelope is the whole body: spectacular must not wrap it in a list
+    # or in a paginator schema again (it would on ListModelMixin views).
+    return extend_schema_serializer(many=False)(envelope)
 
 
 def problem_responses(*statuses):
     """Problem responses for the given statuses, plus 500, which any v3
     endpoint can return. Merge into extend_schema's `responses`."""
     return {
-        (status, PROBLEM_CONTENT_TYPE): OpenApiResponse(ProblemSerializer, description=HTTPStatus(status).phrase)
+        (status, PROBLEM_CONTENT_TYPE): OpenApiResponse(ProblemSerializer, description=status_title(status))
         for status in sorted({*statuses, 500})
     }
