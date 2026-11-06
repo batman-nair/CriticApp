@@ -8,7 +8,7 @@ openapi/v3.yaml) and the snapshot test alike.
 from functools import cache
 from http import HTTPStatus
 
-from drf_spectacular.utils import OpenApiResponse
+from drf_spectacular.utils import OpenApiResponse, extend_schema_field
 from rest_framework import serializers
 
 from .errors import PROBLEM_CONTENT_TYPE, ProblemSerializer
@@ -49,9 +49,15 @@ class PaginatedMetaSerializer(serializers.Serializer):
     pagination = PaginationSerializer()
 
 
+@extend_schema_field({'type': 'object', 'additionalProperties': False})
+class EmptyMetaField(serializers.DictField):
+    # `meta` is always {} without pagination. An empty serializer would be
+    # dropped from the schema, so this is a field typed as an empty object.
+    pass
+
+
 def _empty_meta():
-    # An empty serializer would be dropped from the schema; an object field stays.
-    return serializers.DictField(help_text='Empty for responses without pagination')
+    return EmptyMetaField(help_text='Always empty for responses without pagination')
 
 
 @cache

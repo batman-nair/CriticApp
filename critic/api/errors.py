@@ -135,15 +135,15 @@ def v3_exception_handler(exc, context):
     return problem_response(exc.status_code, _error_code(exc), detail, headers=headers)
 
 
+# Schema only (class docstrings would become schema descriptions).
 class FieldErrorSerializer(serializers.Serializer):
-    """Schema only: one entry of a problem's `errors` list."""
     field = serializers.CharField(allow_null=True)
     code = serializers.CharField()
     message = serializers.CharField()
 
 
+# Schema only: the problem body every v3 error uses.
 class ProblemSerializer(serializers.Serializer):
-    """Schema only: the RFC 9457 problem body every v3 error uses."""
     type = serializers.CharField()
     title = serializers.CharField()
     status = serializers.IntegerField()

@@ -65,14 +65,13 @@ components:
             $ref: '#/components/schemas/Category'
         meta:
           type: object
-          additionalProperties: {}
-          description: Empty for responses without pagination
+          additionalProperties: false
+          description: Always empty for responses without pagination
       required:
       - data
       - meta
     FieldError:
       type: object
-      description: 'Schema only: one entry of a problem''s `errors` list.'
       properties:
         field:
           type: string
@@ -87,7 +86,6 @@ components:
       - message
     Problem:
       type: object
-      description: 'Schema only: the RFC 9457 problem body every v3 error uses.'
       properties:
         type:
           type: string
