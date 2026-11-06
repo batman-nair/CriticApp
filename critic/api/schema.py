@@ -49,8 +49,9 @@ class PaginatedMetaSerializer(serializers.Serializer):
     pagination = PaginationSerializer()
 
 
-class EmptyMetaSerializer(serializers.Serializer):
-    pass
+def _empty_meta():
+    # An empty serializer would be dropped from the schema; an object field stays.
+    return serializers.DictField(help_text='Empty for responses without pagination')
 
 
 @cache
@@ -62,17 +63,15 @@ def wrapped(serializer_class, *, many=False, paginated=False):
     spectacular warn.
     """
     name = serializer_class.__name__.removesuffix('Serializer')
+    # DRF orders fields by creation, so create `data` before `meta`.
+    data = serializer_class(many=many or paginated)
     if paginated:
         suffix, meta = 'PageResponse', PaginatedMetaSerializer()
     elif many:
-        suffix, meta = 'ListResponse', EmptyMetaSerializer()
+        suffix, meta = 'ListResponse', _empty_meta()
     else:
-        suffix, meta = 'Response', EmptyMetaSerializer()
-    fields = {
-        'data': serializer_class(many=many or paginated),
-        'meta': meta,
-    }
-    return type(f'{name}{suffix}Serializer', (serializers.Serializer,), fields)
+        suffix, meta = 'Response', _empty_meta()
+    return type(f'{name}{suffix}Serializer', (serializers.Serializer,), {'data': data, 'meta': meta})
 
 
 def problem_responses(*statuses):
