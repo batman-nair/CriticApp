@@ -31,6 +31,14 @@ def _blocked(target):
 
 
 @pytest.fixture(autouse=True)
+def _clear_cache():
+    """Start each test with an empty cache, so throttle counts don't leak."""
+    from django.core.cache import cache
+
+    cache.clear()
+
+
+@pytest.fixture(autouse=True)
 def _block_external_network(request, monkeypatch):
     """Fail any non-integration test that opens a connection to a remote host.
 
