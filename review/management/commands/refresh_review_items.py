@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from review.models import ReviewItem
-from review.utils import api_utils
+from review.providers import ProviderError, get_provider
 from review.utils.metrics import normalize_provider, push_refresh_run_metrics
 
 
@@ -114,17 +114,18 @@ class Command(BaseCommand):
                 if request_delay_ms:
                     time.sleep(request_delay_ms / 1000)
 
-                details = provider.get_details(item.item_id)
-                if details.get('response') != 'True':
+                try:
+                    details = provider.get_details(item.item_id)
+                except ProviderError as ex:
                     failed += 1
                     provider_totals[provider_name]['failed'] += 1
                     if not dry_run:
                         item.last_refresh_attempt_at = now
                         item.refresh_error_count += 1
                         item.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
-                    err_message = details.get("error", "Unknown error")
-                    status_code = details.get("status_code")
-                    upstream_reason = details.get("upstream_reason")
+                    err_message = ex.message or "Unknown error"
+                    status_code = getattr(ex, 'status_code', None)
+                    upstream_reason = getattr(ex, 'upstream_reason', None)
                     if status_code:
                         err_message = f'{err_message} status={status_code}'
                     if upstream_reason:
@@ -139,15 +140,16 @@ class Command(BaseCommand):
                 if dry_run:
                     continue
 
-                item.title = details.get('title', item.title)
-                item.image_url = details.get('image_url', item.image_url)
-                item.year = details.get('year', item.year)
-                item.attr1 = details.get('attr1', item.attr1)
-                item.attr2 = details.get('attr2', item.attr2)
-                item.attr3 = details.get('attr3', item.attr3)
-                item.language = details.get('language', item.language)
-                item.description = details.get('description', item.description)
-                item.rating = str(details.get('rating', item.rating))
+                fields = details.to_review_item_fields()
+                item.title = fields.get('title', item.title)
+                item.image_url = fields.get('image_url', item.image_url)
+                item.year = fields.get('year', item.year)
+                item.attr1 = fields.get('attr1', item.attr1)
+                item.attr2 = fields.get('attr2', item.attr2)
+                item.attr3 = fields.get('attr3', item.attr3)
+                item.language = fields.get('language', item.language)
+                item.description = fields.get('description', item.description)
+                item.rating = fields.get('rating', item.rating)
                 item.last_refreshed_at = now
                 item.last_refresh_attempt_at = now
                 item.refresh_error_count = 0
@@ -183,17 +185,9 @@ class Command(BaseCommand):
 
     def _build_provider(self, category):
         try:
-            if category in ('movie', 'series'):
-                return api_utils.OMDBItemAPI(category)
-            if category == 'game':
-                return api_utils.RAWGItemAPI()
-            if category == 'anime':
-                return api_utils.MALItemAPI('anime')
-            if category == 'manga':
-                return api_utils.MALItemAPI('manga')
-            if category == 'book':
-                return api_utils.OpenLibraryItemAPI()
+            return get_provider(category)
+        except ValueError:
+            return None
         except RuntimeError as ex:
             self.stderr.write(self.style.WARNING(f'Provider init failed for {category}: {ex}'))
             return None
-        return None
