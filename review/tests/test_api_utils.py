@@ -257,7 +257,7 @@ def _mal_node(mal_id, mean=8.5, **extra):
     if mean is not None:
         node['mean'] = mean
     node.update(extra)
-    return node
+    return {key: value for key, value in node.items() if value is not _DROP}
 
 
 @mock.patch(RECORD_USAGE, new=mock.Mock())
@@ -395,6 +395,103 @@ class MALProviderTest(SimpleTestCase):
 
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
+
+    def test_optional_fields_null_or_missing(self):
+        optional = ['main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis']
+        for missing in (_DROP, None):
+            for category in ('anime', 'manga'):
+                with self.subTest(missing='absent' if missing is _DROP else 'null', category=category):
+                    node = _mal_node(5, **{key: missing for key in optional})
+                    with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                        details = MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                    self.assertEqual(details.to_review_item_fields(), {
+                        'item_id': 'mal_{}_5'.format(category),
+                        'category': category,
+                        'title': 'Title 5',
+                        'image_url': 'N/A',
+                        'year': 'N/A',
+                        'attr1': '',
+                        'attr2': '',
+                        'attr3': 'N/A',
+                        'description': '',
+                        'rating': 'N/A',
+                    })
+
+    def test_entries_without_a_name_are_dropped(self):
+        genres = [{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'Action'}]
+        anime = _mal_node(5, genres=genres, studios=[{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'MAPPA'}])
+        manga = _mal_node(5, genres=genres, authors=[
+            {'node': {'id': 1}},
+            {'node': {'id': 2, 'first_name': None, 'last_name': None}},
+            {'node': {'id': 3, 'first_name': None, 'last_name': 'Miura'}},
+        ])
+        for category, node, creators in (('anime', anime, ['MAPPA']), ('manga', manga, ['Miura'])):
+            with self.subTest(category=category):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                    details = MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                self.assertEqual(details.genres, ['Action'])
+                self.assertEqual(details.creators, creators)
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Node values that are wrong in a search result and in the details alike.
+        node_cases = [
+            ('id missing', {'id': _DROP}),
+            ('id null', {'id': None}),
+            ('id text', {'id': '5'}),
+            ('id bool', {'id': True}),
+            ('title missing', {'title': _DROP}),
+            ('title null', {'title': None}),
+            ('title empty', {'title': ''}),
+            ('title not text', {'title': 5}),
+            ('main_picture not an object', {'main_picture': 'https://img/5l.jpg'}),
+            ('picture url not text', {'main_picture': {'large': 5}}),
+            ('start_date not text', {'start_date': 2019}),
+            ('end_date not text', {'end_date': ['2019']}),
+        ]
+        anime_cases = [
+            ('genres not a list', {'genres': 'Action'}),
+            ('genres not objects', {'genres': [1, 2]}),
+            ('genre name not text', {'genres': [{'id': 1, 'name': 5}]}),
+            ('studios not a list', {'studios': {'name': 'MAPPA'}}),
+            ('studio name not text', {'studios': [{'id': 1, 'name': ['MAPPA']}]}),
+            ('mean text', {'mean': '8.5'}),
+            ('mean bool', {'mean': True}),
+            ('synopsis not text', {'synopsis': 5}),
+            ('media_type not text', {'media_type': ['tv']}),
+        ]
+        manga_cases = [
+            ('authors not a list', {'authors': 'Kentarou Miura'}),
+            ('author without node', {'authors': [{'role': 'Art'}]}),
+            ('author node not an object', {'authors': [{'node': 1868}]}),
+            ('author name not text', {'authors': [{'node': {'id': 1868, 'first_name': 5}}]}),
+        ]
+        body_cases = [
+            ('body is a list', [_mal_node(5)]),
+            ('body is null', None),
+        ]
+        search_cases = body_cases + [
+            ('data not a list', {'data': {'node': _mal_node(5)}}),
+            ('entry not an object', {'data': ['Title 5']}),
+            ('entry without node', {'data': [{}]}),
+            ('node not an object', {'data': [{'node': 5}]}),
+            ('one bad entry among good ones', {'data': [{'node': _mal_node(1)}, {'node': _mal_node(2, title=None)}]}),
+        ] + [(name, {'data': [{'node': _mal_node(5, **extra)}]}) for name, extra in node_cases]
+        cases = [('search', 'anime', name, payload) for name, payload in search_cases]
+        cases += [('get_details', 'anime', name, payload) for name, payload in body_cases]
+        cases += [('get_details', 'anime', name, _mal_node(5, **extra)) for name, extra in node_cases + anime_cases]
+        cases += [('get_details', 'manga', name, _mal_node(5, **extra)) for name, extra in manga_cases]
+        for method, category, name, payload in cases:
+            with self.subTest(method=method, category=category, case=name):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            MALProvider(category).search('frieren')
+                        else:
+                            MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                _assert_bad_response(self, ctx.exception, 'Unexpected response from MAL.', 'MAL API')
 
 
 def _omdb_title(type_='movie', **extra):

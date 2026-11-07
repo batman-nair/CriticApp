@@ -110,10 +110,6 @@ class IGDBProvider(Provider):
             raise TypeError('Expected a list of games.')
         return games
 
-    def _names(self, entries) -> list[str]:
-        # Entries are objects; one without a name is dropped.
-        return unique(self._optional(entry.get("name"), str) for entry in self._optional(entries, list) or [])
-
     def _summary(self, game: dict) -> ItemSummary:
         game_id = game["id"]
         name = game["name"]

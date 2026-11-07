@@ -274,3 +274,7 @@ class Provider(ABC):
         if value is not None and (not isinstance(value, types) or isinstance(value, bool)):
             raise TypeError('Unexpected field type.')
         return value
+
+    def _names(self, entries) -> list[str]:
+        # Entries are objects; one without a name is dropped.
+        return unique(self._optional(entry.get("name"), str) for entry in self._optional(entries, list) or [])
