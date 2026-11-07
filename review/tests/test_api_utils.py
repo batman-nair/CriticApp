@@ -1,5 +1,7 @@
+import logging
 from unittest import mock
 
+from django.core.cache import cache
 from django.test import SimpleTestCase
 import requests
 
@@ -8,6 +10,8 @@ from review.providers import (
     InvalidItemId,
     ItemDetails,
     ItemNotFound,
+    ItemSummary,
+    LEGACY_PREFIXES,
     ProviderError,
     UpstreamError,
     WrongCategory,
@@ -15,13 +19,14 @@ from review.providers import (
     provider_for_item_id,
 )
 from review.providers.base import request_json_with_retry
+from review.providers.igdb import IGDBProvider
 from review.providers.mal import MALProvider
 from review.providers.omdb import OMDbProvider, normalize_imdb_title_url_to_item_id
 from review.providers.openlibrary import OpenLibraryProvider
-from review.providers.rawg import RAWGProvider
 
 RECORD_USAGE = 'review.providers.base.api_usage.record_upstream_request'
 REQUESTS_GET = 'review.providers.base.requests.get'
+REQUESTS_POST = 'review.providers.base.requests.post'
 SLEEP = 'review.providers.base.time.sleep'
 SPECIAL_QUERY = 'a & b #1 + c'
 ENCODED_SPECIAL_QUERY = 'a%20%26%20b%20%231%20%2B%20c'
@@ -113,16 +118,113 @@ class RequestJsonRetryTest(SimpleTestCase):
                 _ResponseStub(503),
                 _ResponseStub(200, json_data={'ok': True}),
             ]):
-                json_data = request_json_with_retry('https://example.com', source_name='RAWG API')
+                json_data = request_json_with_retry('https://example.com', source_name='IGDB API')
 
         self.assertEqual(json_data, {'ok': True})
         self.assertEqual(self.record_usage.call_count, 3)
+
+    def test_get_does_not_post(self):
+        with mock.patch(REQUESTS_POST) as post_mock:
+            with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'ok': True})) as get_mock:
+                json_data = request_json_with_retry('https://example.com', source_name='Test API')
+
+        self.assertEqual(json_data, {'ok': True})
+        get_mock.assert_called_once()
+        self.assertEqual(get_mock.call_args.args, ('https://example.com',))
+        self.assertEqual(set(get_mock.call_args.kwargs), {'timeout', 'headers'})
+        post_mock.assert_not_called()
+
+    def test_post_sends_data_and_headers(self):
+        with mock.patch(REQUESTS_GET) as get_mock:
+            with mock.patch(REQUESTS_POST, return_value=_ResponseStub(200, json_data=[{'id': 1}])) as post_mock:
+                json_data = request_json_with_retry(
+                    'https://example.com/v4/games', source_name='Test API', method='POST',
+                    data='fields name; limit 10;', headers={'Client-ID': 'abc'})
+
+        self.assertEqual(json_data, [{'id': 1}])
+        get_mock.assert_not_called()
+        post_mock.assert_called_once()
+        self.assertEqual(post_mock.call_args.args, ('https://example.com/v4/games',))
+        self.assertEqual(post_mock.call_args.kwargs['data'], 'fields name; limit 10;')
+        self.assertEqual(post_mock.call_args.kwargs['timeout'], 10)
+        headers = post_mock.call_args.kwargs['headers']
+        self.assertEqual(headers['Client-ID'], 'abc')
+        self.assertEqual(headers['User-Agent'], 'CriticApp/1.0')
+        self.record_usage.assert_called_once_with('Test API')
+
+    def test_post_sends_form_data(self):
+        form = {'client_id': 'id', 'grant_type': 'client_credentials'}
+        with mock.patch(REQUESTS_POST, return_value=_ResponseStub(200, json_data={'ok': True})) as post_mock:
+            request_json_with_retry('https://example.com/token', method='POST', data=form)
+
+        self.assertEqual(post_mock.call_args.kwargs['data'], form)
+
+    def test_post_retries_then_succeeds(self):
+        with mock.patch(SLEEP) as sleep_mock:
+            with mock.patch(REQUESTS_POST, side_effect=[
+                _ResponseStub(429, reason='Too Many Requests'),
+                _ResponseStub(200, json_data={'ok': True}),
+            ]) as post_mock:
+                json_data = request_json_with_retry(
+                    'https://example.com', source_name='Test API', method='POST', data='body')
+
+        self.assertEqual(json_data, {'ok': True})
+        sleep_mock.assert_called_once_with(2)
+        self.assertEqual(post_mock.call_count, 2)
+        for call in post_mock.call_args_list:
+            self.assertEqual(call.kwargs['data'], 'body')
+        self.assertEqual(self.record_usage.call_count, 2)
+
+    def test_post_final_failure_raises(self):
+        with mock.patch(REQUESTS_POST, return_value=_ResponseStub(401, reason='Unauthorized')) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                request_json_with_retry('https://example.com', source_name='Test API', method='POST', data='body')
+
+        # 401 isn't retried.
+        post_mock.assert_called_once()
+        self.assertEqual(ctx.exception.status_code, 401)
+        self.assertEqual(ctx.exception.source, 'Test API')
 
     def test_every_provider_error_is_a_provider_error(self):
         for error_class in (InvalidItemId, ItemNotFound, WrongCategory, UpstreamError):
             self.assertTrue(issubclass(error_class, ProviderError))
         # The test network guard raises a RuntimeError, which must not be caught as a provider error.
         self.assertFalse(issubclass(ProviderError, RuntimeError))
+
+
+class ItemSummaryTest(SimpleTestCase):
+    def test_genres_and_rating_default_to_unknown(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title')
+        self.assertIsNone(summary.genres)
+        self.assertIsNone(summary.provider_rating)
+
+    def test_search_result_keeps_the_v2_keys_only(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title', year='2015',
+                              genres=['Action'], provider_rating=8.7)
+        self.assertEqual(summary.to_search_result(), {
+            'item_id': 'x_1',
+            'title': 'Title',
+            'image_url': 'N/A',
+            'year': '2015',
+        })
+
+    def test_details_from_summary(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title', image_url='https://img/1.jpg',
+                              year='2015', genres=['Action'], provider_rating=8.7)
+        details = ItemDetails.from_summary(summary, provider_rating=9.0, platforms=['PC'])
+        self.assertEqual(details.item_id, 'x_1')
+        self.assertEqual(details.image_url, 'https://img/1.jpg')
+        self.assertEqual(details.year, '2015')
+        self.assertEqual(details.genres, ['Action'])
+        self.assertEqual(details.provider_rating, 9.0)
+        self.assertEqual(details.platforms, ['PC'])
+
+    def test_details_from_summary_with_unknown_genres(self):
+        summary = ItemSummary(item_id='x_1', category='game', title='Title')
+        details = ItemDetails.from_summary(summary)
+        self.assertEqual(details.genres, [])
+        self.assertIsNone(details.provider_rating)
+        self.assertEqual(details.to_review_item_fields()['attr1'], '')
 
 
 def _mal_node(mal_id, mean=8.5, **extra):
@@ -475,90 +577,372 @@ class OMDbProviderTest(SimpleTestCase):
         get_mock.assert_not_called()
 
 
-def _rawg_game(game_id=3328, **extra):
+IGDB_ENV = {'IGDB_CLIENT_ID': 'igdb-client-id', 'IGDB_CLIENT_SECRET': 'igdb-secret-s3cr3t'}
+IGDB_TOKEN = 'igdb-token-t0k3n'
+IGDB_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
+IGDB_GAMES_URL = 'https://api.igdb.com/v4/games'
+IGDB_SEARCH_FIELDS = 'fields name,first_release_date,cover.image_id,genres.name,total_rating,platforms.name;'
+# Removes a key from _igdb_game().
+_DROP = object()
+
+
+def _igdb_response(json_data, status_code=200, reason=''):
+    response = _ResponseStub(status_code, reason=reason)
+    # _ResponseStub turns an empty list into {}.
+    response._json_data = json_data
+    return response
+
+
+def _igdb_token(token=IGDB_TOKEN, expires_in=5184000):
+    return _igdb_response({'access_token': token, 'expires_in': expires_in, 'token_type': 'bearer'})
+
+
+def _igdb_game(game_id=1942, **extra):
     game = {
         'id': game_id,
         'name': 'The Witcher 3: Wild Hunt',
-        'background_image': 'https://img/w3.jpg',
-        'released': '2015-05-18',
-        'genres': [{'name': 'Action'}, {'name': 'RPG'}, {'name': 'Action'}],
-        'developers': [{'name': 'CD PROJEKT RED'}],
-        'publishers': [{'name': 'CD PROJEKT RED'}, {'name': 'WB Games'}],
-        'platforms': [{'platform': {'name': 'PC'}}, {'platform': {'name': 'PlayStation 4'}}],
-        'description': '<p>Geralt.</p>',
-        'rating': 4.66,
+        # 2015-05-19 00:00 UTC
+        'first_release_date': 1431993600,
+        'cover': {'id': 89386, 'image_id': 'coaarl'},
+        'genres': [{'id': 12, 'name': 'Role-playing (RPG)'}, {'id': 31, 'name': 'Adventure'}, {'id': 12, 'name': 'Role-playing (RPG)'}],
+        'total_rating': 92.6789,
+        'platforms': [{'id': 6, 'name': 'PC (Microsoft Windows)'}, {'id': 48, 'name': 'PlayStation 4'}],
+        'summary': 'Geralt hunts monsters.',
+        'involved_companies': [
+            {'id': 1, 'company': {'id': 908, 'name': 'CD Projekt RED'}, 'developer': True},
+            {'id': 2, 'company': {'id': 1, 'name': 'Warner Bros.'}, 'developer': False},
+            {'id': 3, 'company': {'id': 909, 'name': 'Saber Interactive'}, 'developer': True},
+            {'id': 4, 'company': {'id': 908, 'name': 'CD Projekt RED'}, 'developer': True},
+        ],
     }
     game.update(extra)
-    return game
+    return {key: value for key, value in game.items() if value is not _DROP}
 
 
 @mock.patch(RECORD_USAGE, new=mock.Mock())
-@mock.patch.dict('os.environ', {'RAWG_API_KEY': 'key-456'})
-class RAWGProviderTest(SimpleTestCase):
-    def test_requires_api_key(self):
-        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
-            with self.assertRaises(RuntimeError):
-                RAWGProvider()
+@mock.patch.dict('os.environ', IGDB_ENV)
+class IGDBProviderTest(SimpleTestCase):
+    def setUp(self):
+        patcher = mock.patch(REQUESTS_GET)
+        get_mock = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(get_mock.assert_not_called)
 
-    def test_search_encodes_the_query(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': [_rawg_game()]})) as get_mock:
-            RAWGProvider().search(SPECIAL_QUERY)
+    def _with_cached_token(self):
+        cache.set(IGDBProvider.TOKEN_CACHE_KEY, IGDB_TOKEN)
+
+    def _assert_bad_response(self, exception):
+        self.assertIsInstance(exception, UpstreamError)
+        self.assertEqual(exception.message, 'Unexpected response from IGDB.')
+        self.assertEqual(exception.source, 'IGDB API')
+        self.assertIsInstance(exception.__cause__, (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError))
+
+    def test_requires_client_id_and_secret(self):
+        for key in IGDB_ENV:
+            with self.subTest(key=key):
+                with mock.patch.dict('os.environ', {key: ''}):
+                    with self.assertRaises(RuntimeError):
+                        IGDBProvider()
+                env = {name: value for name, value in IGDB_ENV.items() if name != key}
+                with mock.patch.dict('os.environ', env, clear=True):
+                    with self.assertRaises(RuntimeError):
+                        IGDBProvider()
+
+    def test_token_is_fetched_once_and_cached(self):
+        responses = [_igdb_token(), _igdb_response([_igdb_game()]), _igdb_response([_igdb_game()])]
+        with mock.patch('review.providers.igdb.cache', wraps=cache) as cache_mock:
+            with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+                provider = IGDBProvider()
+                provider.search('witcher')
+                provider.search('witcher')
+
+        self.assertEqual(post_mock.call_count, 3)
+        token_call, *query_calls = post_mock.call_args_list
+        self.assertEqual(token_call.args, (IGDB_TOKEN_URL,))
+        self.assertEqual(token_call.kwargs['data'], {
+            'client_id': 'igdb-client-id',
+            'client_secret': 'igdb-secret-s3cr3t',
+            'grant_type': 'client_credentials',
+        })
+        for query_call in query_calls:
+            self.assertEqual(query_call.args, (IGDB_GAMES_URL,))
+            self.assertEqual(query_call.kwargs['headers']['Client-ID'], 'igdb-client-id')
+            self.assertEqual(query_call.kwargs['headers']['Authorization'], 'Bearer ' + IGDB_TOKEN)
+        # Cached for an hour less than the token lives.
+        cache_mock.set.assert_called_once_with('igdb:access_token', IGDB_TOKEN, timeout=5184000 - 3600)
+        self.assertEqual(cache.get('igdb:access_token'), IGDB_TOKEN)
+
+    def test_short_lived_token_is_cached_for_a_minute(self):
+        with mock.patch('review.providers.igdb.cache', wraps=cache) as cache_mock:
+            with mock.patch(REQUESTS_POST, side_effect=[_igdb_token(expires_in=100), _igdb_response([_igdb_game()])]):
+                IGDBProvider().search('witcher')
+
+        cache_mock.set.assert_called_once_with('igdb:access_token', IGDB_TOKEN, timeout=60)
+
+    def test_token_request_counts_as_igdb_usage(self):
+        with mock.patch(RECORD_USAGE) as record_usage:
+            with mock.patch(REQUESTS_POST, side_effect=[_igdb_token(), _igdb_response([_igdb_game()])]):
+                IGDBProvider().search('witcher')
+
+        self.assertEqual(record_usage.call_args_list, [mock.call('IGDB API'), mock.call('IGDB API')])
+
+    def test_401_refetches_the_token_and_retries_once(self):
+        cache.set('igdb:access_token', 'old-token')
+        responses = [
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+            _igdb_token('new-token'),
+            _igdb_response([_igdb_game()]),
+        ]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            results = IGDBProvider().search('witcher')
+
+        self.assertEqual([result.item_id for result in results], ['igdb_1942'])
+        urls = [call.args[0] for call in post_mock.call_args_list]
+        self.assertEqual(urls, [IGDB_GAMES_URL, IGDB_TOKEN_URL, IGDB_GAMES_URL])
+        self.assertEqual(post_mock.call_args_list[0].kwargs['headers']['Authorization'], 'Bearer old-token')
+        self.assertEqual(post_mock.call_args_list[2].kwargs['headers']['Authorization'], 'Bearer new-token')
+        self.assertEqual(cache.get('igdb:access_token'), 'new-token')
+
+    def test_401_on_a_fresh_token_is_not_retried(self):
+        responses = [
+            _igdb_token('new-token'),
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+        ]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                IGDBProvider().search('witcher')
+
+        self.assertEqual(post_mock.call_count, 2)
+        self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_401_on_a_cached_token_refetches_it(self):
+        self._with_cached_token()
+        responses = [
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+            _igdb_token('new-token'),
+            _igdb_response([_igdb_game()]),
+        ]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            IGDBProvider().get_details('igdb_1942')
+
+        self.assertEqual(post_mock.call_count, 3)
+        self.assertEqual(cache.get('igdb:access_token'), 'new-token')
+
+    def test_second_401_is_upstream_error(self):
+        cache.set('igdb:access_token', 'old-token')
+        responses = [
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+            _igdb_token('new-token'),
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+        ]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                IGDBProvider().search('witcher')
+
+        self.assertEqual(post_mock.call_count, 3)
+        self.assertEqual(ctx.exception.status_code, 401)
+        self.assertEqual(ctx.exception.source, 'IGDB API')
+
+    def test_other_query_errors_do_not_refetch_the_token(self):
+        with mock.patch(REQUESTS_POST, side_effect=[_igdb_token(), _igdb_response({}, status_code=400, reason='Bad Request')]) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                IGDBProvider().search('witcher')
+
+        self.assertEqual(post_mock.call_count, 2)
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_bad_token_response_is_upstream_error(self):
+        bad_tokens = [
+            {},
+            [],
+            None,
+            {'expires_in': 5184000},
+            {'access_token': '', 'expires_in': 5184000},
+            {'access_token': 123, 'expires_in': 5184000},
+            {'access_token': IGDB_TOKEN},
+            {'access_token': IGDB_TOKEN, 'expires_in': '5184000'},
+            {'access_token': IGDB_TOKEN, 'expires_in': 5184000.0},
+            {'access_token': IGDB_TOKEN, 'expires_in': True},
+        ]
+        for token_json in bad_tokens:
+            with self.subTest(token_json=token_json):
+                with mock.patch(REQUESTS_POST, return_value=_igdb_response(token_json)) as post_mock:
+                    with self.assertRaises(UpstreamError) as ctx:
+                        IGDBProvider().search('witcher')
+
+                self._assert_bad_response(ctx.exception)
+                post_mock.assert_called_once()
+                self.assertIsNone(cache.get('igdb:access_token'))
+
+    def test_token_and_secret_are_never_logged(self):
+        secret = IGDB_ENV['IGDB_CLIENT_SECRET']
+        tokens = ['first-t0k3n', 'second-t0k3n']
+        records = []
+        handler = logging.Handler(level=logging.DEBUG)
+        handler.emit = records.append
+        root = logging.getLogger()
+        old_level = root.level
+        root.addHandler(handler)
+        root.setLevel(logging.DEBUG)
+        errors = []
+        try:
+            responses = [
+                # Token fetch, then a query.
+                _igdb_token(tokens[0]),
+                _igdb_response([_igdb_game()]),
+                # 401 on the cached token, refresh, 401 again.
+                _igdb_response({}, status_code=401, reason='Unauthorized'),
+                _igdb_token(tokens[1]),
+                _igdb_response({}, status_code=401, reason='Unauthorized'),
+                # The token request itself fails, then returns no expiry.
+                _igdb_response({'message': 'invalid client secret'}, status_code=403, reason='Forbidden'),
+                _igdb_response({'access_token': tokens[0]}),
+            ]
+            with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+                provider = IGDBProvider()
+                provider.search('witcher')
+                for _ in range(3):
+                    try:
+                        provider.search('witcher')
+                    except UpstreamError as ex:
+                        errors.append(ex)
+                    cache.clear()
+        finally:
+            root.removeHandler(handler)
+            root.setLevel(old_level)
+
+        self.assertEqual(post_mock.call_count, 7)
+        self.assertEqual(len(errors), 3)
+        formatter = logging.Formatter()
+        texts = [formatter.format(record) for record in records]
+        texts += [str(call.args) + str(call.kwargs.get('url')) for call in post_mock.call_args_list]
+        for error in errors:
+            chained = error
+            while chained is not None:
+                texts += [str(chained), repr(chained), repr(vars(chained))]
+                chained = chained.__cause__ or chained.__context__
+        for text in texts:
+            for value in [secret] + tokens:
+                self.assertNotIn(value, text)
+
+    def test_search_body(self):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game()])) as post_mock:
+            IGDBProvider().search('witcher 3')
 
         self.assertEqual(
-            get_mock.call_args.args[0],
-            'https://api.rawg.io/api/games?key=key-456&search=' + ENCODED_SPECIAL_QUERY,
+            post_mock.call_args.kwargs['data'],
+            'search "witcher 3"; ' + IGDB_SEARCH_FIELDS
+            + ' where version_parent = null & game_type = (0,4,8,9,10); limit 10;',
         )
 
-    def test_search_results(self):
-        games = [_rawg_game(1), _rawg_game(2, background_image=None, released=None)] + [_rawg_game(i) for i in range(3, 15)]
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': games})):
-            results = RAWGProvider().search('witcher')
+    def test_search_escapes_quotes_and_backslashes(self):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game()])) as post_mock:
+            IGDBProvider().search('a "b" \\c')
 
-        self.assertEqual(len(results), 10)
-        self.assertEqual([result.to_search_result() for result in results[:2]], [
-            {'item_id': 'rawg_1', 'title': 'The Witcher 3: Wild Hunt', 'image_url': 'https://img/w3.jpg', 'year': '2015'},
-            {'item_id': 'rawg_2', 'title': 'The Witcher 3: Wild Hunt', 'image_url': 'N/A', 'year': 'N/A'},
+        self.assertTrue(post_mock.call_args.kwargs['data'].startswith('search "a \\"b\\" \\\\c"; fields '))
+
+    def test_search_all_types_drops_the_filter(self):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game()])) as post_mock:
+            IGDBProvider().search('blood and wine', all_types=True)
+
+        self.assertEqual(post_mock.call_args.kwargs['data'], 'search "blood and wine"; ' + IGDB_SEARCH_FIELDS + ' limit 10;')
+
+    def test_search_results(self):
+        self._with_cached_token()
+        games = [
+            _igdb_game(),
+            _igdb_game(1943, cover=_DROP, total_rating=_DROP, first_release_date=_DROP, genres=_DROP),
+        ]
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response(games)):
+            results = IGDBProvider().search('witcher')
+
+        self.assertEqual(results, [
+            ItemSummary(
+                item_id='igdb_1942',
+                category='game',
+                title='The Witcher 3: Wild Hunt',
+                image_url='https://images.igdb.com/igdb/image/upload/t_cover_big/coaarl.jpg',
+                year='2015',
+                genres=['Role-playing (RPG)', 'Adventure'],
+                provider_rating=9.3,
+            ),
+            ItemSummary(
+                item_id='igdb_1943', category='game', title='The Witcher 3: Wild Hunt',
+                image_url=None, year=None, genres=[], provider_rating=None,
+            ),
+        ])
+        self.assertEqual([result.to_search_result() for result in results], [
+            {
+                'item_id': 'igdb_1942',
+                'title': 'The Witcher 3: Wild Hunt',
+                'image_url': 'https://images.igdb.com/igdb/image/upload/t_cover_big/coaarl.jpg',
+                'year': '2015',
+            },
+            {'item_id': 'igdb_1943', 'title': 'The Witcher 3: Wild Hunt', 'image_url': 'N/A', 'year': 'N/A'},
         ])
 
     def test_search_without_results_is_not_found(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': []})):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([])):
             with self.assertRaises(ItemNotFound) as ctx:
-                RAWGProvider().search('zzzzzz')
+                IGDBProvider().search('zzzzzz')
 
         self.assertEqual(ctx.exception.message, 'Game not found!')
 
-    def test_details(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=_rawg_game())) as get_mock:
-            details = RAWGProvider().get_details('rawg_3328')
+    def test_search_retries_429(self):
+        self._with_cached_token()
+        with mock.patch(SLEEP) as sleep_mock:
+            with mock.patch(REQUESTS_POST, side_effect=[
+                _igdb_response({}, status_code=429, reason='Too Many Requests'),
+                _igdb_response([_igdb_game()]),
+            ]) as post_mock:
+                results = IGDBProvider().search('witcher')
 
-        self.assertEqual(get_mock.call_args.args[0], 'https://api.rawg.io/api/games/3328?key=key-456')
-        self.assertEqual(details.genres, ['Action', 'RPG'])
-        self.assertEqual(details.creators, ['CD PROJEKT RED', 'WB Games'])
-        self.assertEqual(details.platforms, ['PC', 'PlayStation 4'])
-        self.assertEqual(details.provider_rating, 4.66 * 2)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(post_mock.call_count, 2)
+        sleep_mock.assert_called_once()
+
+    def test_details(self):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game()])) as post_mock:
+            details = IGDBProvider().get_details('igdb_1942')
+
+        self.assertEqual(post_mock.call_args.args, (IGDB_GAMES_URL,))
+        self.assertEqual(
+            post_mock.call_args.kwargs['data'],
+            'fields name,first_release_date,cover.image_id,genres.name,total_rating,platforms.name,'
+            'summary,involved_companies.company.name,involved_companies.developer; where id = 1942;',
+        )
+        self.assertEqual(details.genres, ['Role-playing (RPG)', 'Adventure'])
+        # Developers only, without the publisher.
+        self.assertEqual(details.creators, ['CD Projekt RED', 'Saber Interactive'])
+        self.assertEqual(details.platforms, ['PC (Microsoft Windows)', 'PlayStation 4'])
+        self.assertEqual(details.languages, [])
+        self.assertEqual(details.provider_rating, 9.3)
         self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'rawg_3328',
+            'item_id': 'igdb_1942',
             'category': 'game',
             'title': 'The Witcher 3: Wild Hunt',
-            'image_url': 'https://img/w3.jpg',
+            'image_url': 'https://images.igdb.com/igdb/image/upload/t_cover_big/coaarl.jpg',
             'year': '2015',
-            'attr1': 'Action, RPG',
-            'attr2': 'CD PROJEKT RED, WB Games',
-            'attr3': 'PC, PlayStation 4',
-            'description': '<p>Geralt.</p>',
-            'rating': str(4.66 * 2),
+            'attr1': 'Role-playing (RPG), Adventure',
+            'attr2': 'CD Projekt RED, Saber Interactive',
+            'attr3': 'PC (Microsoft Windows), PlayStation 4',
+            'description': 'Geralt hunts monsters.',
+            'rating': '9.3',
         })
 
     def test_details_with_missing_optional_fields(self):
-        game = _rawg_game(
-            background_image='null', released=None, genres=[], developers=[], publishers=[],
-            platforms=[], description='', rating=0,
-        )
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=game)):
-            details = RAWGProvider().get_details('rawg_3328')
+        self._with_cached_token()
+        game = {'id': 1942, 'name': 'The Witcher 3: Wild Hunt'}
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([game])):
+            details = IGDBProvider().get_details('igdb_1942')
 
         self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'rawg_3328',
+            'item_id': 'igdb_1942',
             'category': 'game',
             'title': 'The Witcher 3: Wild Hunt',
             'image_url': 'N/A',
@@ -567,40 +951,127 @@ class RAWGProviderTest(SimpleTestCase):
             'attr2': '',
             'attr3': '',
             'description': '',
-            'rating': '0',
+            'rating': 'N/A',
         })
 
-    def test_details_with_null_lists(self):
-        game = _rawg_game(genres=None, developers=None, publishers=None, platforms=None)
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=game)):
-            fields = RAWGProvider().get_details('rawg_3328').to_review_item_fields()
+    def test_long_title_and_platform_list_fit_the_columns(self):
+        self._with_cached_token()
+        platforms = [{'name': 'Platform number {}'.format(i)} for i in range(40)]
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game(name='T' * 150, platforms=platforms)])):
+            fields = IGDBProvider().get_details('igdb_1942').to_review_item_fields()
 
-        self.assertEqual((fields['attr1'], fields['attr2'], fields['attr3']), ('', '', ''))
+        self.assertEqual(fields['title'], 'T' * 100)
+        self.assertLessEqual(len(fields['attr3']), 300)
+        self.assertTrue(fields['attr3'].startswith('Platform number 0, Platform number 1, '))
+        # Whole names only: 0-14 take 288 characters, 15 would make it 308.
+        self.assertTrue(fields['attr3'].endswith('Platform number 14'))
+
+    def test_details_rejects_invalid_ids(self):
+        for item_id in ['igdb_', 'igdb_12a', 'igdb_-1', 'igdb_0', 'igdb_01942', 'igdb_1; fields *', 'igdb_²', 'rawg_1942', '1942']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_POST) as post_mock:
+                    with self.assertRaises(InvalidItemId) as ctx:
+                        IGDBProvider().get_details(item_id)
+
+                post_mock.assert_not_called()
+                if item_id.startswith('igdb_'):
+                    self.assertEqual(ctx.exception.message, 'Invalid game id.')
 
     def test_details_for_unknown_id_is_not_found(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(404, reason='Not Found')):
+        self._with_cached_token()
+        with mock.patch(REQUESTS_POST, return_value=_igdb_response([])):
             with self.assertRaises(ItemNotFound) as ctx:
-                RAWGProvider().get_details('rawg_999999999')
+                IGDBProvider().get_details('igdb_999999999')
 
-        self.assertEqual(ctx.exception.message, 'Bad response from API.')
-        # The refresh command logs the status from the original error.
-        self.assertEqual(ctx.exception.__cause__.status_code, 404)
+        self.assertEqual(ctx.exception.message, 'Game not found!')
 
-    def test_details_server_error_is_upstream_error(self):
-        with mock.patch(SLEEP):
-            with mock.patch(REQUESTS_GET, return_value=_ResponseStub(503, reason='Service Unavailable')):
-                with self.assertRaises(UpstreamError) as ctx:
-                    RAWGProvider().get_details('rawg_3328')
+    def test_optional_fields_null_or_missing(self):
+        company = {'id': 1, 'company': {'id': 908, 'name': 'CD Projekt RED'}, 'developer': True}
+        cases = [
+            ('cover', {'cover': None}, 'image_url', None),
+            ('cover', {'cover': _DROP}, 'image_url', None),
+            ('cover.image_id', {'cover': {'id': 1, 'image_id': None}}, 'image_url', None),
+            ('cover.image_id', {'cover': {'id': 1}}, 'image_url', None),
+            ('genres', {'genres': None}, 'genres', []),
+            ('genres', {'genres': _DROP}, 'genres', []),
+            ('genres.name', {'genres': [{'id': 1, 'name': None}, {'id': 2}]}, 'genres', []),
+            ('total_rating', {'total_rating': None}, 'provider_rating', None),
+            ('total_rating', {'total_rating': _DROP}, 'provider_rating', None),
+            ('first_release_date', {'first_release_date': None}, 'year', None),
+            ('first_release_date', {'first_release_date': _DROP}, 'year', None),
+        ]
+        details_cases = [
+            ('platforms', {'platforms': None}, 'platforms', []),
+            ('platforms', {'platforms': _DROP}, 'platforms', []),
+            ('platforms.name', {'platforms': [{'id': 6, 'name': None}, {'id': 7}]}, 'platforms', []),
+            ('involved_companies', {'involved_companies': None}, 'creators', []),
+            ('involved_companies', {'involved_companies': _DROP}, 'creators', []),
+            ('involved_companies.company', {'involved_companies': [{**company, 'company': None}, {'id': 2, 'developer': True}]}, 'creators', []),
+            ('involved_companies.company.name', {'involved_companies': [{**company, 'company': {'id': 908, 'name': None}}, {**company, 'company': {'id': 908}}]}, 'creators', []),
+            ('involved_companies.developer', {'involved_companies': [{**company, 'developer': None}, {'id': 2, 'company': {'id': 1, 'name': 'X'}}]}, 'creators', []),
+            ('summary', {'summary': None}, 'description', None),
+            ('summary', {'summary': _DROP}, 'description', None),
+        ]
+        self._with_cached_token()
+        for method, item_cases in [('search', cases), ('get_details', cases + details_cases)]:
+            for field_name, extra, attribute, expected in item_cases:
+                with self.subTest(method=method, field=field_name, game=extra):
+                    with mock.patch(REQUESTS_POST, return_value=_igdb_response([_igdb_game(**extra)])):
+                        if method == 'search':
+                            result = IGDBProvider().search('witcher')[0]
+                        else:
+                            result = IGDBProvider().get_details('igdb_1942')
 
-        self.assertEqual(ctx.exception.status_code, 503)
-        self.assertEqual(ctx.exception.source, 'RAWG API')
+                    self.assertEqual(getattr(result, attribute), expected)
+                    self.assertEqual(result.title, 'The Witcher 3: Wild Hunt')
 
-    def test_details_requires_prefix(self):
-        with mock.patch(REQUESTS_GET) as get_mock:
-            with self.assertRaises(InvalidItemId):
-                RAWGProvider().get_details('3328')
+    def test_malformed_payloads_are_upstream_errors(self):
+        cases = [
+            ('body is an object', {}),
+            ('body is null', None),
+            ('entry is not an object', [1]),
+            ('entry is a string', ['The Witcher 3']),
+            ('name missing', [_igdb_game(name=_DROP)]),
+            ('name null', [_igdb_game(name=None)]),
+            ('name empty', [_igdb_game(name='')]),
+            ('name not a string', [_igdb_game(name=3)]),
+            ('id missing', [_igdb_game(id=_DROP)]),
+            ('id null', [_igdb_game(id=None)]),
+            ('id not a number', [_igdb_game(id='abc')]),
+            ('rating text', [_igdb_game(total_rating='high')]),
+            ('rating bool', [_igdb_game(total_rating=True)]),
+            ('rating not finite', [_igdb_game(total_rating=float('nan'))]),
+            ('release date text', [_igdb_game(first_release_date='2015')]),
+            ('release date out of range', [_igdb_game(first_release_date=10 ** 20)]),
+            ('genres not objects', [_igdb_game(genres=[1, 2])]),
+            ('genres not a list', [_igdb_game(genres='RPG')]),
+            ('genre name not text', [_igdb_game(genres=[{'id': 1, 'name': 5}])]),
+            ('cover not an object', [_igdb_game(cover=89386)]),
+            ('cover image id not text', [_igdb_game(cover={'id': 1, 'image_id': 5})]),
+        ]
+        search_cases = [
+            # One bad entry fails the whole search.
+            ('one bad entry among good ones', [_igdb_game(), _igdb_game(1943, name=None)]),
+        ]
+        details_cases = [
+            ('platforms not objects', [_igdb_game(platforms=[6, 48])]),
+            ('companies not objects', [_igdb_game(involved_companies=[1])]),
+            ('company not an object', [_igdb_game(involved_companies=[{'id': 1, 'company': 908, 'developer': True}])]),
+            ('company name not text', [_igdb_game(involved_companies=[{'id': 1, 'company': {'name': 5}, 'developer': True}])]),
+            ('summary not text', [_igdb_game(summary=5)]),
+        ]
+        self._with_cached_token()
+        for method, payload_cases in [('search', cases + search_cases), ('get_details', cases + details_cases)]:
+            for name, payload in payload_cases:
+                with self.subTest(method=method, case=name):
+                    with mock.patch(REQUESTS_POST, return_value=_igdb_response(payload)):
+                        with self.assertRaises(ProviderError) as ctx:
+                            if method == 'search':
+                                IGDBProvider().search('witcher')
+                            else:
+                                IGDBProvider().get_details('igdb_1942')
 
-        get_mock.assert_not_called()
+                    self._assert_bad_response(ctx.exception)
 
 
 def ol_search_doc(work_id='OL27482W', **extra):
@@ -821,13 +1292,13 @@ class OpenLibraryProviderTest(SimpleTestCase):
             self.assertEqual(ctx.exception.source, 'Open Library API')
 
 
-@mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'RAWG_API_KEY': 'key-456', 'MAL_CLIENT_ID': 'client-123'})
+@mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'MAL_CLIENT_ID': 'client-123', **IGDB_ENV})
 class RegistryTest(SimpleTestCase):
     def test_every_category_has_a_provider(self):
         expected = {
             'movie': OMDbProvider,
             'series': OMDbProvider,
-            'game': RAWGProvider,
+            'game': IGDBProvider,
             'anime': MALProvider,
             'manga': MALProvider,
             'book': OpenLibraryProvider,
@@ -843,15 +1314,19 @@ class RegistryTest(SimpleTestCase):
             get_provider('podcast')
 
     def test_missing_key_is_reported_on_every_call(self):
-        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
-            for _ in range(2):
-                with self.assertRaises(RuntimeError):
-                    get_provider('game')
+        for key in IGDB_ENV:
+            with self.subTest(key=key):
+                with mock.patch.dict('os.environ', {key: ''}):
+                    for _ in range(2):
+                        with self.assertRaises(RuntimeError):
+                            get_provider('game')
+                        with self.assertRaises(RuntimeError):
+                            provider_for_item_id('igdb_1942')
 
     def test_provider_for_item_id(self):
         expected = {
             'omdb_tt0903747': (OMDbProvider, None),
-            'rawg_3328': (RAWGProvider, 'game'),
+            'igdb_1942': (IGDBProvider, 'game'),
             'jikan_anime_38000': (MALProvider, 'anime'),
             'jikan_manga_2': (MALProvider, 'manga'),
             'olib_OL27482W': (OpenLibraryProvider, 'book'),
@@ -865,6 +1340,13 @@ class RegistryTest(SimpleTestCase):
         for item_id in ('imdb_tt0903747', 'jikan_novel_1', 'tt0903747', ''):
             with self.assertRaises(InvalidItemId):
                 provider_for_item_id(item_id)
+
+    def test_legacy_rawg_ids_have_no_provider(self):
+        self.assertEqual(LEGACY_PREFIXES, ('rawg_',))
+        with self.assertRaises(InvalidItemId) as ctx:
+            provider_for_item_id('rawg_3328')
+
+        self.assertEqual(ctx.exception.message, 'Unknown item id prefix.')
 
 
 def test_normalize_imdb_title_url_to_item_id_accepts_title_url():

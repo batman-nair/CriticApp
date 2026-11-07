@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from review.models import ReviewItem
-from review.providers import ProviderError, get_provider
+from review.providers import LEGACY_PREFIXES, ProviderError, get_provider
 from review.utils.metrics import normalize_provider, push_refresh_run_metrics
 
 
@@ -74,11 +74,17 @@ class Command(BaseCommand):
         stale_cutoff = now - timedelta(days=stale_days)
         retry_cutoff = now - timedelta(hours=min_retry_hours)
 
+        legacy_items = Q()
+        for prefix in LEGACY_PREFIXES:
+            legacy_items |= Q(item_id__startswith=prefix)
         stale_items = (
             ReviewItem.objects.filter(
                 Q(last_refreshed_at__isnull=True) | Q(last_refreshed_at__lte=stale_cutoff),
                 Q(last_refresh_attempt_at__isnull=True) | Q(last_refresh_attempt_at__lte=retry_cutoff),
             )
+            # Legacy items have no provider. Left in, they'd never refresh,
+            # sort first and fill --max-items on every run.
+            .exclude(legacy_items)
             .order_by('last_refreshed_at', 'item_id')[:max_items]
         )
 
@@ -178,7 +184,7 @@ class Command(BaseCommand):
         if category in ('movie', 'series'):
             return 'omdb'
         if category == 'game':
-            return 'rawg'
+            return 'igdb'
         if category in ('anime', 'manga'):
             return 'mal'
         if category == 'book':

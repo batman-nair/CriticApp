@@ -206,8 +206,8 @@ class RefreshReviewItemsCommandTest(TestCase):
         self.assertEqual(item.language, 'Japanese, English')
 
     def test_refresh_keeps_language_when_provider_has_none(self):
-        item = self._create_item('rawg_lang', category='game', language='English')
-        provider = _ProviderStub({'rawg_lang': _details('rawg_lang', category='game', title='Old Title')})
+        item = self._create_item('igdb_lang', category='game', language='English')
+        provider = _ProviderStub({'igdb_lang': _details('igdb_lang', category='game', title='Old Title')})
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
             call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
@@ -257,13 +257,51 @@ class RefreshReviewItemsCommandTest(TestCase):
         )
 
     def test_failed_refresh_reports_status_of_a_not_found_item(self):
-        self._create_item('rawg_gone', category='game')
+        self._create_item('igdb_gone', category='game')
         not_found = ItemNotFound('Bad response from API.')
         not_found.__cause__ = UpstreamError('Bad response from API.', status_code=404, upstream_reason='Not Found')
-        provider = _ProviderStub({'rawg_gone': not_found})
+        provider = _ProviderStub({'igdb_gone': not_found})
         stderr = StringIO()
 
         with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
             call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0, stderr=stderr)
 
-        self.assertIn('Failed refresh for rawg_gone: Bad response from API. status=404 reason=Not Found.', stderr.getvalue())
+        self.assertIn('Failed refresh for igdb_gone: Bad response from API. status=404 reason=Not Found.', stderr.getvalue())
+
+    def test_legacy_rawg_items_are_left_out(self):
+        long_ago = timezone.now() - timedelta(days=365)
+        legacy = self._create_item('rawg_3328', category='game')
+        legacy.last_refresh_attempt_at = long_ago
+        legacy.refresh_error_count = 3
+        legacy.save(update_fields=['last_refresh_attempt_at', 'refresh_error_count'])
+        item = self._create_item('igdb_1942', category='game')
+        item.last_refreshed_at = timezone.now() - timedelta(days=30)
+        item.save(update_fields=['last_refreshed_at'])
+        provider = _ProviderStub({'igdb_1942': _details('igdb_1942', category='game', title='The Witcher 3: Wild Hunt')})
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider) as build_mock:
+            with mock.patch('review.management.commands.refresh_review_items.push_refresh_run_metrics') as push_mock:
+                call_command('refresh_review_items', max_items=1, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        legacy.refresh_from_db()
+        item.refresh_from_db()
+        # The legacy item was never refreshed, so it would sort first.
+        self.assertEqual(legacy.title, 'Old Title')
+        self.assertIsNone(legacy.last_refreshed_at)
+        self.assertEqual(legacy.last_refresh_attempt_at, long_ago)
+        self.assertEqual(legacy.refresh_error_count, 3)
+        self.assertEqual(item.title, 'The Witcher 3: Wild Hunt')
+        build_mock.assert_called_once_with('game')
+        kwargs = push_mock.call_args.kwargs
+        self.assertEqual((kwargs['processed'], kwargs['refreshed'], kwargs['failed'], kwargs['skipped']), (1, 1, 0, 0))
+        self.assertEqual(set(kwargs['provider_totals']), {'igdb'})
+        self.assertEqual(kwargs['provider_totals']['igdb']['processed'], 1)
+        self.assertEqual(kwargs['provider_totals']['igdb']['refreshed'], 1)
+
+    def test_game_items_use_igdb_provider(self):
+        from review.management.commands.refresh_review_items import Command
+        from review.providers.igdb import IGDBProvider
+
+        with mock.patch.dict('os.environ', {'IGDB_CLIENT_ID': 'client-id', 'IGDB_CLIENT_SECRET': 'secret'}):
+            self.assertIsInstance(Command()._build_provider('game'), IGDBProvider)
+        self.assertEqual(Command()._provider_name_for_category('game'), 'igdb')

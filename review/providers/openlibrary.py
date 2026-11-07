@@ -1,7 +1,7 @@
 import re
 from urllib.parse import quote
 
-from .base import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider, unique
+from .base import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider, fit_joined, unique
 
 
 class OpenLibraryProvider(Provider):
@@ -65,10 +65,10 @@ class OpenLibraryProvider(Provider):
                 genres.setdefault(subject.lower(), subject)
         authors = unique(self._text(entry) for entry in doc.get("author_name") or [])
         rating = doc.get("ratings_average")
-        return ItemDetails(
-            **vars(summary),
-            genres=self._fit(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH),
-            creators=self._fit(authors, self._MAX_ATTR_LENGTH),
+        return ItemDetails.from_summary(
+            summary,
+            genres=fit_joined(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH),
+            creators=fit_joined(authors, self._MAX_ATTR_LENGTH),
             description=self._text(work_json.get("description")) or None,
             pages=doc.get("number_of_pages_median") or None,
             provider_rating=round(rating * 2, 1) if rating else None,
@@ -88,19 +88,6 @@ class OpenLibraryProvider(Provider):
     @staticmethod
     def _truncate(value: str, max_length: int) -> str:
         return value[:max_length] if value else "N/A"
-
-    @staticmethod
-    def _fit(values: list, max_length: int) -> list:
-        # Keep whole entries while their comma-separated join fits the column,
-        # so no name is cut in half. A first entry that alone is too long is cut.
-        fitted = []
-        length = 0
-        for value in values:
-            length += len(value) + (2 if fitted else 0)
-            if length > max_length:
-                return fitted or [value[:max_length]]
-            fitted.append(value)
-        return fitted
 
     def _summary(self, doc: dict, detailed: bool=False) -> ItemSummary:
         cover_id = doc.get("cover_i")

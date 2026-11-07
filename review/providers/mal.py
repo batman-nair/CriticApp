@@ -60,8 +60,8 @@ class MALProvider(Provider):
                 creators.append(' '.join(part for part in [node.get("first_name"), node.get("last_name")] if part))
         else:
             creators = [entry["name"] for entry in mal_json.get("studios", [])]
-        return ItemDetails(
-            **vars(self._summary(mal_json)),
+        return ItemDetails.from_summary(
+            self._summary(mal_json),
             genres=unique(entry["name"] for entry in mal_json.get("genres", [])),
             creators=unique(creators),
             media_type=mal_json.get("media_type"),

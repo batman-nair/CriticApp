@@ -1,10 +1,10 @@
 import pytest
 
 from review.providers import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider
+from review.providers.igdb import IGDBProvider
 from review.providers.mal import MALProvider
 from review.providers.omdb import OMDbProvider
 from review.providers.openlibrary import OpenLibraryProvider
-from review.providers.rawg import RAWGProvider
 
 import time
 
@@ -14,21 +14,21 @@ _REVIEW_ITEM_COLUMNS = ["item_id", "category", "title", "image_url", "year", "at
 
 @pytest.mark.integration
 class TestUtilAPI:
-    """Integration tests that hit real external APIs (OMDb, RAWG, MyAnimeList, Open Library).
+    """Integration tests that hit real external APIs (OMDb, IGDB, MyAnimeList, Open Library).
 
     Skipped in CI by default. Run with: pytest -m integration
     """
 
     def setup_method(self):
         self.omdb_api = OMDbProvider()
-        self.rawg_api = RAWGProvider()
+        self.igdb_api = IGDBProvider()
         self.mal_anime_api = MALProvider('anime')
         self.mal_manga_api = MALProvider('manga')
         self.open_library_api = OpenLibraryProvider()
 
     def test_search(self):
         self._test_search_api(self.omdb_api, 'Breaking Bad')
-        self._test_search_api(self.rawg_api, 'Ori and the Blind Forest')
+        self._test_search_api(self.igdb_api, 'Ori and the Blind Forest')
         self._test_search_api(self.mal_anime_api, 'Kimetsu no Yaiba')
         # Sleep to avoid rate limiting
         time.sleep(1)
@@ -43,9 +43,16 @@ class TestUtilAPI:
         with pytest.raises(ItemNotFound):
             api_obj.search(_JUNK_DATA)
 
+    def test_igdb_search_leaves_out_expansions(self):
+        # Catches a wrong game_type id in the search filter.
+        titles = [result.title for result in self.igdb_api.search('The Witcher 3')]
+        assert 'The Witcher 3: Wild Hunt' in titles, titles
+        assert not any('Hearts of Stone' in title or 'Blood and Wine' in title for title in titles), titles
+
     def test_details(self):
         self._test_details_api(self.omdb_api, 'omdb_tt3896198')
-        self._test_details_api(self.rawg_api, 'rawg_19590')
+        # No hard-coded IGDB id: take one from a search.
+        self._test_details_api(self.igdb_api, self.igdb_api.search('Ori and the Blind Forest')[0].item_id)
         self._test_details_api(self.mal_anime_api, 'jikan_anime_38000')
         self._test_details_api(self.mal_manga_api, 'jikan_manga_2')
         self._test_details_api(self.open_library_api, 'olib_OL27482W')

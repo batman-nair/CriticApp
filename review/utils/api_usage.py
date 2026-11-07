@@ -10,10 +10,10 @@ from django.utils import timezone
 from review.models import UpstreamApiUsage
 from . import metrics
 
-PROVIDERS = ('omdb', 'rawg', 'mal', 'openlibrary')
+PROVIDERS = ('omdb', 'igdb', 'mal', 'openlibrary')
 PROVIDER_LABELS = {
     'omdb': 'OMDb',
-    'rawg': 'RAWG',
+    'igdb': 'IGDB',
     'mal': 'MyAnimeList',
     'openlibrary': 'Open Library',
 }

@@ -5,7 +5,7 @@ from review.utils.review_utils import SUBCATEGORY_FILTERS
 SOURCES = {
     'movie': ('OMDb', 'IMDb'),
     'series': ('OMDb', 'IMDb'),
-    'game': ('RAWG', 'RAWG'),
+    'game': ('IGDB', 'IGDB'),
     'anime': ('MyAnimeList', 'MyAnimeList'),
     'manga': ('MyAnimeList', 'MyAnimeList'),
     'book': ('Open Library', 'Open Library'),

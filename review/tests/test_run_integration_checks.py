@@ -89,14 +89,25 @@ class RunIntegrationChecksTest(SimpleTestCase):
         self.assertIn('test_details', out.getvalue())
 
     def test_missing_api_key_alerts_without_running_tests(self, send_alert):
-        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
+        with mock.patch.dict('os.environ', {'OMDB_API_KEY': ''}):
             with mock.patch(f'{COMMAND}.subprocess.run') as run:
                 with self.assertRaises(CommandError):
                     self._call()
 
         run.assert_not_called()
         send_alert.assert_called_once_with(
-            'CriticApp: prod integration tests not run, missing API keys: RAWG_API_KEY.')
+            'CriticApp: prod integration tests not run, missing API keys: OMDB_API_KEY.')
+
+    def test_missing_igdb_client_secret_is_reported(self, send_alert):
+        env = {'OMDB_API_KEY': 'k', 'IGDB_CLIENT_ID': 'id', 'IGDB_CLIENT_SECRET': '', 'MAL_CLIENT_ID': 'k'}
+        with mock.patch.dict('os.environ', env):
+            with mock.patch(f'{COMMAND}.subprocess.run') as run:
+                with self.assertRaises(CommandError):
+                    self._call()
+
+        run.assert_not_called()
+        send_alert.assert_called_once_with(
+            'CriticApp: prod integration tests not run, missing API keys: IGDB_CLIENT_SECRET.')
 
     def test_collection_error_is_named_without_stray_dot(self, send_alert):
         report = (

@@ -131,8 +131,8 @@ def normalize_provider(source_name: str) -> str:
     lowered = (source_name or '').strip().lower()
     if 'omdb' in lowered:
         return 'omdb'
-    if 'rawg' in lowered:
-        return 'rawg'
+    if 'igdb' in lowered:
+        return 'igdb'
     if lowered.startswith('mal ') or lowered == 'mal' or 'myanimelist' in lowered:
         return 'mal'
     if 'open library' in lowered or 'openlibrary' in lowered:

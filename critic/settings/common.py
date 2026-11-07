@@ -148,7 +148,6 @@ PUSHGATEWAY_TIMEOUT_SECONDS = int(os.environ.get('PUSHGATEWAY_TIMEOUT_SECONDS', 
 # Free-tier request quotas: provider -> (period, limit). Periods are UTC days/months.
 UPSTREAM_API_QUOTAS = {
     'omdb': ('day', 1000),
-    'rawg': ('month', 20000),
 }
 # Send one alert when a provider's usage reaches each of these percentages of its quota.
 UPSTREAM_API_QUOTA_WARN_AT = (80, 100)
