@@ -1,4 +1,4 @@
-"""External item providers (OMDb, RAWG, MyAnimeList, Open Library)."""
+"""External item providers (OMDb, IGDB, MyAnimeList, Open Library)."""
 
 from .base import (
     InvalidItemId,
@@ -10,7 +10,7 @@ from .base import (
     UpstreamError,
     WrongCategory,
 )
-from .registry import CATEGORIES, get_provider, provider_for_item_id
+from .registry import CATEGORIES, LEGACY_PREFIXES, get_provider, provider_for_item_id
 
 __all__ = [
     'CATEGORIES',
@@ -18,6 +18,7 @@ __all__ = [
     'ItemDetails',
     'ItemNotFound',
     'ItemSummary',
+    'LEGACY_PREFIXES',
     'Provider',
     'ProviderError',
     'UpstreamError',

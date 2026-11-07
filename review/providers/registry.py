@@ -1,14 +1,14 @@
 from .base import InvalidItemId, Provider
+from .igdb import IGDBProvider
 from .mal import MALProvider
 from .omdb import OMDbProvider
 from .openlibrary import OpenLibraryProvider
-from .rawg import RAWGProvider
 
 # The same category ids as review/api_v3/categories.py.
 _CATEGORY_FACTORIES = {
     'movie': lambda: OMDbProvider('movie'),
     'series': lambda: OMDbProvider('series'),
-    'game': RAWGProvider,
+    'game': IGDBProvider,
     'anime': lambda: MALProvider('anime'),
     'manga': lambda: MALProvider('manga'),
     'book': OpenLibraryProvider,
@@ -19,11 +19,15 @@ CATEGORIES = tuple(_CATEGORY_FACTORIES)
 # from the item itself.
 _PREFIX_FACTORIES = {
     'omdb_': lambda: OMDbProvider(None),
-    'rawg_': RAWGProvider,
+    'igdb_': IGDBProvider,
     'jikan_anime_': lambda: MALProvider('anime'),
     'jikan_manga_': lambda: MALProvider('manga'),
     'olib_': OpenLibraryProvider,
 }
+
+# Prefixes of item ids whose provider is gone. Stored items with them are
+# still served, but never refreshed, and an unstored one can't be looked up.
+LEGACY_PREFIXES = ('rawg_',)
 
 
 def get_provider(category: str) -> Provider:

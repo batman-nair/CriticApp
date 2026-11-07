@@ -11,6 +11,7 @@ from review.providers import (
     ItemDetails,
     ItemNotFound,
     ItemSummary,
+    LEGACY_PREFIXES,
     ProviderError,
     UpstreamError,
     WrongCategory,
@@ -22,7 +23,6 @@ from review.providers.igdb import IGDBProvider
 from review.providers.mal import MALProvider
 from review.providers.omdb import OMDbProvider, normalize_imdb_title_url_to_item_id
 from review.providers.openlibrary import OpenLibraryProvider
-from review.providers.rawg import RAWGProvider
 
 RECORD_USAGE = 'review.providers.base.api_usage.record_upstream_request'
 REQUESTS_GET = 'review.providers.base.requests.get'
@@ -118,7 +118,7 @@ class RequestJsonRetryTest(SimpleTestCase):
                 _ResponseStub(503),
                 _ResponseStub(200, json_data={'ok': True}),
             ]):
-                json_data = request_json_with_retry('https://example.com', source_name='RAWG API')
+                json_data = request_json_with_retry('https://example.com', source_name='IGDB API')
 
         self.assertEqual(json_data, {'ok': True})
         self.assertEqual(self.record_usage.call_count, 3)
@@ -573,134 +573,6 @@ class OMDbProviderTest(SimpleTestCase):
         with mock.patch(REQUESTS_GET) as get_mock:
             with self.assertRaises(InvalidItemId):
                 OMDbProvider('movie').get_details('tt0903747')
-
-        get_mock.assert_not_called()
-
-
-def _rawg_game(game_id=3328, **extra):
-    game = {
-        'id': game_id,
-        'name': 'The Witcher 3: Wild Hunt',
-        'background_image': 'https://img/w3.jpg',
-        'released': '2015-05-18',
-        'genres': [{'name': 'Action'}, {'name': 'RPG'}, {'name': 'Action'}],
-        'developers': [{'name': 'CD PROJEKT RED'}],
-        'publishers': [{'name': 'CD PROJEKT RED'}, {'name': 'WB Games'}],
-        'platforms': [{'platform': {'name': 'PC'}}, {'platform': {'name': 'PlayStation 4'}}],
-        'description': '<p>Geralt.</p>',
-        'rating': 4.66,
-    }
-    game.update(extra)
-    return game
-
-
-@mock.patch(RECORD_USAGE, new=mock.Mock())
-@mock.patch.dict('os.environ', {'RAWG_API_KEY': 'key-456'})
-class RAWGProviderTest(SimpleTestCase):
-    def test_requires_api_key(self):
-        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
-            with self.assertRaises(RuntimeError):
-                RAWGProvider()
-
-    def test_search_encodes_the_query(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': [_rawg_game()]})) as get_mock:
-            RAWGProvider().search(SPECIAL_QUERY)
-
-        self.assertEqual(
-            get_mock.call_args.args[0],
-            'https://api.rawg.io/api/games?key=key-456&search=' + ENCODED_SPECIAL_QUERY,
-        )
-
-    def test_search_results(self):
-        games = [_rawg_game(1), _rawg_game(2, background_image=None, released=None)] + [_rawg_game(i) for i in range(3, 15)]
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': games})):
-            results = RAWGProvider().search('witcher')
-
-        self.assertEqual(len(results), 10)
-        self.assertEqual([result.to_search_result() for result in results[:2]], [
-            {'item_id': 'rawg_1', 'title': 'The Witcher 3: Wild Hunt', 'image_url': 'https://img/w3.jpg', 'year': '2015'},
-            {'item_id': 'rawg_2', 'title': 'The Witcher 3: Wild Hunt', 'image_url': 'N/A', 'year': 'N/A'},
-        ])
-
-    def test_search_without_results_is_not_found(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'results': []})):
-            with self.assertRaises(ItemNotFound) as ctx:
-                RAWGProvider().search('zzzzzz')
-
-        self.assertEqual(ctx.exception.message, 'Game not found!')
-
-    def test_details(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=_rawg_game())) as get_mock:
-            details = RAWGProvider().get_details('rawg_3328')
-
-        self.assertEqual(get_mock.call_args.args[0], 'https://api.rawg.io/api/games/3328?key=key-456')
-        self.assertEqual(details.genres, ['Action', 'RPG'])
-        self.assertEqual(details.creators, ['CD PROJEKT RED', 'WB Games'])
-        self.assertEqual(details.platforms, ['PC', 'PlayStation 4'])
-        self.assertEqual(details.provider_rating, 4.66 * 2)
-        self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'rawg_3328',
-            'category': 'game',
-            'title': 'The Witcher 3: Wild Hunt',
-            'image_url': 'https://img/w3.jpg',
-            'year': '2015',
-            'attr1': 'Action, RPG',
-            'attr2': 'CD PROJEKT RED, WB Games',
-            'attr3': 'PC, PlayStation 4',
-            'description': '<p>Geralt.</p>',
-            'rating': str(4.66 * 2),
-        })
-
-    def test_details_with_missing_optional_fields(self):
-        game = _rawg_game(
-            background_image='null', released=None, genres=[], developers=[], publishers=[],
-            platforms=[], description='', rating=0,
-        )
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=game)):
-            details = RAWGProvider().get_details('rawg_3328')
-
-        self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'rawg_3328',
-            'category': 'game',
-            'title': 'The Witcher 3: Wild Hunt',
-            'image_url': 'N/A',
-            'year': 'N/A',
-            'attr1': '',
-            'attr2': '',
-            'attr3': '',
-            'description': '',
-            'rating': '0',
-        })
-
-    def test_details_with_null_lists(self):
-        game = _rawg_game(genres=None, developers=None, publishers=None, platforms=None)
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=game)):
-            fields = RAWGProvider().get_details('rawg_3328').to_review_item_fields()
-
-        self.assertEqual((fields['attr1'], fields['attr2'], fields['attr3']), ('', '', ''))
-
-    def test_details_for_unknown_id_is_not_found(self):
-        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(404, reason='Not Found')):
-            with self.assertRaises(ItemNotFound) as ctx:
-                RAWGProvider().get_details('rawg_999999999')
-
-        self.assertEqual(ctx.exception.message, 'Bad response from API.')
-        # The refresh command logs the status from the original error.
-        self.assertEqual(ctx.exception.__cause__.status_code, 404)
-
-    def test_details_server_error_is_upstream_error(self):
-        with mock.patch(SLEEP):
-            with mock.patch(REQUESTS_GET, return_value=_ResponseStub(503, reason='Service Unavailable')):
-                with self.assertRaises(UpstreamError) as ctx:
-                    RAWGProvider().get_details('rawg_3328')
-
-        self.assertEqual(ctx.exception.status_code, 503)
-        self.assertEqual(ctx.exception.source, 'RAWG API')
-
-    def test_details_requires_prefix(self):
-        with mock.patch(REQUESTS_GET) as get_mock:
-            with self.assertRaises(InvalidItemId):
-                RAWGProvider().get_details('3328')
 
         get_mock.assert_not_called()
 
@@ -1408,13 +1280,13 @@ class OpenLibraryProviderTest(SimpleTestCase):
             self.assertEqual(ctx.exception.source, 'Open Library API')
 
 
-@mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'RAWG_API_KEY': 'key-456', 'MAL_CLIENT_ID': 'client-123'})
+@mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'MAL_CLIENT_ID': 'client-123', **IGDB_ENV})
 class RegistryTest(SimpleTestCase):
     def test_every_category_has_a_provider(self):
         expected = {
             'movie': OMDbProvider,
             'series': OMDbProvider,
-            'game': RAWGProvider,
+            'game': IGDBProvider,
             'anime': MALProvider,
             'manga': MALProvider,
             'book': OpenLibraryProvider,
@@ -1430,15 +1302,19 @@ class RegistryTest(SimpleTestCase):
             get_provider('podcast')
 
     def test_missing_key_is_reported_on_every_call(self):
-        with mock.patch.dict('os.environ', {'RAWG_API_KEY': ''}):
-            for _ in range(2):
-                with self.assertRaises(RuntimeError):
-                    get_provider('game')
+        for key in IGDB_ENV:
+            with self.subTest(key=key):
+                with mock.patch.dict('os.environ', {key: ''}):
+                    for _ in range(2):
+                        with self.assertRaises(RuntimeError):
+                            get_provider('game')
+                        with self.assertRaises(RuntimeError):
+                            provider_for_item_id('igdb_1942')
 
     def test_provider_for_item_id(self):
         expected = {
             'omdb_tt0903747': (OMDbProvider, None),
-            'rawg_3328': (RAWGProvider, 'game'),
+            'igdb_1942': (IGDBProvider, 'game'),
             'jikan_anime_38000': (MALProvider, 'anime'),
             'jikan_manga_2': (MALProvider, 'manga'),
             'olib_OL27482W': (OpenLibraryProvider, 'book'),
@@ -1452,6 +1328,13 @@ class RegistryTest(SimpleTestCase):
         for item_id in ('imdb_tt0903747', 'jikan_novel_1', 'tt0903747', ''):
             with self.assertRaises(InvalidItemId):
                 provider_for_item_id(item_id)
+
+    def test_legacy_rawg_ids_have_no_provider(self):
+        self.assertEqual(LEGACY_PREFIXES, ('rawg_',))
+        with self.assertRaises(InvalidItemId) as ctx:
+            provider_for_item_id('rawg_3328')
+
+        self.assertEqual(ctx.exception.message, 'Unknown item id prefix.')
 
 
 def test_normalize_imdb_title_url_to_item_id_accepts_title_url():

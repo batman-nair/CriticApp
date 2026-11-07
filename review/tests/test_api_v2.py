@@ -7,7 +7,17 @@ from rest_framework.test import APITestCase
 
 from review.models import Review, ReviewItem
 from review.providers import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, UpstreamError, WrongCategory
-from review.tests.test_api_utils import REQUESTS_GET, ol_requests_get, ol_search_doc, ol_work
+from review.tests.test_api_utils import (
+    IGDB_ENV,
+    REQUESTS_GET,
+    REQUESTS_POST,
+    _igdb_game,
+    _igdb_response,
+    _igdb_token,
+    ol_requests_get,
+    ol_search_doc,
+    ol_work,
+)
 
 
 class _FakeLookupAPI:
@@ -268,12 +278,77 @@ class LookupV2Test(APITestCase):
                     self.assertEqual(response.json()['error']['message'], error.message)
         self.assertFalse(ReviewItem.objects.filter(item_id='omdb_tt7777777').exists())
 
+    @mock.patch.dict('os.environ', IGDB_ENV)
     def test_upstream_http_failure_message(self):
-        with mock.patch(REQUESTS_GET, return_value=mock.Mock(status_code=404, reason='Not Found', headers={})):
-            response = self.client.get('/api/v2/lookup/item/game/rawg_999999999/')
+        responses = [_igdb_token(), _igdb_response({}, status_code=404, reason='Not Found')]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            response = self.client.get('/api/v2/lookup/item/game/igdb_999999999/')
+        self.assertEqual(post_mock.call_count, 2)
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
         self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
         self.assertEqual(response.json()['error']['message'], 'Bad response from API.')
+        self.assertFalse(ReviewItem.objects.filter(item_id='igdb_999999999').exists())
+
+    # --- Games (real IGDB provider, HTTP mocked) ---
+
+    @mock.patch.dict('os.environ', IGDB_ENV)
+    def test_search_v2_game_uses_igdb(self):
+        games = [_igdb_game(), _igdb_game(1943, name='Gwent', cover=None, first_release_date=None)]
+        with mock.patch(REQUESTS_GET) as get_mock:
+            with mock.patch(REQUESTS_POST, side_effect=[_igdb_token(), _igdb_response(games)]) as post_mock:
+                response = self.client.get('/api/v2/lookup/search/game/', {'q': 'witcher'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['data'], [
+            {
+                'item_id': 'igdb_1942',
+                'title': 'The Witcher 3: Wild Hunt',
+                'image_url': 'https://images.igdb.com/igdb/image/upload/t_cover_big/coaarl.jpg',
+                'year': '2015',
+            },
+            {'item_id': 'igdb_1943', 'title': 'Gwent', 'image_url': 'N/A', 'year': 'N/A'},
+        ])
+        self.assertEqual(post_mock.call_args.args, ('https://api.igdb.com/v4/games',))
+        self.assertIn('search "witcher";', post_mock.call_args.kwargs['data'])
+        get_mock.assert_not_called()
+
+    @mock.patch.dict('os.environ', IGDB_ENV)
+    def test_search_v2_game_malformed_response_is_upstream_error(self):
+        with mock.patch(REQUESTS_POST, side_effect=[_igdb_token(), _igdb_response([_igdb_game(name=None)])]):
+            response = self.client.get('/api/v2/lookup/search/game/', {'q': 'witcher'})
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
+        self.assertEqual(response.json()['error']['message'], 'Unexpected response from IGDB.')
+
+    @mock.patch.dict('os.environ', IGDB_ENV)
+    def test_get_item_info_v2_serves_stored_legacy_rawg_item(self):
+        ReviewItem.objects.create(
+            item_id='rawg_3328',
+            category='game',
+            title='The Witcher 3: Wild Hunt',
+            image_url='https://example.com/w3.png',
+            year='2015-05-18',
+            attr1='RPG', attr2='CD PROJEKT RED', attr3='PC',
+            description='Desc',
+            rating='9.3',
+        )
+        with mock.patch(REQUESTS_GET) as get_mock, mock.patch(REQUESTS_POST) as post_mock:
+            response = self.client.get('/api/v2/lookup/item/game/rawg_3328/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['data']['item_id'], 'rawg_3328')
+        self.assertEqual(response.json()['data']['title'], 'The Witcher 3: Wild Hunt')
+        get_mock.assert_not_called()
+        post_mock.assert_not_called()
+
+    @mock.patch.dict('os.environ', IGDB_ENV)
+    def test_get_item_info_v2_unstored_legacy_rawg_item_is_upstream_error(self):
+        with mock.patch(REQUESTS_GET) as get_mock, mock.patch(REQUESTS_POST) as post_mock:
+            response = self.client.get('/api/v2/lookup/item/game/rawg_3328/')
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(response.json()['error']['code'], 'UPSTREAM_ERROR')
+        self.assertEqual(response.json()['error']['message'], 'Missing prefix in item id.')
+        get_mock.assert_not_called()
+        post_mock.assert_not_called()
+        self.assertFalse(ReviewItem.objects.filter(item_id='rawg_3328').exists())
 
     # --- SearchItemV2 ---
 
