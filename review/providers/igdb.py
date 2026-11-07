@@ -1,15 +1,11 @@
 import math
 import os
 import re
-from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from django.core.cache import cache
 
 from .base import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, fit_joined, unique
-
-# Anything a malformed response can make the parsing below raise.
-_PARSE_ERRORS = (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError)
 
 
 class IGDBProvider(Provider):
@@ -24,7 +20,7 @@ class IGDBProvider(Provider):
     TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
     GAMES_URL = 'https://api.igdb.com/v4/games'
     TOKEN_CACHE_KEY = 'igdb:access_token'
-    BAD_RESPONSE_MESSAGE = 'Unexpected response from IGDB.'
+    UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from IGDB.'
     # Main games, standalone expansions, remakes, remasters and expanded games,
     # without editions. DLC, expansions, bundles, mods, ports etc. are left out.
     SEARCH_FILTER = 'where version_parent = null & game_type = (0,4,8,9,10);'
@@ -108,32 +104,11 @@ class IGDBProvider(Provider):
         headers = {'Client-ID': self._client_id, 'Authorization': 'Bearer {}'.format(token)}
         return self._request_json(self.GAMES_URL, headers=headers, method='POST', data=body)
 
-    @contextmanager
-    def _parsing(self):
-        # IGDB leaves out empty fields, and any field may come back in an
-        # unexpected shape. Whatever can't be parsed is the upstream's fault.
-        try:
-            yield
-        except _PARSE_ERRORS as ex:
-            raise UpstreamError(self.BAD_RESPONSE_MESSAGE, source=self.source_name) from ex
-
     @staticmethod
     def _game_list(games) -> list:
         if not isinstance(games, list):
             raise TypeError('Expected a list of games.')
         return games
-
-    @staticmethod
-    def _is_number(value, types=(int, float)) -> bool:
-        # bool is an int subclass, but never a valid number here.
-        return isinstance(value, types) and not isinstance(value, bool)
-
-    @staticmethod
-    def _optional(value, types):
-        """`value`, which must be of `types` unless it's None."""
-        if value is not None and (not isinstance(value, types) or isinstance(value, bool)):
-            raise TypeError('Unexpected field type.')
-        return value
 
     def _names(self, entries) -> list[str]:
         # Entries are objects; one without a name is dropped.

@@ -1,5 +1,6 @@
 import time
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -18,6 +19,8 @@ DEFAULT_REQUEST_HEADERS = {
 }
 MISSING_PREFIX_MESSAGE = "Missing prefix in item id."
 BAD_RESPONSE_MESSAGE = "Bad response from API."
+# Anything a malformed response can make a provider's parsing raise.
+_PARSE_ERRORS = (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError)
 
 
 class ProviderError(Exception):
@@ -230,6 +233,8 @@ class Provider(ABC):
     prefix: str
     category: Optional[str]
     source_name: str
+    # The UpstreamError message for a response that can't be parsed.
+    UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from API.'
 
     @abstractmethod
     def search(self, query: str) -> list[ItemSummary]:
@@ -247,3 +252,25 @@ class Provider(ABC):
 
     def _request_json(self, url: str, headers: Optional[dict]=None, method: str='GET', data=None) -> dict:
         return request_json_with_retry(url, source_name=self.source_name, headers=headers, method=method, data=data)
+
+    @contextmanager
+    def _parsing(self):
+        # Providers leave out empty fields, and any field may come back in an
+        # unexpected shape. Whatever can't be parsed is the upstream's fault.
+        # Keep requests out of this block: requests' exceptions are OSErrors.
+        try:
+            yield
+        except _PARSE_ERRORS as ex:
+            raise UpstreamError(self.UNEXPECTED_RESPONSE_MESSAGE, source=self.source_name) from ex
+
+    @staticmethod
+    def _is_number(value, types=(int, float)) -> bool:
+        # bool is an int subclass, but never a valid number here.
+        return isinstance(value, types) and not isinstance(value, bool)
+
+    @staticmethod
+    def _optional(value, types):
+        """`value`, which must be of `types` unless it's None."""
+        if value is not None and (not isinstance(value, types) or isinstance(value, bool)):
+            raise TypeError('Unexpected field type.')
+        return value
