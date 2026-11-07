@@ -29,6 +29,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Internal Server Error
+  /api/v3/tags:
+    get:
+      operationId: tags_list
+      description: Tags from the user's reviews, most used first, then by name. Tags
+        are grouped case-insensitively and returned in their most frequent spelling.
+      summary: List a user's most-used tags
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: Maximum number of tags. Default 10; values above 50 are cut down
+          to 50, and invalid values fall back to the default.
+      - in: query
+        name: username
+        schema:
+          type: string
+        description: Whose tags to count. Defaults to the logged-in user; required
+          when not logged in.
+      tags:
+      - tags
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+          description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
 components:
   schemas:
     Category:
@@ -115,6 +165,42 @@ components:
       required:
       - id
       - label
+    Tag:
+      type: object
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+          description: How many times the tag is used in the reviews
+      required:
+      - count
+      - name
+    TagListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 tags:
 - name: categories
   description: Review categories and their data sources
+- name: tags
+  description: A user's most-used review tags

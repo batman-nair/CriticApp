@@ -51,7 +51,7 @@ def most_used_tags(username, limit):
 
 class TagSerializer(serializers.Serializer):
     name = serializers.CharField()
-    count = serializers.IntegerField(help_text='Number of reviews with this tag')
+    count = serializers.IntegerField(help_text='How many times the tag is used in the reviews')
 
 
 class TagListView(V3APIView):
