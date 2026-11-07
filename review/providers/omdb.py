@@ -21,7 +21,9 @@ def normalize_imdb_title_url_to_item_id(value: str) -> Optional[str]:
 
 
 def _value(text: Optional[str]) -> Optional[str]:
-    # OMDb fills unknown fields with "N/A".
+    # OMDb fills unknown fields with "N/A", and may leave them out. A value
+    # that isn't text is a malformed response.
+    text = Provider._optional(text, str)
     return None if not text or text == "N/A" else text
 
 
@@ -32,6 +34,7 @@ def _split(text: Optional[str]) -> list[str]:
 
 class OMDbProvider(Provider):
     source_name = 'OMDB API'
+    UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from OMDb.'
     # Movies and series share the prefix, so ids from before the split stay valid.
     prefix = 'omdb_'
 
@@ -53,15 +56,23 @@ class OMDbProvider(Provider):
         search_url = '{base_url}&type={type}&s={movie_name}'.format(
             base_url=self._base_url, type=self.category, movie_name=quote(query))
         omdb_json = self._request_json(search_url)
-        self._raise_for_error(omdb_json)
-        return [self._summary(item, self.category) for item in omdb_json.get("Search", [])[:10]]
+        with self._parsing():
+            self._raise_for_error(omdb_json)
+            entries = self._optional(omdb_json.get("Search"), list) or []
+            return [self._summary(item, self.category) for item in entries[:10]]
 
     def get_details(self, item_id: str) -> ItemDetails:
         imdb_id = self._strip_prefix(item_id)
         info_url = '{base_url}&i={imdb_id}'.format(base_url=self._base_url, imdb_id=imdb_id)
         omdb_json = self._request_json(info_url)
+        with self._parsing():
+            return self._details(omdb_json)
+
+    def _details(self, omdb_json: dict) -> ItemDetails:
         self._raise_for_error(omdb_json)
-        is_series = omdb_json.get("Type") == "series"
+        # Read before the category check, so a malformed Type isn't taken for a movie.
+        media_type = _value(omdb_json.get("Type"))
+        is_series = media_type == "series"
         if self.category is None:
             category = 'series' if is_series else 'movie'
         elif is_series != (self.category == 'series'):
@@ -73,15 +84,15 @@ class OMDbProvider(Provider):
         summary = self._summary(omdb_json, category)
         creators = []
         for role in ["Director", "Writer", "Actors"]:
-            creators += _split(omdb_json[role])
+            creators += _split(omdb_json.get(role))
         return ItemDetails.from_summary(
             summary,
-            genres=_split(omdb_json["Genre"]),
+            genres=_split(omdb_json.get("Genre")),
             creators=unique(creators),
             languages=_split(omdb_json.get("Language")),
-            description=_value(omdb_json["Plot"]),
+            description=_value(omdb_json.get("Plot")),
             provider_rating=self._rating(omdb_json.get("imdbRating")),
-            media_type=omdb_json["Type"],
+            media_type=media_type,
         )
 
     def _raise_for_error(self, omdb_json: dict):
@@ -95,12 +106,18 @@ class OMDbProvider(Provider):
         raise UpstreamError(error, source=self.source_name)
 
     def _summary(self, omdb_json: dict, category: str) -> ItemSummary:
+        imdb_id = omdb_json["imdbID"]
+        title = omdb_json["Title"]
+        if not isinstance(imdb_id, str) or not imdb_id:
+            raise ValueError('Missing IMDb id.')
+        if not isinstance(title, str) or not title:
+            raise ValueError('Missing title.')
         return ItemSummary(
-            item_id=self.prefix + omdb_json["imdbID"],
+            item_id=self.prefix + imdb_id,
             category=category,
-            title=omdb_json["Title"],
-            image_url=_value(omdb_json["Poster"]),
-            year=_value(omdb_json["Year"]),
+            title=title,
+            image_url=_value(omdb_json.get("Poster")),
+            year=_value(omdb_json.get("Year")),
         )
 
     @staticmethod

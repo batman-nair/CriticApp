@@ -18,7 +18,7 @@ from review.providers import (
     get_provider,
     provider_for_item_id,
 )
-from review.providers.base import request_json_with_retry
+from review.providers.base import _PARSE_ERRORS, request_json_with_retry
 from review.providers.igdb import IGDBProvider
 from review.providers.mal import MALProvider
 from review.providers.omdb import OMDbProvider, normalize_imdb_title_url_to_item_id
@@ -44,6 +44,24 @@ class _ResponseStub:
         if self._invalid_json:
             raise ValueError('not json')
         return self._json_data
+
+
+def _json_response(json_data, status_code=200, reason=''):
+    """A response with exactly this body; _ResponseStub turns None or [] into {}."""
+    response = _ResponseStub(status_code, reason=reason)
+    response._json_data = json_data
+    return response
+
+
+# Removes a key from the payload builders below (_omdb_title, _mal_node, _igdb_game).
+_DROP = object()
+
+
+def _assert_bad_response(testcase, exception, message, source):
+    testcase.assertIsInstance(exception, UpstreamError)
+    testcase.assertEqual(exception.message, message)
+    testcase.assertEqual(exception.source, source)
+    testcase.assertIsInstance(exception.__cause__, _PARSE_ERRORS)
 
 
 class RequestJsonRetryTest(SimpleTestCase):
@@ -238,7 +256,7 @@ def _mal_node(mal_id, mean=8.5, **extra):
     if mean is not None:
         node['mean'] = mean
     node.update(extra)
-    return node
+    return {key: value for key, value in node.items() if value is not _DROP}
 
 
 @mock.patch(RECORD_USAGE, new=mock.Mock())
@@ -377,6 +395,105 @@ class MALProviderTest(SimpleTestCase):
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
 
+    def test_optional_fields_null_or_missing(self):
+        optional = ['main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis']
+        for missing in (_DROP, None):
+            for category in ('anime', 'manga'):
+                with self.subTest(missing='absent' if missing is _DROP else 'null', category=category):
+                    node = _mal_node(5, **{key: missing for key in optional})
+                    with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                        details = MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                    self.assertEqual(details.to_review_item_fields(), {
+                        'item_id': 'mal_{}_5'.format(category),
+                        'category': category,
+                        'title': 'Title 5',
+                        'image_url': 'N/A',
+                        'year': 'N/A',
+                        'attr1': '',
+                        'attr2': '',
+                        'attr3': 'N/A',
+                        'description': '',
+                        'rating': 'N/A',
+                    })
+
+    def test_entries_without_a_name_are_dropped(self):
+        genres = [{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'Action'}]
+        anime = _mal_node(5, genres=genres, studios=[{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'MAPPA'}])
+        manga = _mal_node(5, genres=genres, authors=[
+            {'node': {'id': 1}},
+            {'node': {'id': 2, 'first_name': None, 'last_name': None}},
+            {'node': {'id': 3, 'first_name': None, 'last_name': 'Miura'}},
+        ])
+        for category, node, creators in (('anime', anime, ['MAPPA']), ('manga', manga, ['Miura'])):
+            with self.subTest(category=category):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                    details = MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                self.assertEqual(details.genres, ['Action'])
+                self.assertEqual(details.creators, creators)
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Node values that are wrong in a search result and in the details alike.
+        node_cases = [
+            ('id missing', {'id': _DROP}),
+            ('id null', {'id': None}),
+            ('id text', {'id': '5'}),
+            ('id bool', {'id': True}),
+            ('title missing', {'title': _DROP}),
+            ('title null', {'title': None}),
+            ('title empty', {'title': ''}),
+            ('title not text', {'title': 5}),
+            ('main_picture not an object', {'main_picture': 'https://img/5l.jpg'}),
+            ('picture url not text', {'main_picture': {'large': 5}}),
+            ('start_date not text', {'start_date': 2019}),
+            ('end_date not text', {'end_date': ['2019']}),
+        ]
+        anime_cases = [
+            ('genres not a list', {'genres': 'Action'}),
+            ('genres not objects', {'genres': [1, 2]}),
+            ('genre name not text', {'genres': [{'id': 1, 'name': 5}]}),
+            ('studios not a list', {'studios': {'name': 'MAPPA'}}),
+            ('studios not objects', {'studios': [1]}),
+            ('studio name not text', {'studios': [{'id': 1, 'name': ['MAPPA']}]}),
+            ('mean text', {'mean': '8.5'}),
+            ('mean bool', {'mean': True}),
+            ('synopsis not text', {'synopsis': 5}),
+            ('media_type not text', {'media_type': ['tv']}),
+        ]
+        manga_cases = [
+            ('authors not a list', {'authors': 'Kentarou Miura'}),
+            ('authors not objects', {'authors': [5]}),
+            ('author without node', {'authors': [{'role': 'Art'}]}),
+            ('author node not an object', {'authors': [{'node': 1868}]}),
+            ('author name not text', {'authors': [{'node': {'id': 1868, 'first_name': 5}}]}),
+        ]
+        body_cases = [
+            ('body is a list', [_mal_node(5)]),
+            ('body is null', None),
+        ]
+        search_cases = body_cases + [
+            ('data not a list', {'data': {'node': _mal_node(5)}}),
+            ('entry not an object', {'data': ['Title 5']}),
+            ('entry without node', {'data': [{}]}),
+            ('node not an object', {'data': [{'node': 5}]}),
+            ('one bad entry among good ones', {'data': [{'node': _mal_node(1)}, {'node': _mal_node(2, title=None)}]}),
+        ] + [(name, {'data': [{'node': _mal_node(5, **extra)}]}) for name, extra in node_cases]
+        cases = [('search', 'anime', name, payload) for name, payload in search_cases]
+        cases += [('get_details', 'anime', name, payload) for name, payload in body_cases]
+        cases += [('get_details', 'anime', name, _mal_node(5, **extra)) for name, extra in node_cases + anime_cases]
+        cases += [('get_details', 'manga', name, _mal_node(5, **extra)) for name, extra in manga_cases]
+        for method, category, name, payload in cases:
+            with self.subTest(method=method, category=category, case=name):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            MALProvider(category).search('frieren')
+                        else:
+                            MALProvider(category).get_details('mal_{}_5'.format(category))
+
+                _assert_bad_response(self, ctx.exception, 'Unexpected response from MAL.', 'MAL API')
+
 
 def _omdb_title(type_='movie', **extra):
     data = {
@@ -395,7 +512,7 @@ def _omdb_title(type_='movie', **extra):
         'Language': 'English, Spanish',
     }
     data.update(extra)
-    return data
+    return {key: value for key, value in data.items() if value is not _DROP}
 
 
 @mock.patch(RECORD_USAGE, new=mock.Mock())
@@ -576,21 +693,99 @@ class OMDbProviderTest(SimpleTestCase):
 
         get_mock.assert_not_called()
 
+    def test_optional_keys_missing_or_null(self):
+        optional = ['Poster', 'Year', 'Genre', 'Director', 'Writer', 'Actors', 'Plot', 'imdbRating', 'Language', 'Type']
+        for missing in (_DROP, None):
+            with self.subTest(missing='absent' if missing is _DROP else 'null'):
+                title = _omdb_title(**{key: missing for key in optional})
+                with mock.patch(REQUESTS_GET, return_value=_json_response(title)):
+                    details = OMDbProvider('movie').get_details('omdb_tt0903747')
+                with mock.patch(REQUESTS_GET, return_value=_json_response({'Response': 'True', 'Search': [title]})):
+                    results = OMDbProvider('movie').search('breaking')
+
+                self.assertEqual(details.to_review_item_fields(), {
+                    'item_id': 'omdb_tt0903747',
+                    'category': 'movie',
+                    'title': 'Breaking Bad',
+                    'image_url': 'N/A',
+                    'year': 'N/A',
+                    'attr1': 'N/A',
+                    'attr2': '',
+                    # No Type: the movie default.
+                    'attr3': 'N/A',
+                    'language': '',
+                    'description': 'N/A',
+                    'rating': 'N/A',
+                })
+                self.assertEqual(results[0].to_search_result(), {
+                    'item_id': 'omdb_tt0903747', 'title': 'Breaking Bad', 'image_url': 'N/A', 'year': 'N/A',
+                })
+
+    def test_search_with_null_results_is_empty(self):
+        with mock.patch(REQUESTS_GET, return_value=_json_response({'Response': 'True', 'Search': None})):
+            self.assertEqual(OMDbProvider('movie').search('breaking'), [])
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Field values that are wrong in a search result and in a title alike.
+        field_cases = [
+            ('imdbID missing', {'imdbID': _DROP}),
+            ('imdbID null', {'imdbID': None}),
+            ('imdbID empty', {'imdbID': ''}),
+            ('imdbID not text', {'imdbID': 903747}),
+            ('Title missing', {'Title': _DROP}),
+            ('Title null', {'Title': None}),
+            ('Title empty', {'Title': ''}),
+            ('Title not text', {'Title': 5}),
+            ('Poster not text', {'Poster': ['https://img/bb.jpg']}),
+            ('Year not text', {'Year': 2008}),
+        ]
+        details_field_cases = [
+            ('Genre not text', {'Genre': ['Crime']}),
+            ('Director not text', {'Director': 5}),
+            ('Actors not text', {'Actors': {'name': 'Bryan Cranston'}}),
+            ('Plot not text', {'Plot': {'short': 'A teacher.'}}),
+            ('Language not text', {'Language': ['English']}),
+            ('Type not text', {'Type': 5}),
+        ]
+        body_cases = [
+            ('body is a list', [_omdb_title()]),
+            ('body is null', None),
+            ('error message not text', {'Response': 'False', 'Error': 5}),
+        ]
+        search_cases = body_cases + [
+            ('Search not a list', {'Response': 'True', 'Search': _omdb_title()}),
+            ('entry not an object', {'Response': 'True', 'Search': ['tt0903747']}),
+            ('one bad entry among good ones', {'Response': 'True', 'Search': [_omdb_title(), _omdb_title(Title=None)]}),
+        ] + [(name, {'Response': 'True', 'Search': [_omdb_title(**extra)]}) for name, extra in field_cases]
+        details_cases = body_cases + [
+            (name, _omdb_title(**extra)) for name, extra in field_cases + details_field_cases
+        ]
+        # A series lookup checks Type first: a malformed one isn't "not a series".
+        series_cases = [('Type not text', _omdb_title('series', Type=5)), ('Type a list', _omdb_title('series', Type=['series']))]
+        cases = [('search', 'movie', name, payload) for name, payload in search_cases]
+        cases += [('get_details', 'movie', name, payload) for name, payload in details_cases]
+        cases += [('get_details', 'series', name, payload) for name, payload in series_cases]
+        for method, category, name, payload in cases:
+            with self.subTest(method=method, category=category, case=name):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            OMDbProvider(category).search('breaking')
+                        else:
+                            OMDbProvider(category).get_details('omdb_tt0903747')
+
+                    _assert_bad_response(self, ctx.exception, 'Unexpected response from OMDb.', 'OMDB API')
+
 
 IGDB_ENV = {'IGDB_CLIENT_ID': 'igdb-client-id', 'IGDB_CLIENT_SECRET': 'igdb-secret-s3cr3t'}
 IGDB_TOKEN = 'igdb-token-t0k3n'
 IGDB_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 IGDB_GAMES_URL = 'https://api.igdb.com/v4/games'
 IGDB_SEARCH_FIELDS = 'fields name,first_release_date,cover.image_id,genres.name,total_rating,platforms.name;'
-# Removes a key from _igdb_game().
-_DROP = object()
 
 
 def _igdb_response(json_data, status_code=200, reason=''):
-    response = _ResponseStub(status_code, reason=reason)
-    # _ResponseStub turns an empty list into {}.
-    response._json_data = json_data
-    return response
+    return _json_response(json_data, status_code=status_code, reason=reason)
 
 
 def _igdb_token(token=IGDB_TOKEN, expires_in=5184000):
@@ -632,10 +827,7 @@ class IGDBProviderTest(SimpleTestCase):
         cache.set(IGDBProvider.TOKEN_CACHE_KEY, IGDB_TOKEN)
 
     def _assert_bad_response(self, exception):
-        self.assertIsInstance(exception, UpstreamError)
-        self.assertEqual(exception.message, 'Unexpected response from IGDB.')
-        self.assertEqual(exception.source, 'IGDB API')
-        self.assertIsInstance(exception.__cause__, (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError))
+        _assert_bad_response(self, exception, 'Unexpected response from IGDB.', 'IGDB API')
 
     def test_requires_client_id_and_secret(self):
         for key in IGDB_ENV:
@@ -1099,12 +1291,23 @@ def ol_work(**extra):
     return {key: value for key, value in work.items() if value is not None}
 
 
-def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=200):
-    """Fake requests.get answering the Open Library search and work URLs."""
+_UNSET = object()
+
+
+def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=200, search_json=_UNSET, work_json=_UNSET):
+    """Fake requests.get answering the Open Library search and work URLs.
+
+    `search_json` and `work_json` are raw bodies, sent exactly as given, in
+    place of the docs wrapper and the default work.
+    """
     def fake_get(url, **kwargs):
         if '/search.json' in url:
+            if search_json is not _UNSET:
+                return _json_response(search_json, status_code=search_status)
             return _ResponseStub(search_status, json_data={'docs': search_docs if search_docs is not None else [ol_search_doc()]})
         if '/works/' in url and url.endswith('.json'):
+            if work_json is not _UNSET:
+                return _json_response(work_json, status_code=work_status)
             return _ResponseStub(work_status, json_data=work if work is not None else ol_work())
         raise AssertionError('Unexpected URL {}'.format(url))
     return fake_get
@@ -1290,6 +1493,42 @@ class OpenLibraryProviderTest(SimpleTestCase):
                         OpenLibraryProvider().get_details('olib_OL27482W')
 
             self.assertEqual(ctx.exception.source, 'Open Library API')
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Search bodies that are wrong for a search and for the details' lookup alike.
+        search_body_cases = [
+            ('search body is a list', [ol_search_doc()]),
+            ('search body is null', None),
+            ('docs is an object', {'docs': ol_search_doc()}),
+            ('docs is a string', {'docs': 'The Hobbit'}),
+            ('doc not an object', {'docs': ['OL27482W']}),
+            ('key not text', {'docs': [ol_search_doc(key=27482)]}),
+            ('cover_i text', {'docs': [ol_search_doc(cover_i='14627509')]}),
+            ('first_publish_year text', {'docs': [ol_search_doc(first_publish_year='1937')]}),
+        ]
+        search_cases = search_body_cases + [
+            ('one bad doc among good ones', {'docs': [ol_search_doc(), ol_search_doc('OL1W', cover_i='14627509')]}),
+        ]
+        details_cases = [(name, {'search_json': body}) for name, body in search_body_cases] + [
+            ('ratings_average text', {'search_json': {'docs': [ol_search_doc(ratings_average='4.3')]}}),
+            ('number_of_pages_median text', {'search_json': {'docs': [ol_search_doc(number_of_pages_median='310')]}}),
+            ('author_name a string', {'search_json': {'docs': [ol_search_doc(author_name='J.R.R. Tolkien')]}}),
+            ('work body is a list', {'work_json': [ol_work()]}),
+            ('work body is null', {'work_json': None}),
+            ('subjects a string', {'work_json': ol_work(subjects='Fantasy')}),
+        ]
+        cases = [('search', name, {'search_json': body}) for name, body in search_cases]
+        cases += [('get_details', name, fake_args) for name, fake_args in details_cases]
+        for method, name, fake_args in cases:
+            with self.subTest(method=method, case=name):
+                with mock.patch(REQUESTS_GET, side_effect=ol_requests_get(**fake_args)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            OpenLibraryProvider().search('hobbit')
+                        else:
+                            OpenLibraryProvider().get_details('olib_OL27482W')
+
+                _assert_bad_response(self, ctx.exception, 'Unexpected response from Open Library.', 'Open Library API')
 
 
 @mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'MAL_CLIENT_ID': 'client-123', **IGDB_ENV})

@@ -6,6 +6,7 @@ from .base import ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamErro
 
 class MALProvider(Provider):
     source_name = 'MAL API'
+    UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from MAL.'
     _COMMON_FIELDS = 'id,title,main_picture,start_date,end_date,mean'
     _DETAIL_FIELDS = {
         'anime': 'genres,studios,media_type,synopsis',
@@ -28,13 +29,14 @@ class MALProvider(Provider):
             base_url=self._base_url, search_term=quote(query), fields=self._COMMON_FIELDS)
         mal_json = self._request_json(search_url, headers=self._headers)
         results = []
-        for entry in mal_json.get("data", []):
-            item = entry["node"]
-            if not item.get("mean"):
-                continue
-            results.append(self._summary(item))
-            if len(results) >= 10:
-                break
+        with self._parsing():
+            for entry in self._optional(mal_json.get("data"), list) or []:
+                item = entry["node"]
+                if not item.get("mean"):
+                    continue
+                results.append(self._summary(item))
+                if len(results) >= 10:
+                    break
         if len(results) == 0:
             raise ItemNotFound("{} not found!".format(self.category.capitalize()))
         return results
@@ -51,35 +53,47 @@ class MALProvider(Provider):
             if ex.status_code == 404:
                 raise ItemNotFound(ex.message) from ex
             raise
+        with self._parsing():
+            return self._details(mal_json)
+
+    def _details(self, mal_json: dict) -> ItemDetails:
         if self.category == 'manga':
             creators = []
-            for entry in mal_json.get("authors", []):
+            for entry in self._optional(mal_json.get("authors"), list) or []:
                 node = entry["node"]
-                creators.append(' '.join(part for part in [node.get("first_name"), node.get("last_name")] if part))
+                names = [self._optional(node.get(key), str) for key in ("first_name", "last_name")]
+                # An author without a name is dropped by unique() below.
+                creators.append(' '.join(name for name in names if name))
         else:
-            creators = [entry["name"] for entry in mal_json.get("studios", [])]
+            creators = self._names(mal_json.get("studios"))
         return ItemDetails.from_summary(
             self._summary(mal_json),
-            genres=unique(entry["name"] for entry in mal_json.get("genres", [])),
+            genres=self._names(mal_json.get("genres")),
             creators=unique(creators),
-            media_type=mal_json.get("media_type"),
-            description=mal_json.get("synopsis") or None,
-            provider_rating=mal_json.get("mean"),
+            media_type=self._optional(mal_json.get("media_type"), str),
+            description=self._optional(mal_json.get("synopsis"), str) or None,
+            provider_rating=self._optional(mal_json.get("mean"), (int, float)),
         )
 
     def _summary(self, mal_json: dict) -> ItemSummary:
-        picture = mal_json.get("main_picture") or {}
-        start_date = mal_json.get("start_date")
-        end_date = mal_json.get("end_date")
+        mal_id = mal_json["id"]
+        title = mal_json["title"]
+        if not self._is_number(mal_id, int):
+            raise TypeError('Unexpected MAL id.')
+        if not isinstance(title, str) or not title:
+            raise ValueError('Missing title.')
+        picture = self._optional(mal_json.get("main_picture"), dict) or {}
+        start_date = self._optional(mal_json.get("start_date"), str)
+        end_date = self._optional(mal_json.get("end_date"), str)
         year = None
         if start_date:
             year = start_date[:4]
             if end_date:
                 year += '-{}'.format(end_date[:4])
         return ItemSummary(
-            item_id=self.prefix + str(mal_json["id"]),
+            item_id=self.prefix + str(mal_id),
             category=self.category,
-            title=mal_json["title"],
-            image_url=picture.get("large") or picture.get("medium") or None,
+            title=title,
+            image_url=self._optional(picture.get("large"), str) or self._optional(picture.get("medium"), str) or None,
             year=year,
         )

@@ -6,6 +6,7 @@ from .base import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provide
 
 class OpenLibraryProvider(Provider):
     source_name = 'Open Library API'
+    UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from Open Library.'
     prefix = 'olib_'
     category = 'book'
     # Open Library allows a higher request rate to clients that identify themselves.
@@ -32,7 +33,8 @@ class OpenLibraryProvider(Provider):
         search_url = '{base_url}/search.json?q={search_term}&limit=10&fields={fields}'.format(
             base_url=self._base_url, search_term=quote(query), fields=self._SEARCH_FIELDS)
         ol_json = self._request_json(search_url, headers=self._headers)
-        results = [self._summary(doc) for doc in ol_json.get("docs", []) if self._work_id(doc)]
+        with self._parsing():
+            results = [self._summary(doc) for doc in self._docs(ol_json) if self._work_id(doc)]
         if len(results) == 0:
             raise ItemNotFound("Book not found!")
         return results[:10]
@@ -45,14 +47,18 @@ class OpenLibraryProvider(Provider):
         search_url = '{base_url}/search.json?q=key:/works/{work_id}&fields={fields}'.format(
             base_url=self._base_url, work_id=work_id, fields=self._DETAIL_FIELDS)
         search_json = self._request_json(search_url, headers=self._headers)
-        docs = search_json.get("docs", [])
+        with self._parsing():
+            docs = self._docs(search_json)
         if len(docs) == 0:
             raise ItemNotFound("Book not found!")
         # The search index has author names, ratings and page counts; only the
         # work itself has the description and the full subject list.
         work_url = '{base_url}/works/{work_id}.json'.format(base_url=self._base_url, work_id=work_id)
         work_json = self._request_json(work_url, headers=self._headers)
-        doc = docs[0]
+        with self._parsing():
+            return self._details(work_id, docs[0], work_json)
+
+    def _details(self, work_id: str, doc: dict, work_json: dict) -> ItemDetails:
         summary = self._summary(doc, detailed=True)
         summary.item_id = self.prefix + work_id
         if not doc.get("cover_i"):
@@ -60,22 +66,25 @@ class OpenLibraryProvider(Provider):
         # Keyed by lower case to drop repeats like "Fiction"/"fiction". Subjects
         # with commas would read as several genres in the comma-separated list.
         genres = {}
-        for subject in (self._text(entry) for entry in work_json.get("subjects") or []):
+        for subject in (self._text(entry) for entry in self._optional(work_json.get("subjects"), list) or []):
             if subject and ':' not in subject and ',' not in subject and subject.lower() not in self._IGNORED_SUBJECTS:
                 genres.setdefault(subject.lower(), subject)
-        authors = unique(self._text(entry) for entry in doc.get("author_name") or [])
-        rating = doc.get("ratings_average")
+        authors = unique(self._text(entry) for entry in self._optional(doc.get("author_name"), list) or [])
+        rating = self._optional(doc.get("ratings_average"), (int, float))
         return ItemDetails.from_summary(
             summary,
             genres=fit_joined(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH),
             creators=fit_joined(authors, self._MAX_ATTR_LENGTH),
             description=self._text(work_json.get("description")) or None,
-            pages=doc.get("number_of_pages_median") or None,
+            pages=self._optional(doc.get("number_of_pages_median"), int) or None,
             provider_rating=round(rating * 2, 1) if rating else None,
         )
 
+    def _docs(self, search_json: dict) -> list:
+        return self._optional(search_json.get("docs"), list) or []
+
     def _work_id(self, doc: dict) -> str:
-        work_id = (doc.get("key") or "").rsplit('/', 1)[-1]
+        work_id = (self._optional(doc.get("key"), str) or "").rsplit('/', 1)[-1]
         return work_id if self._WORK_ID_RE.fullmatch(work_id) else ""
 
     @staticmethod
@@ -90,8 +99,8 @@ class OpenLibraryProvider(Provider):
         return value[:max_length] if value else "N/A"
 
     def _summary(self, doc: dict, detailed: bool=False) -> ItemSummary:
-        cover_id = doc.get("cover_i")
-        year = doc.get("first_publish_year")
+        cover_id = self._optional(doc.get("cover_i"), int)
+        year = self._optional(doc.get("first_publish_year"), int)
         return ItemSummary(
             item_id=self.prefix + self._work_id(doc),
             category=self.category,

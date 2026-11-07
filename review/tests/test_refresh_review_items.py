@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from review.models import ReviewItem
 from review.providers import ItemDetails, ItemNotFound, UpstreamError
+from review.tests.test_api_utils import _DROP, _json_response, _omdb_title
 
 
 def _details(item_id, category='movie', **fields):
@@ -305,3 +306,39 @@ class RefreshReviewItemsCommandTest(TestCase):
         with mock.patch.dict('os.environ', {'IGDB_CLIENT_ID': 'client-id', 'IGDB_CLIENT_SECRET': 'secret'}):
             self.assertIsInstance(Command()._build_provider('game'), IGDBProvider)
         self.assertEqual(Command()._provider_name_for_category('game'), 'igdb')
+
+    @mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123'})
+    def test_malformed_item_is_counted_as_failed_and_run_continues(self):
+        long_ago = timezone.now() - timedelta(days=30)
+        # Sorted by item id, so the malformed item comes first.
+        malformed = self._create_item('omdb_tt0000001', last_refreshed_at=long_ago, last_refresh_attempt_at=long_ago)
+        valid = self._create_item('omdb_tt0000002', last_refreshed_at=long_ago, last_refresh_attempt_at=long_ago)
+        responses = {
+            'tt0000001': _omdb_title(imdbID='tt0000001', Title=_DROP),
+            'tt0000002': _omdb_title(imdbID='tt0000002', Title='Fresh Title'),
+        }
+
+        def fake_get(url, **kwargs):
+            return _json_response(responses[url.rsplit('&i=', 1)[1]])
+
+        stderr = StringIO()
+        # The real OMDb provider, with only HTTP mocked.
+        with mock.patch('review.providers.base.requests.get', side_effect=fake_get), \
+                mock.patch('review.providers.base.api_usage.record_upstream_request'), \
+                mock.patch('review.management.commands.refresh_review_items.push_refresh_run_metrics') as push_mock:
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0, stderr=stderr)
+
+        malformed.refresh_from_db()
+        valid.refresh_from_db()
+        self.assertEqual(malformed.title, 'Old Title')
+        self.assertEqual(malformed.refresh_error_count, 1)
+        self.assertEqual(malformed.last_refreshed_at, long_ago)
+        self.assertEqual(valid.title, 'Fresh Title')
+        self.assertEqual(valid.refresh_error_count, 0)
+        self.assertGreater(valid.last_refreshed_at, long_ago)
+        self.assertIn('Failed refresh for omdb_tt0000001: Unexpected response from OMDb.', stderr.getvalue())
+        kwargs = push_mock.call_args.kwargs
+        self.assertTrue(kwargs['success'])
+        self.assertEqual((kwargs['processed'], kwargs['refreshed'], kwargs['failed'], kwargs['skipped']), (2, 1, 1, 0))
+        self.assertEqual(kwargs['provider_totals']['omdb']['failed'], 1)
+        self.assertEqual(kwargs['provider_totals']['omdb']['refreshed'], 1)
