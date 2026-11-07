@@ -1286,12 +1286,23 @@ def ol_work(**extra):
     return {key: value for key, value in work.items() if value is not None}
 
 
-def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=200):
-    """Fake requests.get answering the Open Library search and work URLs."""
+_UNSET = object()
+
+
+def ol_requests_get(search_docs=None, work=None, search_status=200, work_status=200, search_json=_UNSET, work_json=_UNSET):
+    """Fake requests.get answering the Open Library search and work URLs.
+
+    `search_json` and `work_json` are raw bodies, sent exactly as given, in
+    place of the docs wrapper and the default work.
+    """
     def fake_get(url, **kwargs):
         if '/search.json' in url:
+            if search_json is not _UNSET:
+                return _json_response(search_json, status_code=search_status)
             return _ResponseStub(search_status, json_data={'docs': search_docs if search_docs is not None else [ol_search_doc()]})
         if '/works/' in url and url.endswith('.json'):
+            if work_json is not _UNSET:
+                return _json_response(work_json, status_code=work_status)
             return _ResponseStub(work_status, json_data=work if work is not None else ol_work())
         raise AssertionError('Unexpected URL {}'.format(url))
     return fake_get
@@ -1477,6 +1488,42 @@ class OpenLibraryProviderTest(SimpleTestCase):
                         OpenLibraryProvider().get_details('olib_OL27482W')
 
             self.assertEqual(ctx.exception.source, 'Open Library API')
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Search bodies that are wrong for a search and for the details' lookup alike.
+        search_body_cases = [
+            ('search body is a list', [ol_search_doc()]),
+            ('search body is null', None),
+            ('docs is an object', {'docs': ol_search_doc()}),
+            ('docs is a string', {'docs': 'The Hobbit'}),
+            ('doc not an object', {'docs': ['OL27482W']}),
+            ('key not text', {'docs': [ol_search_doc(key=27482)]}),
+            ('cover_i text', {'docs': [ol_search_doc(cover_i='14627509')]}),
+            ('first_publish_year text', {'docs': [ol_search_doc(first_publish_year='1937')]}),
+        ]
+        search_cases = search_body_cases + [
+            ('one bad doc among good ones', {'docs': [ol_search_doc(), ol_search_doc('OL1W', cover_i='14627509')]}),
+        ]
+        details_cases = [(name, {'search_json': body}) for name, body in search_body_cases] + [
+            ('ratings_average text', {'search_json': {'docs': [ol_search_doc(ratings_average='4.3')]}}),
+            ('number_of_pages_median text', {'search_json': {'docs': [ol_search_doc(number_of_pages_median='310')]}}),
+            ('author_name a string', {'search_json': {'docs': [ol_search_doc(author_name='J.R.R. Tolkien')]}}),
+            ('work body is a list', {'work_json': [ol_work()]}),
+            ('work body is null', {'work_json': None}),
+            ('subjects a string', {'work_json': ol_work(subjects='Fantasy')}),
+        ]
+        cases = [('search', name, {'search_json': body}) for name, body in search_cases]
+        cases += [('get_details', name, fake_args) for name, fake_args in details_cases]
+        for method, name, fake_args in cases:
+            with self.subTest(method=method, case=name):
+                with mock.patch(REQUESTS_GET, side_effect=ol_requests_get(**fake_args)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            OpenLibraryProvider().search('hobbit')
+                        else:
+                            OpenLibraryProvider().get_details('olib_OL27482W')
+
+                _assert_bad_response(self, ctx.exception, 'Unexpected response from Open Library.', 'Open Library API')
 
 
 @mock.patch.dict('os.environ', {'OMDB_API_KEY': 'key-123', 'MAL_CLIENT_ID': 'client-123', **IGDB_ENV})
