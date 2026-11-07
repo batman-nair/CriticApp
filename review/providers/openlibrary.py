@@ -11,8 +11,8 @@ class OpenLibraryProvider(Provider):
     category = 'book'
     # Open Library allows a higher request rate to clients that identify themselves.
     USER_AGENT = 'CriticApp/1.0 (+https://github.com/batman-nair/CriticApp)'
-    _SEARCH_FIELDS = 'key,title,author_name,first_publish_year,cover_i'
-    _DETAIL_FIELDS = _SEARCH_FIELDS + ',ratings_average,number_of_pages_median'
+    _SEARCH_FIELDS = 'key,title,author_name,first_publish_year,cover_i,ratings_average'
+    _DETAIL_FIELDS = _SEARCH_FIELDS + ',number_of_pages_median'
     _WORK_ID_RE = re.compile(r'OL\d+W')
     _COVER_URL = 'https://covers.openlibrary.org/b/id/{cover_id}-{size}.jpg'
     # Without a cover this URL 404s instead of returning a blank image, so the
@@ -70,14 +70,12 @@ class OpenLibraryProvider(Provider):
             if subject and ':' not in subject and ',' not in subject and subject.lower() not in self._IGNORED_SUBJECTS:
                 genres.setdefault(subject.lower(), subject)
         authors = unique(self._text(entry) for entry in self._optional(doc.get("author_name"), list) or [])
-        rating = self._optional(doc.get("ratings_average"), (int, float))
         return ItemDetails.from_summary(
             summary,
             genres=fit_joined(list(genres.values())[:self._MAX_GENRES], self._MAX_ATTR_LENGTH),
             creators=fit_joined(authors, self._MAX_ATTR_LENGTH),
             description=self._text(work_json.get("description")) or None,
             pages=self._optional(doc.get("number_of_pages_median"), int) or None,
-            provider_rating=round(rating * 2, 1) if rating else None,
         )
 
     def _docs(self, search_json: dict) -> list:
@@ -101,10 +99,13 @@ class OpenLibraryProvider(Provider):
     def _summary(self, doc: dict, detailed: bool=False) -> ItemSummary:
         cover_id = self._optional(doc.get("cover_i"), int)
         year = self._optional(doc.get("first_publish_year"), int)
+        rating = self._optional(doc.get("ratings_average"), (int, float))
         return ItemSummary(
             item_id=self.prefix + self._work_id(doc),
             category=self.category,
             title=self._truncate(self._text(doc.get("title")), self._MAX_TITLE_LENGTH),
             image_url=self._COVER_URL.format(cover_id=cover_id, size='L' if detailed else 'M') if cover_id else None,
             year=str(year) if year else None,
+            # Genres need the work itself, a second request, so search leaves them unknown.
+            provider_rating=round(rating * 2, 1) if rating else None,
         )

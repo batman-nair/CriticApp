@@ -8,6 +8,8 @@ class MALProvider(Provider):
     source_name = 'MAL API'
     UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from MAL.'
     _COMMON_FIELDS = 'id,title,main_picture,start_date,end_date,mean'
+    # Genres come with search results at no extra cost; details ask for them below.
+    _SEARCH_FIELDS = _COMMON_FIELDS + ',genres'
     _DETAIL_FIELDS = {
         'anime': 'genres,studios,media_type,synopsis',
         'manga': 'genres,authors{first_name,last_name},media_type,synopsis',
@@ -26,7 +28,7 @@ class MALProvider(Provider):
 
     def search(self, query: str) -> list[ItemSummary]:
         search_url = '{base_url}?q={search_term}&limit=20&fields={fields}'.format(
-            base_url=self._base_url, search_term=quote(query), fields=self._COMMON_FIELDS)
+            base_url=self._base_url, search_term=quote(query), fields=self._SEARCH_FIELDS)
         mal_json = self._request_json(search_url, headers=self._headers)
         results = []
         with self._parsing():
@@ -96,4 +98,7 @@ class MALProvider(Provider):
             title=title,
             image_url=self._optional(picture.get("large"), str) or self._optional(picture.get("medium"), str) or None,
             year=year,
+            # MAL leaves out empty fields: no genres key means no genres.
+            genres=self._names(mal_json.get("genres")),
+            provider_rating=self._optional(mal_json.get("mean"), (int, float)),
         )
