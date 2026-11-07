@@ -9,7 +9,7 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 ## What It Does
 
 - Stores personal reviews across movie, series, game, anime, manga, and book categories
-- Fetches item metadata from OMDb, RAWG, MyAnimeList, and Open Library
+- Fetches item metadata from OMDb, IGDB, MyAnimeList, and Open Library
 - Supports user profiles and searchable review lists
 - Exposes API endpoints for review CRUD and item lookups
 - Includes an API usage page with Telegram quota alerts, and machine monitoring via Beszel
@@ -36,7 +36,7 @@ Start from `.env.example` and set values for:
 
 - `SECRET_KEY`
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `OMDB_API_KEY`, `RAWG_API_KEY`, `MAL_CLIENT_ID` (for metadata enrichment)
+- `OMDB_API_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `MAL_CLIENT_ID` (for metadata enrichment; the IGDB keys are a Twitch app's client ID and secret)
 
 ## Deployment
 

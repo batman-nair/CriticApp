@@ -39,7 +39,8 @@ Required keys:
 - `DB_HOST`
 - `DB_PORT`
 - `OMDB_API_KEY`
-- `RAWG_API_KEY`
+- `IGDB_CLIENT_ID`
+- `IGDB_CLIENT_SECRET`
 - `MAL_CLIENT_ID`
 
 Optional keys (quota alerts, see [Monitoring](#monitoring)):
@@ -69,6 +70,15 @@ The deployment workflow requires:
 - `ALLOWED_HOSTS` (optional but recommended)
 - `CSRF_TRUSTED_ORIGINS` (optional but recommended)
 - `LETSENCRYPT_EMAIL` (required if workflow should apply ClusterIssuer)
+
+The integration test workflow (`.github/workflows/integration.yml`) requires:
+
+- `OMDB_API_KEY`
+- `IGDB_CLIENT_ID`
+- `IGDB_CLIENT_SECRET`
+- `MAL_CLIENT_ID`
+
+`IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` are the client ID and secret of an app registered in the [Twitch developer console](https://dev.twitch.tv/console).
 
 ## First Deployment (Manual Bootstrap)
 
@@ -210,13 +220,56 @@ kubectl exec -i -n criticapp deploy/criticapp-postgres -- \
   pg_restore -U criticuser -d criticdb --clean --if-exists < criticapp_backup.dump
 ```
 
+### Map old RAWG games to IGDB (one-off)
+
+Games come from IGDB. Games reviewed before the switch still point at `rawg_` items. Those items stay viewable, but the refresh CronJob skips them, and the "Reviewed" badge and duplicate detection don't match them to IGDB games. `map_rawg_to_igdb` moves their reviews to IGDB items.
+
+Before the deploy that switches to IGDB, add `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` to `criticapp-secrets` and to the GitHub Actions secrets. Without them, game search, game refresh and the integration tests fail.
+
+1. Back up before data fixes:
+
+   ```bash
+   kubectl exec -n criticapp deploy/criticapp-postgres -- \
+     pg_dump -U criticuser -d criticdb -Fc > criticapp_$(date +%Y%m%d_%H%M%S).dump
+   ```
+
+2. Dry run (writes nothing). It prints one line per `rawg_` item with reviews, the proposed IGDB item and a status:
+
+   ```bash
+   kubectl exec -n criticapp deploy/criticapp-web -- python manage.py map_rawg_to_igdb
+   ```
+
+   | Status | Meaning | What to do |
+   |---|---|---|
+   | `MATCH` | One IGDB game with the same title and year | Nothing, `--apply` maps it |
+   | `CHECK` | Same title but the year is off by one or unknown, or the title matches only without its subtitle | Check it, then `--map` or `--skip` |
+   | `AMBIGUOUS` | Several plausible games, listed as `candidate` lines | `--map` the right one, or `--skip` |
+   | `NOT_FOUND` | Nothing in the normal games search | See the `hint` lines, then `--map` or `--skip` |
+
+   `NOT_FOUND` rows list `hint igdb_<n> ...` lines from an unfiltered search that includes DLC and expansions. Their ids go straight into `--map`.
+
+3. Apply. `MATCH` rows are mapped automatically. Every other row needs `--map` (which also overrides a `MATCH`) or `--skip`, both repeatable. Rows with neither are left alone and reported:
+
+   ```bash
+   kubectl exec -n criticapp deploy/criticapp-web -- python manage.py map_rawg_to_igdb --apply --map rawg_123=igdb_456 --skip rawg_789
+   ```
+
+   It ends with `mapped= skipped= conflicts= left=`.
+
+Notes:
+
+- Each item is mapped in its own transaction. Reviews keep their dates, so the "Recently updated" order doesn't change. The `rawg_` item is deleted once no review points at it.
+- If a user already reviewed the target IGDB game, their `rawg_` review isn't merged. It stays on the `rawg_` item and is reported as a conflict.
+- Re-running is safe. Mapped items are gone, so the next dry run shows only what's left. Running again with the same flags changes nothing.
+- If IGDB fails, the command prints the summary so far and exits non-zero. Items already mapped stay mapped.
+
 ## Monitoring
 
 Monitoring is lean on purpose: kube-prometheus-stack used about 1 GB of RAM on a ~4 GB box.
 
 - **Machine health** (CPU, memory, disk, disk I/O, network, load) comes from [Beszel](https://beszel.dev), installed on the host, outside k3s.
-- **External API usage** (OMDb, RAWG, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it at `https://<APP_DOMAIN>/usage/` (staff only).
-- **Quota alerts:** the app sends one Telegram message when OMDb reaches 80% and 100% of 1,000 requests per day, and when RAWG reaches 80% and 100% of 20,000 requests per month. The quotas live in `UPSTREAM_API_QUOTAS` in `critic/settings/common.py`. Check them against your API accounts.
+- **External API usage** (OMDb, IGDB, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it at `https://<APP_DOMAIN>/usage/` (staff only).
+- **Quota alerts:** the app sends one Telegram message when OMDb reaches 80% and 100% of 1,000 requests per day. The other APIs have no quota. The quotas live in `UPSTREAM_API_QUOTAS` in `critic/settings/common.py`. Check them against your API accounts.
 - **Prod integration tests:** a daily CronJob runs the integration test suite against the real APIs with prod's keys, and sends one Telegram message naming the failed tests (see below).
 - **Box down:** Beszel's hub runs on the same machine, so it can't report the machine being down. Use an outside check (below).
 
@@ -264,7 +317,7 @@ Install the hub and the agent on the host with the official scripts, which set u
 
 ### Daily prod integration tests
 
-CronJob manifest: `k8s/integration-cronjob.yaml`. The deploy workflow applies it after a successful web rollout, pinned to the deployed commit's image tag, so it tests the image that is live. A plain `kubectl apply -f` of the file uses `:latest` instead. If any of `OMDB_API_KEY`, `RAWG_API_KEY` or `MAL_CLIENT_ID` is missing from `criticapp-secrets`, it alerts about the missing keys without running the tests. It runs `python manage.py run_integration_checks` daily at 06:30 UTC. That command runs `pytest -m integration` in the prod image with prod's API keys but under `critic.settings.test`, so it never touches the prod database. If any test fails, errors or the run times out, it sends one Telegram message listing the failed tests and exits non-zero. A passing run sends nothing. Failed runs aren't retried, so there's one alert per failure.
+CronJob manifest: `k8s/integration-cronjob.yaml`. The deploy workflow applies it after a successful web rollout, pinned to the deployed commit's image tag, so it tests the image that is live. A plain `kubectl apply -f` of the file uses `:latest` instead. If any of `OMDB_API_KEY`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` or `MAL_CLIENT_ID` is missing from `criticapp-secrets`, it alerts about the missing keys without running the tests. It runs `python manage.py run_integration_checks` daily at 06:30 UTC. That command runs `pytest -m integration` in the prod image with prod's API keys but under `critic.settings.test`, so it never touches the prod database. If any test fails, errors or the run times out, it sends one Telegram message listing the failed tests and exits non-zero. A passing run sends nothing. Failed runs aren't retried, so there's one alert per failure.
 
 Run it now and read the result:
 

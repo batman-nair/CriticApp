@@ -11,7 +11,7 @@ from review.utils import api_usage
 
 TEST_SETTINGS_MODULE = 'critic.settings.test'
 # Test settings replace missing keys with dummies, which would look like an upstream failure.
-REQUIRED_KEYS = ('OMDB_API_KEY', 'RAWG_API_KEY', 'MAL_CLIENT_ID')
+REQUIRED_KEYS = ('OMDB_API_KEY', 'IGDB_CLIENT_ID', 'IGDB_CLIENT_SECRET', 'MAL_CLIENT_ID')
 RUN_TIMEOUT_SECONDS = 15 * 60
 MAX_REASON_LENGTH = 200
 # Telegram messages are capped at 4096 characters.

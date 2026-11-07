@@ -5,11 +5,12 @@ import os
 
 DEBUG = False
 
-# External APIs are mocked in non-integration tests, but review/views.py
-# builds the API clients at import time and they require a key. Real keys
-# from the environment or .env still take precedence.
+# External APIs are mocked in non-integration tests, but providers are built
+# per call and require their keys. Real keys from the environment or .env
+# still take precedence.
 os.environ.setdefault('OMDB_API_KEY', 'test-dummy')
-os.environ.setdefault('RAWG_API_KEY', 'test-dummy')
+os.environ.setdefault('IGDB_CLIENT_ID', 'test-dummy')
+os.environ.setdefault('IGDB_CLIENT_SECRET', 'test-dummy')
 os.environ.setdefault('MAL_CLIENT_ID', 'test-dummy')
 
 # SQLite by default; set TEST_DB_ENGINE=postgresql to test against Postgres
