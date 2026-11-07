@@ -70,7 +70,9 @@ class OMDbProvider(Provider):
 
     def _details(self, omdb_json: dict) -> ItemDetails:
         self._raise_for_error(omdb_json)
-        is_series = omdb_json.get("Type") == "series"
+        # Read before the category check, so a malformed Type isn't taken for a movie.
+        media_type = _value(omdb_json.get("Type"))
+        is_series = media_type == "series"
         if self.category is None:
             category = 'series' if is_series else 'movie'
         elif is_series != (self.category == 'series'):
@@ -90,7 +92,7 @@ class OMDbProvider(Provider):
             languages=_split(omdb_json.get("Language")),
             description=_value(omdb_json.get("Plot")),
             provider_rating=self._rating(omdb_json.get("imdbRating")),
-            media_type=_value(omdb_json.get("Type")),
+            media_type=media_type,
         )
 
     def _raise_for_error(self, omdb_json: dict):

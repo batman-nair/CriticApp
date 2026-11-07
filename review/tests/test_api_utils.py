@@ -18,7 +18,7 @@ from review.providers import (
     get_provider,
     provider_for_item_id,
 )
-from review.providers.base import request_json_with_retry
+from review.providers.base import _PARSE_ERRORS, request_json_with_retry
 from review.providers.igdb import IGDBProvider
 from review.providers.mal import MALProvider
 from review.providers.omdb import OMDbProvider, normalize_imdb_title_url_to_item_id
@@ -55,14 +55,13 @@ def _json_response(json_data, status_code=200, reason=''):
 
 # Removes a key from the payload builders below (_omdb_title, _mal_node, _igdb_game).
 _DROP = object()
-_PARSE_ERROR_TYPES = (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError)
 
 
 def _assert_bad_response(testcase, exception, message, source):
     testcase.assertIsInstance(exception, UpstreamError)
     testcase.assertEqual(exception.message, message)
     testcase.assertEqual(exception.source, source)
-    testcase.assertIsInstance(exception.__cause__, _PARSE_ERROR_TYPES)
+    testcase.assertIsInstance(exception.__cause__, _PARSE_ERRORS)
 
 
 class RequestJsonRetryTest(SimpleTestCase):
@@ -455,6 +454,7 @@ class MALProviderTest(SimpleTestCase):
             ('genres not objects', {'genres': [1, 2]}),
             ('genre name not text', {'genres': [{'id': 1, 'name': 5}]}),
             ('studios not a list', {'studios': {'name': 'MAPPA'}}),
+            ('studios not objects', {'studios': [1]}),
             ('studio name not text', {'studios': [{'id': 1, 'name': ['MAPPA']}]}),
             ('mean text', {'mean': '8.5'}),
             ('mean bool', {'mean': True}),
@@ -463,6 +463,7 @@ class MALProviderTest(SimpleTestCase):
         ]
         manga_cases = [
             ('authors not a list', {'authors': 'Kentarou Miura'}),
+            ('authors not objects', {'authors': [5]}),
             ('author without node', {'authors': [{'role': 'Art'}]}),
             ('author node not an object', {'authors': [{'node': 1868}]}),
             ('author name not text', {'authors': [{'node': {'id': 1868, 'first_name': 5}}]}),
@@ -759,15 +760,19 @@ class OMDbProviderTest(SimpleTestCase):
         details_cases = body_cases + [
             (name, _omdb_title(**extra)) for name, extra in field_cases + details_field_cases
         ]
-        for method, payload_cases in [('search', search_cases), ('get_details', details_cases)]:
-            for name, payload in payload_cases:
-                with self.subTest(method=method, case=name):
-                    with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
-                        with self.assertRaises(ProviderError) as ctx:
-                            if method == 'search':
-                                OMDbProvider('movie').search('breaking')
-                            else:
-                                OMDbProvider('movie').get_details('omdb_tt0903747')
+        # A series lookup checks Type first: a malformed one isn't "not a series".
+        series_cases = [('Type not text', _omdb_title('series', Type=5)), ('Type a list', _omdb_title('series', Type=['series']))]
+        cases = [('search', 'movie', name, payload) for name, payload in search_cases]
+        cases += [('get_details', 'movie', name, payload) for name, payload in details_cases]
+        cases += [('get_details', 'series', name, payload) for name, payload in series_cases]
+        for method, category, name, payload in cases:
+            with self.subTest(method=method, category=category, case=name):
+                with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
+                    with self.assertRaises(ProviderError) as ctx:
+                        if method == 'search':
+                            OMDbProvider(category).search('breaking')
+                        else:
+                            OMDbProvider(category).get_details('omdb_tt0903747')
 
                     _assert_bad_response(self, ctx.exception, 'Unexpected response from OMDb.', 'OMDB API')
 
