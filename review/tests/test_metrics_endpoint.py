@@ -48,3 +48,9 @@ def test_normalize_provider_maps_open_library_source():
     from review.utils.metrics import normalize_provider
 
     assert normalize_provider('Open Library API') == 'openlibrary'
+
+
+def test_normalize_provider_maps_igdb_source():
+    from review.utils.metrics import normalize_provider
+
+    assert normalize_provider('IGDB API') == 'igdb'

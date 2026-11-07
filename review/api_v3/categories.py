@@ -32,7 +32,7 @@ class Category:
 CATEGORIES: tuple[Category, ...] = (
     Category('movie', 'Movies', source='OMDb', rating_label='IMDb'),
     Category('series', 'Series', source='OMDb', rating_label='IMDb'),
-    Category('game', 'Games', source='RAWG', rating_label='RAWG'),
+    Category('game', 'Games', source='IGDB', rating_label='IGDB'),
     Category('anime', 'Anime', source='MyAnimeList', rating_label='MyAnimeList', subcategories=(
         Subcategory('anime:series', 'Anime series'),
         Subcategory('anime:movie', 'Anime movies'),
