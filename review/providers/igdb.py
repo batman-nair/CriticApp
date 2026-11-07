@@ -31,7 +31,8 @@ class IGDBProvider(Provider):
     _SEARCH_FIELDS = 'name,first_release_date,cover.image_id,genres.name,total_rating,platforms.name'
     _DETAIL_FIELDS = _SEARCH_FIELDS + ',summary,involved_companies.company.name,involved_companies.developer'
     _COVER_URL = 'https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg'
-    _GAME_ID_RE = re.compile(r'[0-9]+')
+    # No leading zeros: the stored item id is rebuilt from IGDB's number.
+    _GAME_ID_RE = re.compile(r'[1-9][0-9]*')
     # Column sizes of ReviewItem.
     _MAX_TITLE_LENGTH = 100
     _MAX_ATTR_LENGTH = 300
@@ -90,12 +91,16 @@ class IGDBProvider(Provider):
         return token
 
     def _query(self, body: str):
-        try:
+        token = cache.get(self.TOKEN_CACHE_KEY)
+        if not token:
+            # A token fetched just now that IGDB refuses won't do better on a second try.
             return self._post_query(body, self._access_token())
+        try:
+            return self._post_query(body, token)
         except UpstreamError as ex:
             if ex.status_code != 401:
                 raise
-        # The token was revoked or expired early: get a new one and try once more.
+        # The cached token was revoked or expired early: get a new one and try once more.
         cache.delete(self.TOKEN_CACHE_KEY)
         return self._post_query(body, self._access_token())
 

@@ -92,12 +92,12 @@ def request_json_with_retry(url: str, source_name: str='Upstream API', retries: 
 
         if response_obj.status_code == 200:
             try:
-                data = response_obj.json()
+                response_json = response_obj.json()
             except ValueError as ex:
                 metrics.record_upstream_api_call(source_name, 'invalid_json')
                 raise UpstreamError("Invalid JSON from upstream API.", source=source_name) from ex
             metrics.record_upstream_api_call(source_name, 'success')
-            return data
+            return response_json
 
         if response_obj.status_code in RETRY_STATUS_CODES and attempt < retries - 1:
             retry_after = response_obj.headers.get('Retry-After')

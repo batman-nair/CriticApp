@@ -687,8 +687,8 @@ class IGDBProviderTest(SimpleTestCase):
         self.assertEqual(record_usage.call_args_list, [mock.call('IGDB API'), mock.call('IGDB API')])
 
     def test_401_refetches_the_token_and_retries_once(self):
+        cache.set('igdb:access_token', 'old-token')
         responses = [
-            _igdb_token('old-token'),
             _igdb_response({}, status_code=401, reason='Unauthorized'),
             _igdb_token('new-token'),
             _igdb_response([_igdb_game()]),
@@ -698,10 +698,22 @@ class IGDBProviderTest(SimpleTestCase):
 
         self.assertEqual([result.item_id for result in results], ['igdb_1942'])
         urls = [call.args[0] for call in post_mock.call_args_list]
-        self.assertEqual(urls, [IGDB_TOKEN_URL, IGDB_GAMES_URL, IGDB_TOKEN_URL, IGDB_GAMES_URL])
-        self.assertEqual(post_mock.call_args_list[1].kwargs['headers']['Authorization'], 'Bearer old-token')
-        self.assertEqual(post_mock.call_args_list[3].kwargs['headers']['Authorization'], 'Bearer new-token')
+        self.assertEqual(urls, [IGDB_GAMES_URL, IGDB_TOKEN_URL, IGDB_GAMES_URL])
+        self.assertEqual(post_mock.call_args_list[0].kwargs['headers']['Authorization'], 'Bearer old-token')
+        self.assertEqual(post_mock.call_args_list[2].kwargs['headers']['Authorization'], 'Bearer new-token')
         self.assertEqual(cache.get('igdb:access_token'), 'new-token')
+
+    def test_401_on_a_fresh_token_is_not_retried(self):
+        responses = [
+            _igdb_token('new-token'),
+            _igdb_response({}, status_code=401, reason='Unauthorized'),
+        ]
+        with mock.patch(REQUESTS_POST, side_effect=responses) as post_mock:
+            with self.assertRaises(UpstreamError) as ctx:
+                IGDBProvider().search('witcher')
+
+        self.assertEqual(post_mock.call_count, 2)
+        self.assertEqual(ctx.exception.status_code, 401)
 
     def test_401_on_a_cached_token_refetches_it(self):
         self._with_cached_token()
@@ -717,8 +729,8 @@ class IGDBProviderTest(SimpleTestCase):
         self.assertEqual(cache.get('igdb:access_token'), 'new-token')
 
     def test_second_401_is_upstream_error(self):
+        cache.set('igdb:access_token', 'old-token')
         responses = [
-            _igdb_token('old-token'),
             _igdb_response({}, status_code=401, reason='Unauthorized'),
             _igdb_token('new-token'),
             _igdb_response({}, status_code=401, reason='Unauthorized'),
@@ -727,7 +739,7 @@ class IGDBProviderTest(SimpleTestCase):
             with self.assertRaises(UpstreamError) as ctx:
                 IGDBProvider().search('witcher')
 
-        self.assertEqual(post_mock.call_count, 4)
+        self.assertEqual(post_mock.call_count, 3)
         self.assertEqual(ctx.exception.status_code, 401)
         self.assertEqual(ctx.exception.source, 'IGDB API')
 
@@ -955,7 +967,7 @@ class IGDBProviderTest(SimpleTestCase):
         self.assertTrue(fields['attr3'].endswith('Platform number 14'))
 
     def test_details_rejects_invalid_ids(self):
-        for item_id in ['igdb_', 'igdb_12a', 'igdb_-1', 'igdb_1; fields *', 'igdb_²', 'rawg_1942', '1942']:
+        for item_id in ['igdb_', 'igdb_12a', 'igdb_-1', 'igdb_0', 'igdb_01942', 'igdb_1; fields *', 'igdb_²', 'rawg_1942', '1942']:
             with self.subTest(item_id=item_id):
                 with mock.patch(REQUESTS_POST) as post_mock:
                     with self.assertRaises(InvalidItemId) as ctx:
