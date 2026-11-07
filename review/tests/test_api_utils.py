@@ -264,7 +264,7 @@ class MALProviderTest(SimpleTestCase):
         self.assertEqual(len(results), 10)
         self.assertEqual(results[0].category, 'anime')
         self.assertEqual(results[0].to_search_result(), {
-            'item_id': 'jikan_anime_2',
+            'item_id': 'mal_anime_2',
             'title': 'Title 2',
             'image_url': 'https://img/2l.jpg',
             'year': '2019-2019',
@@ -294,7 +294,7 @@ class MALProviderTest(SimpleTestCase):
             synopsis='Demons.',
         )
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=node)) as get_mock:
-            details = MALProvider('anime').get_details('jikan_anime_38000')
+            details = MALProvider('anime').get_details('mal_anime_38000')
 
         url = get_mock.call_args.args[0]
         self.assertTrue(url.startswith('https://api.myanimelist.net/v2/anime/38000?fields='))
@@ -305,7 +305,7 @@ class MALProviderTest(SimpleTestCase):
         self.assertEqual(details.media_type, 'tv')
         self.assertEqual(details.provider_rating, 8.5)
         self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'jikan_anime_38000',
+            'item_id': 'mal_anime_38000',
             'category': 'anime',
             'title': 'Title 38000',
             'image_url': 'https://img/38000l.jpg',
@@ -329,11 +329,11 @@ class MALProviderTest(SimpleTestCase):
             synopsis='Guts.',
         )
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=node)) as get_mock:
-            details = MALProvider('manga').get_details('jikan_manga_2')
+            details = MALProvider('manga').get_details('mal_manga_2')
 
         self.assertIn('authors{first_name,last_name}', get_mock.call_args.args[0])
         fields = details.to_review_item_fields()
-        self.assertEqual(fields['item_id'], 'jikan_manga_2')
+        self.assertEqual(fields['item_id'], 'mal_manga_2')
         self.assertEqual(fields['category'], 'manga')
         self.assertEqual(fields['year'], '2019')
         self.assertEqual(fields['attr2'], 'Kentarou Miura, Studio Gaga')
@@ -342,13 +342,13 @@ class MALProviderTest(SimpleTestCase):
     def test_details_with_missing_optional_fields(self):
         node = {'id': 5, 'title': 'Bare'}
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=node)):
-            details = MALProvider('anime').get_details('jikan_anime_5')
+            details = MALProvider('anime').get_details('mal_anime_5')
 
         self.assertIsNone(details.image_url)
         self.assertIsNone(details.year)
         self.assertIsNone(details.provider_rating)
         self.assertEqual(details.to_review_item_fields(), {
-            'item_id': 'jikan_anime_5',
+            'item_id': 'mal_anime_5',
             'category': 'anime',
             'title': 'Bare',
             'image_url': 'N/A',
@@ -363,7 +363,7 @@ class MALProviderTest(SimpleTestCase):
     def test_details_for_unknown_id_is_not_found(self):
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(404, reason='Not Found')):
             with self.assertRaises(ItemNotFound) as ctx:
-                MALProvider('anime').get_details('jikan_anime_999999999')
+                MALProvider('anime').get_details('mal_anime_999999999')
 
         self.assertEqual(ctx.exception.message, 'Bad response from API.')
         # The refresh command logs the status from the original error.
@@ -372,7 +372,7 @@ class MALProviderTest(SimpleTestCase):
     def test_details_requires_prefix(self):
         with mock.patch(REQUESTS_GET) as get_mock:
             with self.assertRaises(InvalidItemId) as ctx:
-                MALProvider('anime').get_details('jikan_manga_2')
+                MALProvider('anime').get_details('mal_manga_2')
 
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
@@ -1260,7 +1260,7 @@ class OpenLibraryProviderTest(SimpleTestCase):
     def test_details_requires_prefix(self):
         with mock.patch(REQUESTS_GET) as get_mock:
             with self.assertRaises(InvalidItemId) as ctx:
-                OpenLibraryProvider().get_details('jikan_manga_2')
+                OpenLibraryProvider().get_details('mal_manga_2')
 
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
@@ -1327,8 +1327,8 @@ class RegistryTest(SimpleTestCase):
         expected = {
             'omdb_tt0903747': (OMDbProvider, None),
             'igdb_1942': (IGDBProvider, 'game'),
-            'jikan_anime_38000': (MALProvider, 'anime'),
-            'jikan_manga_2': (MALProvider, 'manga'),
+            'mal_anime_38000': (MALProvider, 'anime'),
+            'mal_manga_2': (MALProvider, 'manga'),
             'olib_OL27482W': (OpenLibraryProvider, 'book'),
         }
         for item_id, (provider_class, category) in expected.items():
@@ -1337,7 +1337,7 @@ class RegistryTest(SimpleTestCase):
             self.assertEqual(provider.category, category)
 
     def test_provider_for_unknown_prefix(self):
-        for item_id in ('imdb_tt0903747', 'jikan_novel_1', 'tt0903747', ''):
+        for item_id in ('imdb_tt0903747', 'mal_novel_1', 'jikan_anime_38000', 'tt0903747', ''):
             with self.assertRaises(InvalidItemId):
                 provider_for_item_id(item_id)
 

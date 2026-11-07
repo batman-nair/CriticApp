@@ -130,7 +130,7 @@ class ReviewV2Phase2Test(APITestCase):
         self.assertEqual(categories, {'movie'})
 
     def test_v2_exclude_categories_accepts_anime_subcategories(self):
-        for item_id, attr3 in (('jikan_anime_1', 'tv'), ('jikan_anime_2', 'movie')):
+        for item_id, attr3 in (('mal_anime_1', 'tv'), ('mal_anime_2', 'movie')):
             item = ReviewItem.objects.create(
                 item_id=item_id, category='anime', title=item_id, image_url='https://example.com/a.png',
                 year='2020', attr1='A', attr2='B', attr3=attr3, description='D', rating='8.0',
@@ -141,7 +141,7 @@ class ReviewV2Phase2Test(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         item_ids = [row['review_item']['item_id'] for row in response.json()['data']]
-        self.assertEqual(item_ids, ['jikan_anime_1'])
+        self.assertEqual(item_ids, ['mal_anime_1'])
 
     def test_v2_languages_filter_matches_any_language(self):
         for item_id, language in (('omdb_ko', 'Korean, English'), ('omdb_de', 'German'), ('omdb_ja', 'Japanese')):

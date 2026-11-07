@@ -19,7 +19,7 @@ class MoveSeriesToSeriesCategoryTest(TestCase):
     def test_moves_only_omdb_series(self):
         self._create_item('omdb_series', 'movie', 'series')
         self._create_item('omdb_movie', 'movie', 'movie')
-        self._create_item('jikan_anime_1', 'anime', 'series')
+        self._create_item('mal_anime_1', 'anime', 'series')
 
         series_migration.move_series_to_series_category(apps, None)
 
@@ -27,7 +27,7 @@ class MoveSeriesToSeriesCategoryTest(TestCase):
         self.assertEqual(categories, {
             'omdb_series': 'series',
             'omdb_movie': 'movie',
-            'jikan_anime_1': 'anime',
+            'mal_anime_1': 'anime',
         })
 
     def test_reverse_moves_series_back_to_movie(self):

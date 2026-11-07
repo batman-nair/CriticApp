@@ -80,10 +80,10 @@ class AnimeSubcategoryFilterTest(TestCase):
     def setUp(self):
         user = get_user_model().objects.create_user(username='animefan', password='123test123')
         items = [
-            ('jikan_anime_1', 'anime', 'tv'),
-            ('jikan_anime_2', 'anime', 'movie'),
-            ('jikan_anime_3', 'anime', 'Movie'),  # stored by the old Jikan API
-            ('jikan_anime_4', 'anime', 'ova'),
+            ('mal_anime_1', 'anime', 'tv'),
+            ('mal_anime_2', 'anime', 'movie'),
+            ('mal_anime_3', 'anime', 'Movie'),  # stored by the old Jikan API
+            ('mal_anime_4', 'anime', 'ova'),
             ('omdb_tt1', 'movie', 'movie'),
         ]
         for item_id, category, attr3 in items:
@@ -94,19 +94,19 @@ class AnimeSubcategoryFilterTest(TestCase):
         return sorted(review.review_item.item_id for review in review_utils.get_filtered_review_objects(**kwargs))
 
     def test_include_anime_movies(self):
-        self.assertEqual(self._item_ids(categories=['anime:movie']), ['jikan_anime_2', 'jikan_anime_3'])
+        self.assertEqual(self._item_ids(categories=['anime:movie']), ['mal_anime_2', 'mal_anime_3'])
 
     def test_include_anime_series(self):
-        self.assertEqual(self._item_ids(categories=['anime:series']), ['jikan_anime_1', 'jikan_anime_4'])
+        self.assertEqual(self._item_ids(categories=['anime:series']), ['mal_anime_1', 'mal_anime_4'])
 
     def test_include_mixes_categories_and_subcategories(self):
-        self.assertEqual(self._item_ids(categories=['movie,anime:movie']), ['jikan_anime_2', 'jikan_anime_3', 'omdb_tt1'])
+        self.assertEqual(self._item_ids(categories=['movie,anime:movie']), ['mal_anime_2', 'mal_anime_3', 'omdb_tt1'])
 
     def test_exclude_anime_movies(self):
-        self.assertEqual(self._item_ids(exclude_categories=['anime:movie']), ['jikan_anime_1', 'jikan_anime_4', 'omdb_tt1'])
+        self.assertEqual(self._item_ids(exclude_categories=['anime:movie']), ['mal_anime_1', 'mal_anime_4', 'omdb_tt1'])
 
     def test_exclude_anime_series_and_movie_category(self):
-        self.assertEqual(self._item_ids(exclude_categories=['anime:series', 'movie']), ['jikan_anime_2', 'jikan_anime_3'])
+        self.assertEqual(self._item_ids(exclude_categories=['anime:series', 'movie']), ['mal_anime_2', 'mal_anime_3'])
 
     def test_unknown_subcategory_matches_nothing(self):
         self.assertEqual(self._item_ids(categories=['anime:musical']), [])

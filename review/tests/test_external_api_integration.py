@@ -53,8 +53,8 @@ class TestUtilAPI:
         self._test_details_api(self.omdb_api, 'omdb_tt3896198')
         # No hard-coded IGDB id: take one from a search.
         self._test_details_api(self.igdb_api, self.igdb_api.search('Ori and the Blind Forest')[0].item_id)
-        self._test_details_api(self.mal_anime_api, 'jikan_anime_38000')
-        self._test_details_api(self.mal_manga_api, 'jikan_manga_2')
+        self._test_details_api(self.mal_anime_api, 'mal_anime_38000')
+        self._test_details_api(self.mal_manga_api, 'mal_manga_2')
         self._test_details_api(self.open_library_api, 'olib_OL27482W')
 
     def _test_details_api(self, api_obj: Provider, success_id: str):
