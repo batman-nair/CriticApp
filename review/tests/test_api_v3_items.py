@@ -62,7 +62,8 @@ class ParseYearsTest(SimpleTestCase):
             ('2018–', (2018, None)),
             ('2022-02-25', (2022, None)),
             ('2019-2020', (2019, 2020)),
-            ('2023-2023', (2023, 2023)),
+            # MAL's range for a title that started and ended in one year.
+            ('2023-2023', (2023, None)),
             (' 2019 ', (2019, None)),
             ('N/A', (None, None)),
             ('', (None, None)),
@@ -257,6 +258,13 @@ class GetOrFetchItemTest(TestCase):
         # Whole names only.
         self.assertEqual(item.attr2.split(', '), crew[:len(item.attr2.split(', '))])
 
+    def test_over_long_image_url_and_year_are_left_out(self):
+        provider = _StubProvider(_anime_details(image_url='https://img/' + 'x' * 200, year='2019–2020–2021'))
+        with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=provider):
+            item = get_or_fetch_item('mal_anime_52991')
+
+        self.assertEqual((item.image_url, item.year), ('N/A', 'N/A'))
+
     def test_over_long_id_is_invalid_without_a_request(self):
         with mock.patch(PROVIDER_FOR_ITEM_ID) as provider_for:
             with self.assertRaises(InvalidItemId):
@@ -311,7 +319,7 @@ class V3ItemDetailTest(APITestCase):
             'title': 'Title 52991',
             'image_url': 'https://img/52991l.jpg',
             'start_year': 2019,
-            'end_year': 2019,
+            'end_year': None,
             'genres': ['Adventure'],
             'creators': ['Madhouse'],
             'languages': [],
@@ -357,6 +365,14 @@ class V3ItemDetailTest(APITestCase):
                     body = self.assertProblem(self.get('mal_anime_1'), status, code)
                 self.assertEqual(body['detail'], error.message)
         self.assertFalse(ReviewItem.objects.exists())
+
+    @mock.patch.dict('os.environ', {'MAL_CLIENT_ID': 'client-123', **OMDB_ENV})
+    def test_malformed_mal_and_omdb_ids_are_not_found_without_a_request(self):
+        for item_id in ['mal_anime_abc', 'mal_anime_052991', 'mal_manga_', 'omdb_TT0903747', 'omdb_tt1&type=series', 'omdb_x']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_GET) as get_mock:
+                    self.assertProblem(self.get(item_id), 404, 'NOT_FOUND')
+                get_mock.assert_not_called()
 
     def test_invalid_igdb_id_is_not_found(self):
         with mock.patch.dict('os.environ', {'IGDB_CLIENT_ID': 'id', 'IGDB_CLIENT_SECRET': 'secret'}):

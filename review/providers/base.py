@@ -1,3 +1,4 @@
+import math
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -273,6 +274,14 @@ class Provider(ABC):
         """`value`, which must be of `types` unless it's None."""
         if value is not None and (not isinstance(value, types) or isinstance(value, bool)):
             raise TypeError('Unexpected field type.')
+        return value
+
+    @classmethod
+    def _optional_rating(cls, value):
+        """A rating number or None; NaN and infinity are malformed (they can't go into JSON)."""
+        value = cls._optional(value, (int, float))
+        if value is not None and not math.isfinite(value):
+            raise ValueError('Unexpected rating.')
         return value
 
     def _names(self, entries) -> list[str]:

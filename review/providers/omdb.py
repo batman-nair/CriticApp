@@ -4,7 +4,7 @@ from typing import Optional
 from urllib.parse import quote
 
 from .base import (
-    BAD_RESPONSE_MESSAGE, ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, WrongCategory, unique,
+    BAD_RESPONSE_MESSAGE, InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, WrongCategory, unique,
 )
 
 IMDB_TITLE_URL_RE = re.compile(
@@ -37,6 +37,8 @@ class OMDbProvider(Provider):
     UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from OMDb.'
     # Movies and series share the prefix, so ids from before the split stay valid.
     prefix = 'omdb_'
+    # Lower case, as IMDb and OMDb give ids, so the stored id is the requested one.
+    _IMDB_ID_RE = re.compile(r'tt[0-9]+')
 
     def __init__(self, category: Optional[str]='movie'):
         """category is 'movie' or 'series'. None is for looking up an item by id
@@ -63,6 +65,9 @@ class OMDbProvider(Provider):
 
     def get_details(self, item_id: str) -> ItemDetails:
         imdb_id = self._strip_prefix(item_id)
+        # The id goes into the URL, so only accept IMDb title ids.
+        if not self._IMDB_ID_RE.fullmatch(imdb_id):
+            raise InvalidItemId("Invalid IMDb id.")
         info_url = '{base_url}&i={imdb_id}'.format(base_url=self._base_url, imdb_id=imdb_id)
         omdb_json = self._request_json(info_url)
         with self._parsing():

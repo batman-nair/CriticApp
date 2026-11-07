@@ -98,7 +98,8 @@ class V3SearchTest(APITestCase):
         self.assertEqual(get_mock.call_count, 1)
         first, second = response.json()['data']
         self.assertEqual((first['genres'], first['provider_rating']), (['Adventure', 'Drama'], 9.3))
-        self.assertEqual((first['start_year'], first['end_year']), (2019, 2019))
+        # MAL's "2019-2019": started and ended in one year.
+        self.assertEqual((first['start_year'], first['end_year']), (2019, None))
         # MAL reported no genres.
         self.assertEqual((second['genres'], second['provider_rating']), ([], 8))
 

@@ -411,6 +411,16 @@ class MALProviderTest(SimpleTestCase):
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
 
+    def test_details_rejects_invalid_ids(self):
+        for item_id in ['mal_anime_abc', 'mal_anime_052991', 'mal_anime_', 'mal_anime_1/2', 'mal_anime_1?x=2']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_GET) as get_mock:
+                    with self.assertRaises(InvalidItemId) as ctx:
+                        MALProvider('anime').get_details(item_id)
+
+                self.assertEqual(ctx.exception.message, 'Invalid anime id.')
+                get_mock.assert_not_called()
+
     def test_optional_fields_null_or_missing(self):
         optional = ['main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis']
         for missing in (_DROP, None):
@@ -469,6 +479,8 @@ class MALProviderTest(SimpleTestCase):
             ('genre name not text', {'genres': [{'id': 1, 'name': 5}]}),
             ('mean text', {'mean': '8.5'}),
             ('mean bool', {'mean': True}),
+            ('mean NaN', {'mean': float('nan')}),
+            ('mean infinite', {'mean': float('inf')}),
         ]
         anime_cases = [
             ('studios not a list', {'studios': {'name': 'MAPPA'}}),
@@ -708,6 +720,16 @@ class OMDbProviderTest(SimpleTestCase):
                 OMDbProvider('movie').get_details('tt0903747')
 
         get_mock.assert_not_called()
+
+    def test_details_rejects_invalid_ids(self):
+        for item_id in ['omdb_TT0903747', 'omdb_tt', 'omdb_nm0000206', 'omdb_tt1&type=series', 'omdb_tt1 ']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_GET) as get_mock:
+                    with self.assertRaises(InvalidItemId) as ctx:
+                        OMDbProvider(None).get_details(item_id)
+
+                self.assertEqual(ctx.exception.message, 'Invalid IMDb id.')
+                get_mock.assert_not_called()
 
     def test_optional_keys_missing_or_null(self):
         optional = ['Poster', 'Year', 'Genre', 'Director', 'Writer', 'Actors', 'Plot', 'imdbRating', 'Language', 'Type']
@@ -1533,6 +1555,7 @@ class OpenLibraryProviderTest(SimpleTestCase):
             ('cover_i text', {'docs': [ol_search_doc(cover_i='14627509')]}),
             ('first_publish_year text', {'docs': [ol_search_doc(first_publish_year='1937')]}),
             ('ratings_average text', {'docs': [ol_search_doc(ratings_average='4.3')]}),
+            ('ratings_average NaN', {'docs': [ol_search_doc(ratings_average=float('nan'))]}),
         ]
         search_cases = search_body_cases + [
             ('one bad doc among good ones', {'docs': [ol_search_doc(), ol_search_doc('OL1W', cover_i='14627509')]}),

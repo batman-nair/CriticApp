@@ -99,7 +99,7 @@ class OpenLibraryProvider(Provider):
     def _summary(self, doc: dict, detailed: bool=False) -> ItemSummary:
         cover_id = self._optional(doc.get("cover_i"), int)
         year = self._optional(doc.get("first_publish_year"), int)
-        rating = self._optional(doc.get("ratings_average"), (int, float))
+        rating = self._optional_rating(doc.get("ratings_average"))
         return ItemSummary(
             item_id=self.prefix + self._work_id(doc),
             category=self.category,

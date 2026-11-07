@@ -28,7 +28,8 @@ _PAGES_RE = re.compile(r'(\d+) pages')
 def parse_years(text):
     """(start_year, end_year) from year text; None for what isn't known.
 
-    A single year and an open range ("2018–") both have no end year.
+    A single year, a range within one year (MAL's "2023-2023") and an open
+    range ("2018–") have no end year.
     """
     text = (text or '').strip()
     match = _DATE_RE.fullmatch(text)
@@ -36,8 +37,9 @@ def parse_years(text):
         return int(match.group(1)), None
     match = _YEARS_RE.fullmatch(text)
     if match:
-        end = match.group(2)
-        return int(match.group(1)), int(end) if end else None
+        start = int(match.group(1))
+        end = int(match.group(2)) if match.group(2) else None
+        return start, end if end != start else None
     return None, None
 
 

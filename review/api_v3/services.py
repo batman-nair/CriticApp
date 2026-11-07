@@ -34,6 +34,11 @@ def get_or_fetch_item(item_id: str) -> ReviewItem:
     # Not every provider fits its values to the columns, and an over-long
     # value would fail the insert.
     details.title = details.title[:_max_length('title')]
+    # A cut URL or year would be wrong, so an over-long one is left out.
+    if details.image_url and len(details.image_url) > _max_length('image_url'):
+        details.image_url = None
+    if details.year and len(details.year) > _max_length('year'):
+        details.year = None
     for name, column in _LIST_COLUMNS.items():
         setattr(details, name, fit_joined(getattr(details, name), _max_length(column)))
 
