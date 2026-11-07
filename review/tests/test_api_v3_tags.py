@@ -34,13 +34,18 @@ class TestMostUsedTags(TestCase):
     def test_counts_and_orders_by_count_then_name(self):
         add_review(self.user, 'drama,rewatch,favourite')
         add_review(self.user, 'rewatch,favourite')
-        add_review(self.user, 'rewatch,Classic')
+        add_review(self.user, 'rewatch,Zebra')
+        # Ties are ordered by name ignoring case: drama before Zebra.
         self.assertEqual(most_used_tags('alice', 10), [
             {'name': 'rewatch', 'count': 3},
             {'name': 'favourite', 'count': 2},
-            {'name': 'Classic', 'count': 1},
             {'name': 'drama', 'count': 1},
+            {'name': 'Zebra', 'count': 1},
         ])
+
+    def test_tag_repeated_in_one_review_counts_each_time(self):
+        add_review(self.user, 'rewatch,Rewatch')
+        self.assertEqual(most_used_tags('alice', 10), [{'name': 'Rewatch', 'count': 2}])
 
     def test_groups_case_insensitively_under_the_most_frequent_spelling(self):
         add_review(self.user, 'Rewatch')
@@ -105,10 +110,10 @@ class TestV3Tags(TestCase):
         self.assertEqual(self.names(username='alice', limit=3), names[:3])
 
     def test_limit_is_capped_at_50(self):
-        add_distinct_tags(self.alice, 60)
+        names = add_distinct_tags(self.alice, 60)
         for limit in (51, 500):
             with self.subTest(limit=limit):
-                self.assertEqual(len(self.names(username='alice', limit=limit)), 50)
+                self.assertEqual(self.names(username='alice', limit=limit), names[:50])
 
     def test_invalid_limit_falls_back_to_10(self):
         add_distinct_tags(self.alice, 12)
@@ -121,10 +126,16 @@ class TestV3Tags(TestCase):
         add_review(self.bob, 'theirs')
         self.client.force_login(self.alice)
         self.assertEqual(self.names(), ['mine'])
+        self.assertEqual(self.names(username=' '), ['mine'])
         self.assertEqual(self.names(username='bob'), ['theirs'])
 
+    def test_username_is_matched_exactly(self):
+        add_review(self.alice, 'mine')
+        self.assertEqual(self.names(username=' alice '), [])
+        self.assertEqual(self.names(username='Alice'), [])
+
     def test_username_required_when_not_logged_in(self):
-        for params in ({}, {'username': ''}):
+        for params in ({}, {'username': ''}, {'username': ' '}):
             with self.subTest(params=params):
                 response = self.get(**params)
                 self.assertEqual(response.status_code, 400)
