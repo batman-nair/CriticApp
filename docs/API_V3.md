@@ -70,7 +70,8 @@ A user's most-used tags, for tag suggestions. `GET /api/v3/tags?username=alice&l
 
 ### Items
 
-Search results and items describe a title (a movie, game, book, ...) in this shape:
+An item is a title (a movie, game, book, ...). `/items` returns this shape;
+search results are a shorter form of it (see `/search`):
 
 ```json
 {
@@ -130,8 +131,9 @@ Search results and items describe a title (a movie, game, book, ...) in this sha
 - `category` (one of the categories above) and `q` (at most 100 characters)
   are required; otherwise 400 `VALIDATION_ERROR`.
 - For `movie` and `series`, `q` may be a full IMDb title URL; the result is
-  that one title. The URL of a series in a movie search (or the other way
-  round) is 400 `VALIDATION_ERROR` on `q`.
+  that one title, with `genres` and `provider_rating` filled (OMDb's lookup
+  by id gives them in the same request). The URL of a series in a movie
+  search (or the other way round) is 400 `VALIDATION_ERROR` on `q`.
 - `genres` and `provider_rating` are filled only when the data source's
   search gives them, with no extra requests. `null` means unknown, `[]`
   means the source reported no genres:

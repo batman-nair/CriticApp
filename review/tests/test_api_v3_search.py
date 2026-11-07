@@ -216,6 +216,7 @@ class V3SearchTest(APITestCase):
         cases = [
             ({'category': 'podcast', 'q': 'x'}, 'category'),
             ({'q': 'x'}, 'category'),
+            ({'category': '', 'q': 'x'}, 'category'),
             ({'category': 'movie'}, 'q'),
             ({'category': 'movie', 'q': '   '}, 'q'),
             ({'category': 'movie', 'q': 'x' * 101}, 'q'),
