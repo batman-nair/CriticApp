@@ -139,12 +139,15 @@ class RenameJikanItemIdsToMalTest(TestCase):
 
     def test_existing_mal_id_fails_without_renaming(self):
         self._create_data('jikan_anime_1', 'jikan_manga_2')
-        self._create_item('mal_anime_1', 'anime')
+        # Manga is renamed after anime, so anime's rename has to roll back too.
+        self._create_item('mal_manga_2', 'manga')
         reviews_before = self._reviews()
 
         with self.assertRaises(IntegrityError), transaction.atomic():
             mal_prefix_migration.rename_jikan_to_mal(apps, None)
 
-        self.assertTrue(ReviewItem.objects.filter(item_id='jikan_anime_1').exists())
-        self.assertTrue(ReviewItem.objects.filter(item_id='jikan_manga_2').exists())
+        self.assertEqual(
+            set(ReviewItem.objects.values_list('item_id', flat=True)),
+            {'jikan_anime_1', 'jikan_manga_2', 'mal_manga_2', 'omdb_tt1', 'igdb_5', 'rawg_9'},
+        )
         self.assertEqual(self._reviews(), reviews_before)

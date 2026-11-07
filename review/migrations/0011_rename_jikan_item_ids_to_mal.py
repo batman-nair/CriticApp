@@ -16,9 +16,12 @@ def _rename_prefixes(apps, prefixes):
         )
         for old_id in old_ids:
             new_id = new_prefix + old_id[len(old_prefix):]
+            # Locks the old row, so a review saved to it meanwhile (by a web pod
+            # still on the old code) waits and then fails on the deleted row,
+            # instead of being deleted with it by the CASCADE.
+            item = ReviewItem.objects.select_for_update().get(pk=old_id)
             # A copy of the row under the new id. An existing row with that id
             # raises IntegrityError, so nothing is merged.
-            item = ReviewItem.objects.get(pk=old_id)
             item.item_id = new_id
             item.save(force_insert=True)
             # A queryset update leaves modified_date (auto_now) as it was.
