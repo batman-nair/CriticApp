@@ -1,5 +1,7 @@
 from django.test import TestCase
 
+from review import providers
+from review.api_v3 import categories
 from review.utils.review_utils import SUBCATEGORY_FILTERS
 
 SOURCES = {
@@ -53,6 +55,9 @@ class TestV3Categories(TestCase):
     def test_subcategory_ids_match_the_review_filter(self):
         ids = {s['id'] for c in self.categories.values() for s in c['subcategories']}
         self.assertEqual(ids, set(SUBCATEGORY_FILTERS))
+
+    def test_same_categories_as_the_providers(self):
+        self.assertEqual({category.id for category in categories.CATEGORIES}, set(providers.CATEGORIES))
 
     def test_stale_token_is_ignored(self):
         response = self.client.get('/api/v3/categories', HTTP_AUTHORIZATION='Bearer expired-or-invalid')

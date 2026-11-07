@@ -30,6 +30,8 @@ V3_SCHEMA_SETTINGS = {
     'TAGS': [
         {'name': 'categories', 'description': 'Review categories and their data sources'},
         {'name': 'tags', 'description': "A user's most-used review tags"},
+        {'name': 'search', 'description': "Search a category's data source"},
+        {'name': 'items', 'description': 'Items (titles) by id'},
     ],
 }
 
