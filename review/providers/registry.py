@@ -20,8 +20,8 @@ CATEGORIES = tuple(_CATEGORY_FACTORIES)
 _PREFIX_FACTORIES = {
     'omdb_': lambda: OMDbProvider(None),
     'igdb_': IGDBProvider,
-    'jikan_anime_': lambda: MALProvider('anime'),
-    'jikan_manga_': lambda: MALProvider('manga'),
+    'mal_anime_': lambda: MALProvider('anime'),
+    'mal_manga_': lambda: MALProvider('manga'),
     'olib_': OpenLibraryProvider,
 }
 

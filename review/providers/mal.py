@@ -16,9 +16,7 @@ class MALProvider(Provider):
         if category not in ['anime', 'manga']:
             raise RuntimeError('MAL API should be of type "anime" or "manga".')
         self.category = category
-        # Items were first fetched from Jikan, which uses the same MAL ids, so the
-        # old prefix is kept to keep existing item ids valid.
-        self.prefix = 'jikan_{}_'.format(category)
+        self.prefix = 'mal_{}_'.format(category)
         self._client_id = os.environ.get('MAL_CLIENT_ID', None)
         if not self._client_id:
             raise RuntimeError('MAL_CLIENT_ID required for accessing MAL data.')
