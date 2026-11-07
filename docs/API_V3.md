@@ -13,6 +13,7 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/v3/categories` | public | Categories, with filter subcategories, data source and rating label |
+| GET | `/api/v3/tags` | public; defaults to the logged-in user | A user's most-used tags |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
 
@@ -38,6 +39,32 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 ```
 
 The categories are, in order: `movie`, `series`, `game`, `anime`, `manga`, `book`.
+
+### `GET /api/v3/tags`
+
+A user's most-used tags, for tag suggestions. `GET /api/v3/tags?username=alice&limit=2`:
+
+```json
+{
+  "data": [
+    {"name": "favourite", "count": 14},
+    {"name": "rewatch", "count": 6}
+  ],
+  "meta": {}
+}
+```
+
+- `username`: whose tags to count. If it's omitted or blank, it defaults to the
+  logged-in user. If there's neither, the response is 400 `VALIDATION_ERROR`
+  with an error for the `username` field. An unknown username gets `data: []`.
+- `limit`: default 10. Values above 50 are cut down to 50, and invalid values
+  fall back to 10, like pagination limits.
+- Sorted by count (most used first), then by name, ignoring case. Tags are
+  grouped case-insensitively and returned in their most frequent spelling.
+  Empty entries and surrounding whitespace are ignored.
+- The view keeps the default authentication classes, because the result can
+  depend on who is logged in. Unlike `/categories`, an invalid or expired
+  `Authorization` token gets 401 `UNAUTHENTICATED`.
 
 ## Successful responses
 
