@@ -29,6 +29,7 @@ V3_SCHEMA_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'TAGS': [
         {'name': 'categories', 'description': 'Review categories and their data sources'},
+        {'name': 'tags', 'description': "A user's most-used review tags"},
     ],
 }
 
