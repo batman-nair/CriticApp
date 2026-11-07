@@ -59,9 +59,9 @@ A user's most-used tags, for tag suggestions. `GET /api/v3/tags?username=alice&l
   with an error for the `username` field. An unknown username gets `data: []`.
 - `limit`: default 10. Values above 50 are cut down to 50, and invalid values
   fall back to 10, like pagination limits.
-- Sorted by count (most used first), then by name. Tags are grouped
-  case-insensitively and returned in their most frequent spelling. Empty
-  entries and surrounding whitespace are ignored.
+- Sorted by count (most used first), then by name, ignoring case. Tags are
+  grouped case-insensitively and returned in their most frequent spelling.
+  Empty entries and surrounding whitespace are ignored.
 - The view keeps the default authentication classes, because the result can
   depend on who is logged in. Unlike `/categories`, an invalid or expired
   `Authorization` token gets 401 `UNAUTHENTICATED`.

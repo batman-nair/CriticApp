@@ -25,7 +25,8 @@ class TagLimit(V3LimitOffsetPagination):
 
 
 def most_used_tags(username, limit):
-    """The user's tags as [{name, count}], most used first, then by name.
+    """The user's tags as [{name, count}], most used first, then by name
+    (ignoring case).
 
     Tags are grouped case-insensitively and named by their most frequent
     spelling (ties go to the spelling that sorts first). Empty entries and
@@ -64,7 +65,7 @@ class TagListView(V3APIView):
         operation_id='tags_list',
         summary="List a user's most-used tags",
         description=(
-            'Tags from the user\'s reviews, most used first, then by name. Tags are '
+            'Tags from the user\'s reviews, most used first, then by name (ignoring case). Tags are '
             'grouped case-insensitively and returned in their most frequent spelling.'
         ),
         parameters=[
@@ -83,8 +84,8 @@ class TagListView(V3APIView):
         responses={200: wrapped(TagSerializer, many=True), **problem_responses(400, 401)},
     )
     def get(self, request):
-        username = request.query_params.get('username', '').strip()
-        if not username:
+        username = request.query_params.get('username', '')
+        if not username.strip():
             if not request.user.is_authenticated:
                 raise serializers.ValidationError(
                     {'username': ['This parameter is required when not logged in.']}, code='required',

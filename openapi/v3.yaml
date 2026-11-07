@@ -32,8 +32,9 @@ paths:
   /api/v3/tags:
     get:
       operationId: tags_list
-      description: Tags from the user's reviews, most used first, then by name. Tags
-        are grouped case-insensitively and returned in their most frequent spelling.
+      description: Tags from the user's reviews, most used first, then by name (ignoring
+        case). Tags are grouped case-insensitively and returned in their most frequent
+        spelling.
       summary: List a user's most-used tags
       parameters:
       - in: query
