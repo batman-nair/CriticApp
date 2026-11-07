@@ -140,7 +140,7 @@ class Command(BaseCommand):
         self._provider = None
         self._igdb_requests = 0
         self._status_counts = Counter()
-        self._totals = Counter(mapped=0, skipped=0, conflicts=0, left=0)
+        self._totals = Counter(mapped=0, conflicts=0, left=0)
         self._apply = apply
 
         try:
@@ -188,7 +188,6 @@ class Command(BaseCommand):
         if row.item_id in skips:
             self._status_counts[SKIP] += 1
             self.stdout.write(f'{rawg} SKIP')
-            self._totals['skipped'] += 1
             return
 
         if row.item_id in maps:
@@ -248,6 +247,9 @@ class Command(BaseCommand):
                 return
 
         with transaction.atomic():
+            # Locks the RAWG item, so a review saved to it meanwhile waits and then
+            # fails on the deleted row, instead of being deleted with it (CASCADE).
+            list(ReviewItem.objects.select_for_update().filter(pk=row.pk).values_list('pk', flat=True))
             if target is None:
                 now = timezone.now()
                 fields = details.to_review_item_fields()
@@ -290,7 +292,8 @@ class Command(BaseCommand):
         self.stdout.write(' '.join(f'{status}={self._status_counts[status]}' for status in STATUSES))
         if self._apply:
             self.stdout.write(
-                'mapped={mapped} skipped={skipped} conflicts={conflicts} left={left}'.format(**self._totals)
+                'mapped={mapped} skipped={skipped} conflicts={conflicts} left={left}'.format(
+                    skipped=self._status_counts[SKIP], **self._totals)
             )
         else:
             self.stdout.write('dry run, nothing written (use --apply to write)')
