@@ -46,6 +46,25 @@ class _ResponseStub:
         return self._json_data
 
 
+def _json_response(json_data, status_code=200, reason=''):
+    """A response with exactly this body; _ResponseStub turns None or [] into {}."""
+    response = _ResponseStub(status_code, reason=reason)
+    response._json_data = json_data
+    return response
+
+
+# Removes a key from the payload builders below (_omdb_title, _mal_node, _igdb_game).
+_DROP = object()
+_PARSE_ERROR_TYPES = (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError)
+
+
+def _assert_bad_response(testcase, exception, message, source):
+    testcase.assertIsInstance(exception, UpstreamError)
+    testcase.assertEqual(exception.message, message)
+    testcase.assertEqual(exception.source, source)
+    testcase.assertIsInstance(exception.__cause__, _PARSE_ERROR_TYPES)
+
+
 class RequestJsonRetryTest(SimpleTestCase):
     def setUp(self):
         patcher = mock.patch(RECORD_USAGE)
@@ -395,7 +414,7 @@ def _omdb_title(type_='movie', **extra):
         'Language': 'English, Spanish',
     }
     data.update(extra)
-    return data
+    return {key: value for key, value in data.items() if value is not _DROP}
 
 
 @mock.patch(RECORD_USAGE, new=mock.Mock())
@@ -576,21 +595,95 @@ class OMDbProviderTest(SimpleTestCase):
 
         get_mock.assert_not_called()
 
+    def test_optional_keys_missing_or_null(self):
+        optional = ['Poster', 'Year', 'Genre', 'Director', 'Writer', 'Actors', 'Plot', 'imdbRating', 'Language', 'Type']
+        for missing in (_DROP, None):
+            with self.subTest(missing='absent' if missing is _DROP else 'null'):
+                title = _omdb_title(**{key: missing for key in optional})
+                with mock.patch(REQUESTS_GET, return_value=_json_response(title)):
+                    details = OMDbProvider('movie').get_details('omdb_tt0903747')
+                with mock.patch(REQUESTS_GET, return_value=_json_response({'Response': 'True', 'Search': [title]})):
+                    results = OMDbProvider('movie').search('breaking')
+
+                self.assertEqual(details.to_review_item_fields(), {
+                    'item_id': 'omdb_tt0903747',
+                    'category': 'movie',
+                    'title': 'Breaking Bad',
+                    'image_url': 'N/A',
+                    'year': 'N/A',
+                    'attr1': 'N/A',
+                    'attr2': '',
+                    # No Type: the movie default.
+                    'attr3': 'N/A',
+                    'language': '',
+                    'description': 'N/A',
+                    'rating': 'N/A',
+                })
+                self.assertEqual(results[0].to_search_result(), {
+                    'item_id': 'omdb_tt0903747', 'title': 'Breaking Bad', 'image_url': 'N/A', 'year': 'N/A',
+                })
+
+    def test_search_with_null_results_is_empty(self):
+        with mock.patch(REQUESTS_GET, return_value=_json_response({'Response': 'True', 'Search': None})):
+            self.assertEqual(OMDbProvider('movie').search('breaking'), [])
+
+    def test_malformed_payloads_are_upstream_errors(self):
+        # Field values that are wrong in a search result and in a title alike.
+        field_cases = [
+            ('imdbID missing', {'imdbID': _DROP}),
+            ('imdbID null', {'imdbID': None}),
+            ('imdbID empty', {'imdbID': ''}),
+            ('imdbID not text', {'imdbID': 903747}),
+            ('Title missing', {'Title': _DROP}),
+            ('Title null', {'Title': None}),
+            ('Title empty', {'Title': ''}),
+            ('Title not text', {'Title': 5}),
+            ('Poster not text', {'Poster': ['https://img/bb.jpg']}),
+            ('Year not text', {'Year': 2008}),
+        ]
+        details_field_cases = [
+            ('Genre not text', {'Genre': ['Crime']}),
+            ('Director not text', {'Director': 5}),
+            ('Actors not text', {'Actors': {'name': 'Bryan Cranston'}}),
+            ('Plot not text', {'Plot': {'short': 'A teacher.'}}),
+            ('Language not text', {'Language': ['English']}),
+            ('Type not text', {'Type': 5}),
+        ]
+        body_cases = [
+            ('body is a list', [_omdb_title()]),
+            ('body is null', None),
+            ('error message not text', {'Response': 'False', 'Error': 5}),
+        ]
+        search_cases = body_cases + [
+            ('Search not a list', {'Response': 'True', 'Search': _omdb_title()}),
+            ('entry not an object', {'Response': 'True', 'Search': ['tt0903747']}),
+            ('one bad entry among good ones', {'Response': 'True', 'Search': [_omdb_title(), _omdb_title(Title=None)]}),
+        ] + [(name, {'Response': 'True', 'Search': [_omdb_title(**extra)]}) for name, extra in field_cases]
+        details_cases = body_cases + [
+            (name, _omdb_title(**extra)) for name, extra in field_cases + details_field_cases
+        ]
+        for method, payload_cases in [('search', search_cases), ('get_details', details_cases)]:
+            for name, payload in payload_cases:
+                with self.subTest(method=method, case=name):
+                    with mock.patch(REQUESTS_GET, return_value=_json_response(payload)):
+                        with self.assertRaises(ProviderError) as ctx:
+                            if method == 'search':
+                                OMDbProvider('movie').search('breaking')
+                            else:
+                                OMDbProvider('movie').get_details('omdb_tt0903747')
+
+                    _assert_bad_response(self, ctx.exception, 'Unexpected response from OMDb.', 'OMDB API')
+
 
 IGDB_ENV = {'IGDB_CLIENT_ID': 'igdb-client-id', 'IGDB_CLIENT_SECRET': 'igdb-secret-s3cr3t'}
 IGDB_TOKEN = 'igdb-token-t0k3n'
 IGDB_TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 IGDB_GAMES_URL = 'https://api.igdb.com/v4/games'
 IGDB_SEARCH_FIELDS = 'fields name,first_release_date,cover.image_id,genres.name,total_rating,platforms.name;'
-# Removes a key from _igdb_game().
-_DROP = object()
 
 
 def _igdb_response(json_data, status_code=200, reason=''):
-    response = _ResponseStub(status_code, reason=reason)
-    # _ResponseStub turns an empty list into {}.
-    response._json_data = json_data
-    return response
+    return _json_response(json_data, status_code=status_code, reason=reason)
 
 
 def _igdb_token(token=IGDB_TOKEN, expires_in=5184000):
@@ -632,10 +725,7 @@ class IGDBProviderTest(SimpleTestCase):
         cache.set(IGDBProvider.TOKEN_CACHE_KEY, IGDB_TOKEN)
 
     def _assert_bad_response(self, exception):
-        self.assertIsInstance(exception, UpstreamError)
-        self.assertEqual(exception.message, 'Unexpected response from IGDB.')
-        self.assertEqual(exception.source, 'IGDB API')
-        self.assertIsInstance(exception.__cause__, (KeyError, TypeError, ValueError, AttributeError, OverflowError, OSError))
+        _assert_bad_response(self, exception, 'Unexpected response from IGDB.', 'IGDB API')
 
     def test_requires_client_id_and_secret(self):
         for key in IGDB_ENV:
