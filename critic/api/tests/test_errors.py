@@ -249,6 +249,21 @@ class TestApiError(ProblemAssertions, SimpleTestCase):
         body = self.assertProblem(call(view, factory.get('/x')), 409, 'DUPLICATE_REVIEW')
         self.assertEqual(body['detail'], 'Already reviewed.')
 
+    def test_extra_members_appear_in_the_body(self):
+        exc = ApiError(409, 'DUPLICATE_REVIEW', 'Already reviewed.', extra={'existing_review_id': 12})
+        body = self.assertProblem(call(RaisingView.as_view(exc=exc), factory.get('/x')), 409, 'DUPLICATE_REVIEW')
+        self.assertEqual(body['existing_review_id'], 12)
+
+    def test_without_extra_the_body_has_only_the_standard_members(self):
+        exc = ApiError(409, 'DUPLICATE_REVIEW', 'Already reviewed.')
+        body = self.assertProblem(call(RaisingView.as_view(exc=exc), factory.get('/x')), 409, 'DUPLICATE_REVIEW')
+        self.assertEqual(set(body), {'type', 'title', 'status', 'code', 'detail'})
+
+    def test_extra_members_do_not_replace_standard_ones(self):
+        exc = ApiError(409, 'DUPLICATE_REVIEW', 'Already reviewed.', extra={'status': 200, 'code': 'OK'})
+        body = self.assertProblem(call(RaisingView.as_view(exc=exc), factory.get('/x')), 409, 'DUPLICATE_REVIEW')
+        self.assertEqual(body['detail'], 'Already reviewed.')
+
 
 class TestUnhandledException(ProblemAssertions, SimpleTestCase):
     def test_returns_500_problem_without_internals_and_logs(self):

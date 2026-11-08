@@ -46,11 +46,12 @@ _CODES = (
 class ApiError(exceptions.APIException):
     """An endpoint's own error, e.g. ApiError(409, 'DUPLICATE_REVIEW', '...')."""
 
-    def __init__(self, status, code, detail):
+    def __init__(self, status, code, detail, extra=None):
         if not isinstance(detail, (str, Promise)):
             raise TypeError('ApiError detail must be a string')
         self.status_code = status
         self.code = code
+        self.extra = extra
         super().__init__(detail=detail, code=code)
 
 
@@ -97,7 +98,7 @@ def status_title(status):
         return 'Error'
 
 
-def problem_response(status, code, detail, errors=None, headers=None):
+def problem_response(status, code, detail, errors=None, headers=None, extra=None):
     body = {
         'type': 'about:blank',
         'title': status_title(status),
@@ -107,6 +108,9 @@ def problem_response(status, code, detail, errors=None, headers=None):
     }
     if errors is not None:
         body['errors'] = errors
+    # Extra members never replace the standard ones.
+    for key, value in (extra or {}).items():
+        body.setdefault(key, value)
     return Response(body, status=status, headers=headers, content_type=PROBLEM_CONTENT_TYPE)
 
 
@@ -147,7 +151,9 @@ def v3_exception_handler(exc, context):
 
     # Dict/list details (e.g. simplejwt's token internals) stay out of the body.
     detail = str(exc.detail) if isinstance(exc.detail, str) else str(exc.default_detail)
-    return problem_response(exc.status_code, _error_code(exc), detail, headers=headers)
+    return problem_response(
+        exc.status_code, _error_code(exc), detail, headers=headers, extra=getattr(exc, 'extra', None),
+    )
 
 
 # Schema only (class docstrings would become schema descriptions).
