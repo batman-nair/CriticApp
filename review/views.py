@@ -98,7 +98,7 @@ class ReviewListCreateV2(generics.ListCreateAPIView):
         review_item = ReviewItemSerializer()
         class Meta:
             model = Review
-            fields = '__all__'
+            exclude = ('created_at', 'updated_at')
 
     def get_serializer_class(self):
         if self.request.method == 'GET':

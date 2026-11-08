@@ -18,7 +18,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = '__all__'
+        exclude = ('created_at', 'updated_at')
         extra_kwargs = {
             'review_tags': {
                 'required': False,
