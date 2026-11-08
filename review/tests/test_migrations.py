@@ -4,8 +4,9 @@ from importlib import import_module
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.db import IntegrityError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase
 
 from review.models import Review, ReviewItem
 
@@ -151,3 +152,73 @@ class RenameJikanItemIdsToMalTest(TestCase):
             {'jikan_anime_1', 'jikan_manga_2', 'mal_manga_2', 'omdb_tt1', 'igdb_5', 'rawg_9'},
         )
         self.assertEqual(self._reviews(), reviews_before)
+
+
+class ReviewTimestampsMigrationTest(TransactionTestCase):
+    BEFORE = [('review', '0011_rename_jikan_item_ids_to_mal')]
+    AFTER = [('review', '0012_review_created_at_updated_at')]
+    FIRST_DAY = date(2020, 5, 6)
+    SECOND_DAY = date(2021, 7, 8)
+
+    def setUp(self):
+        self.apps = self._migrate(self.BEFORE)
+        User = self.apps.get_model('users', 'User')
+        ReviewItem = self.apps.get_model('review', 'ReviewItem')
+        Review = self.apps.get_model('review', 'Review')
+        alice = User.objects.create(username='alice', password='x')
+        bob = User.objects.create(username='bob', password='x')
+        item = ReviewItem.objects.create(
+            item_id='omdb_tt1', category='movie', title='Title', image_url='https://example.com/i.png',
+            year='2000', attr1='a', attr2='b', attr3='movie', description='d', rating='5',
+        )
+        self.first = Review.objects.create(user=alice, review_item=item, review_rating=Decimal('8.0'))
+        self.second = Review.objects.create(user=bob, review_item=item, review_rating=Decimal('6.0'))
+        # A queryset update, because auto_now would set today on a save().
+        Review.objects.filter(pk=self.first.pk).update(modified_date=self.FIRST_DAY)
+        Review.objects.filter(pk=self.second.pk).update(modified_date=self.SECOND_DAY)
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def _migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return MigrationExecutor(connection).loader.project_state(targets).apps
+
+    def _review_columns(self):
+        with connection.cursor() as cursor:
+            description = connection.introspection.get_table_description(cursor, 'review_review')
+        return {column.name for column in description}
+
+    def test_created_at_stays_null_on_old_rows(self):
+        Review = self._migrate(self.AFTER).get_model('review', 'Review')
+
+        self.assertEqual(
+            list(Review.objects.order_by('pk').values_list('created_at', flat=True)),
+            [None, None],
+        )
+
+    def test_updated_at_is_modified_date_at_midnight_utc(self):
+        Review = self._migrate(self.AFTER).get_model('review', 'Review')
+
+        self.assertEqual(Review.objects.get(pk=self.first.pk).updated_at,
+                         datetime(2020, 5, 6, tzinfo=timezone.utc))
+        self.assertEqual(Review.objects.get(pk=self.second.pk).updated_at,
+                         datetime(2021, 7, 8, tzinfo=timezone.utc))
+
+    def test_modified_date_is_unchanged(self):
+        Review = self._migrate(self.AFTER).get_model('review', 'Review')
+
+        self.assertEqual(Review.objects.get(pk=self.first.pk).modified_date, self.FIRST_DAY)
+        self.assertEqual(Review.objects.get(pk=self.second.pk).modified_date, self.SECOND_DAY)
+
+    def test_reverse_drops_the_columns_and_keeps_the_rows(self):
+        self._migrate(self.AFTER)
+        self.assertLessEqual({'created_at', 'updated_at'}, self._review_columns())
+
+        Review = self._migrate(self.BEFORE).get_model('review', 'Review')
+
+        self.assertFalse({'created_at', 'updated_at'} & self._review_columns())
+        self.assertEqual(Review.objects.get(pk=self.first.pk).modified_date, self.FIRST_DAY)
+        self.assertEqual(Review.objects.get(pk=self.second.pk).modified_date, self.SECOND_DAY)
