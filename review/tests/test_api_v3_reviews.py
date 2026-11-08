@@ -2,13 +2,12 @@ from datetime import timedelta
 from itertools import count
 from unittest import mock
 
-import yaml
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken
 
-from critic.api.tests.test_schema import COMMITTED_SCHEMA
 from review.api_v3 import reviews as reviews_module
 from review.models import Review, ReviewItem
 from review.providers import InvalidItemId, ItemNotFound, UpstreamError
@@ -336,6 +335,15 @@ class CreateTest(ReviewsApiTestCase):
         existing = add_review(self.alice)
         self.assertFieldError(self.post(existing.review_item_id, rating=11), 'rating', 'max_value')
 
+    def test_duplicate_under_an_alias_of_the_stored_id_is_a_conflict(self):
+        existing = add_review(self.alice, item_id='mal_anime_52991')
+        # The provider answers with its own id, so the pre-check on the id as
+        # sent misses and only the unique constraint catches the duplicate.
+        with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=_StubProvider(_anime_details())):
+            body = self.assertProblem(self.post('mal_anime_052991'), 409, 'DUPLICATE_REVIEW')
+
+        self.assertEqual(body['existing_review_id'], existing.pk)
+
     def test_concurrent_duplicate_is_a_conflict(self):
         existing = add_review(self.alice)
         real_lookup = reviews_module._existing_review_id
@@ -488,7 +496,9 @@ class PermissionsTest(ReviewsApiTestCase):
         self.assertUnauthenticated(self.client.post(LIST_URL, {'item_id': 'x', 'rating': 7}, format='json'))
         self.assertUnauthenticated(self.client.patch(detail_url(self.review.pk), {'rating': 1}, format='json'))
 
-    def test_options_on_the_list_when_logged_in(self):
+    def test_options_on_the_list_with_a_valid_token(self):
+        self.client.force_authenticate(None)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {AccessToken.for_user(self.alice)}')
         response = self.client.options(LIST_URL)
         self.assertEqual(response.status_code, 200, response.content)
 
@@ -566,18 +576,17 @@ class DeleteTest(ReviewsApiTestCase):
         self.assertFalse(Review.objects.filter(pk=review.pk).exists())
 
 
-class CommittedSchemaTest(SimpleTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.schema = yaml.safe_load(COMMITTED_SCHEMA.read_text())
+class SchemaTest(SimpleTestCase):
+    # The served schema; test_schema.py checks the committed file is the same.
+    def schema(self):
+        return self.client.get('/api/v3/schema', {'format': 'json'}).json()
 
     def test_create_request_rating_is_a_number(self):
-        rating = self.schema['components']['schemas']['ReviewCreateRequest']['properties']['rating']
+        rating = self.schema()['components']['schemas']['ReviewCreateRequest']['properties']['rating']
         self.assertEqual(rating['type'], 'number')
 
     def test_list_documents_every_filter_param(self):
-        parameters = self.schema['paths']['/api/v3/reviews']['get']['parameters']
+        parameters = self.schema()['paths']['/api/v3/reviews']['get']['parameters']
         self.assertLessEqual(
             {'username', 'q', 'category', 'exclude_category', 'language', 'sort', 'limit', 'offset'},
             {parameter['name'] for parameter in parameters if parameter['in'] == 'query'},

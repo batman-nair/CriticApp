@@ -133,7 +133,6 @@ class PublicReadMixin:
 
 class ReviewListCreateView(PublicReadMixin, V3GenericAPIView):
     permission_classes = [IsAuthenticatedOrReadOnly]
-    # DRF's OPTIONS metadata calls get_serializer() for POST.
     serializer_class = ReviewCreateSerializer
 
     @extend_schema(
@@ -201,8 +200,9 @@ class ReviewListCreateView(PublicReadMixin, V3GenericAPIView):
             with transaction.atomic():
                 review = serializer.save(user=request.user, review_item=item)
         except IntegrityError:
-            # A concurrent request created the same review.
-            existing_id = _existing_review_id(request.user, item_id)
+            # A concurrent request created the same review, or item_id is an
+            # alias of a stored item: providers build the stored id themselves.
+            existing_id = _existing_review_id(request.user, item.pk)
             if existing_id is None:
                 raise
             raise _duplicate_review(existing_id) from None

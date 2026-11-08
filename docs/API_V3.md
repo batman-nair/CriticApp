@@ -250,7 +250,7 @@ The 409 body has the id of the existing review:
 
 `PATCH` returns 200 with the review, and `DELETE` returns 204 with no body.
 Both are 401 when not logged in, 403 for another user's review, and 404 for
-a missing id. PUT isn't supported (405).
+a missing id. There is no `PUT` (405 when logged in, 401 otherwise).
 
 ## Successful responses
 
