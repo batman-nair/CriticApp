@@ -1,13 +1,18 @@
 import os
+import re
 from urllib.parse import quote
 
-from .base import ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, unique
+from .base import InvalidItemId, ItemDetails, ItemNotFound, ItemSummary, Provider, UpstreamError, unique
 
 
 class MALProvider(Provider):
     source_name = 'MAL API'
     UNEXPECTED_RESPONSE_MESSAGE = 'Unexpected response from MAL.'
     _COMMON_FIELDS = 'id,title,main_picture,start_date,end_date,mean'
+    # No leading zeros: the stored item id is rebuilt from MAL's number.
+    _MAL_ID_RE = re.compile(r'[1-9][0-9]*')
+    # Genres come with search results at no extra cost; details ask for them below.
+    _SEARCH_FIELDS = _COMMON_FIELDS + ',genres'
     _DETAIL_FIELDS = {
         'anime': 'genres,studios,media_type,synopsis',
         'manga': 'genres,authors{first_name,last_name},media_type,synopsis',
@@ -26,7 +31,7 @@ class MALProvider(Provider):
 
     def search(self, query: str) -> list[ItemSummary]:
         search_url = '{base_url}?q={search_term}&limit=20&fields={fields}'.format(
-            base_url=self._base_url, search_term=quote(query), fields=self._COMMON_FIELDS)
+            base_url=self._base_url, search_term=quote(query), fields=self._SEARCH_FIELDS)
         mal_json = self._request_json(search_url, headers=self._headers)
         results = []
         with self._parsing():
@@ -43,6 +48,9 @@ class MALProvider(Provider):
 
     def get_details(self, item_id: str) -> ItemDetails:
         mal_id = self._strip_prefix(item_id)
+        # The id goes into the URL, so only accept numbers.
+        if not self._MAL_ID_RE.fullmatch(mal_id):
+            raise InvalidItemId("Invalid {} id.".format(self.category))
         info_url = '{base_url}/{item_id}?fields={fields}'.format(
             base_url=self._base_url, item_id=mal_id,
             fields='{},{}'.format(self._COMMON_FIELDS, self._DETAIL_FIELDS[self.category]))
@@ -72,7 +80,7 @@ class MALProvider(Provider):
             creators=unique(creators),
             media_type=self._optional(mal_json.get("media_type"), str),
             description=self._optional(mal_json.get("synopsis"), str) or None,
-            provider_rating=self._optional(mal_json.get("mean"), (int, float)),
+            provider_rating=self._optional_rating(mal_json.get("mean")),
         )
 
     def _summary(self, mal_json: dict) -> ItemSummary:
@@ -96,4 +104,7 @@ class MALProvider(Provider):
             title=title,
             image_url=self._optional(picture.get("large"), str) or self._optional(picture.get("medium"), str) or None,
             year=year,
+            # MAL leaves out empty fields: no genres key means no genres.
+            genres=self._names(mal_json.get("genres")),
+            provider_rating=self._optional_rating(mal_json.get("mean")),
         )

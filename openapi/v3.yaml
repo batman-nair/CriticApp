@@ -29,6 +29,133 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Internal Server Error
+  /api/v3/items/{item_id}:
+    get:
+      operationId: items_retrieve
+      description: The stored item, or else the item fetched from its provider (picked
+        by the id prefix) and stored. 404 when the prefix is unknown or the provider
+        has no such item; 502 when the provider fails.
+      summary: Get an item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - items
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+          description: ''
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '502':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
+  /api/v3/search:
+    get:
+      operationId: search_list
+      description: Search the category's provider. `genres` and `provider_rating`
+        are filled only when the provider returns them with its search. Nothing found
+        is an empty list; a failing provider is 502 UPSTREAM_ERROR.
+      summary: Search items
+      parameters:
+      - in: query
+        name: category
+        schema:
+          enum:
+          - movie
+          - series
+          - game
+          - anime
+          - manga
+          - book
+          type: string
+          minLength: 1
+        description: |-
+          * `movie` - movie
+          * `series` - series
+          * `game` - game
+          * `anime` - anime
+          * `manga` - manga
+          * `book` - book
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description: Search text. For movie and series, also a full IMDb title URL
+        required: true
+      tags:
+      - search
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResultListResponse'
+          description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '502':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
   /api/v3/tags:
     get:
       operationId: tags_list
@@ -82,6 +209,137 @@ paths:
           description: Internal Server Error
 components:
   schemas:
+    AnimeItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/AnimeItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/MediaTypeDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    AnimeItemCategoryEnum:
+      enum:
+      - anime
+      type: string
+      description: '* `anime` - anime'
+    BookDetails:
+      type: object
+      properties:
+        pages:
+          type: integer
+          nullable: true
+          description: Median page count of the editions
+      required:
+      - pages
+    BookItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/BookItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/BookDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    BookItemCategoryEnum:
+      enum:
+      - book
+      type: string
+      description: '* `book` - book'
     Category:
       type: object
       properties:
@@ -133,6 +391,252 @@ components:
       - code
       - field
       - message
+    GameDetails:
+      type: object
+      properties:
+        platforms:
+          type: array
+          items:
+            type: string
+      required:
+      - platforms
+    GameItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/GameItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/GameDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    GameItemCategoryEnum:
+      enum:
+      - game
+      type: string
+      description: '* `game` - game'
+    Item:
+      oneOf:
+      - $ref: '#/components/schemas/MovieItem'
+      - $ref: '#/components/schemas/SeriesItem'
+      - $ref: '#/components/schemas/GameItem'
+      - $ref: '#/components/schemas/AnimeItem'
+      - $ref: '#/components/schemas/MangaItem'
+      - $ref: '#/components/schemas/BookItem'
+      discriminator:
+        propertyName: category
+        mapping:
+          movie: '#/components/schemas/MovieItem'
+          series: '#/components/schemas/SeriesItem'
+          game: '#/components/schemas/GameItem'
+          anime: '#/components/schemas/AnimeItem'
+          manga: '#/components/schemas/MangaItem'
+          book: '#/components/schemas/BookItem'
+    ItemResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Item'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    MangaItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/MangaItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/MediaTypeDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    MangaItemCategoryEnum:
+      enum:
+      - manga
+      type: string
+      description: '* `manga` - manga'
+    MediaTypeDetails:
+      type: object
+      properties:
+        media_type:
+          type: string
+          nullable: true
+          description: OMDb type for movies and series, MAL media type for anime and
+            manga
+      required:
+      - media_type
+    MovieItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/MovieItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/MediaTypeDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    MovieItemCategoryEnum:
+      enum:
+      - movie
+      type: string
+      description: '* `movie` - movie'
+    MyReview:
+      type: object
+      properties:
+        id:
+          type: integer
+        rating:
+          type: number
+          format: double
+          maximum: 100
+          minimum: -100
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+      required:
+      - id
+      - rating
     Problem:
       type: object
       properties:
@@ -156,6 +660,144 @@ components:
       - status
       - title
       - type
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/SearchResultCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+        genres:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Null when the provider's search doesn't give genres; [] when
+            it gave none
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10. Null when the provider's search
+            doesn't give it
+        my_review:
+          allOf:
+          - $ref: '#/components/schemas/MyReview'
+          nullable: true
+          description: The logged-in user's review of this item, if any
+      required:
+      - category
+      - end_year
+      - genres
+      - id
+      - image_url
+      - my_review
+      - provider_rating
+      - start_year
+      - title
+    SearchResultCategoryEnum:
+      enum:
+      - movie
+      - series
+      - game
+      - anime
+      - manga
+      - book
+      type: string
+      description: |-
+        * `movie` - movie
+        * `series` - series
+        * `game` - game
+        * `anime` - anime
+        * `manga` - manga
+        * `book` - book
+    SearchResultListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    SeriesItem:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          $ref: '#/components/schemas/SeriesItemCategoryEnum'
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        start_year:
+          type: integer
+          nullable: true
+        end_year:
+          type: integer
+          nullable: true
+          description: Null for a single year and for ongoing titles
+        genres:
+          type: array
+          items:
+            type: string
+        creators:
+          type: array
+          items:
+            type: string
+          description: Crew, studios, developers or authors
+        languages:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        provider_rating:
+          type: number
+          format: double
+          nullable: true
+          description: The source's rating, 0-10
+        details:
+          $ref: '#/components/schemas/MediaTypeDetails'
+      required:
+      - category
+      - creators
+      - description
+      - details
+      - end_year
+      - genres
+      - id
+      - image_url
+      - languages
+      - provider_rating
+      - start_year
+      - title
+    SeriesItemCategoryEnum:
+      enum:
+      - series
+      type: string
+      description: '* `series` - series'
     Subcategory:
       type: object
       properties:
@@ -205,3 +847,7 @@ tags:
   description: Review categories and their data sources
 - name: tags
   description: A user's most-used review tags
+- name: search
+  description: Search a category's data source
+- name: items
+  description: Items (titles) by id

@@ -288,6 +288,22 @@ class MALProviderTest(SimpleTestCase):
             'year': '2019-2019',
         })
 
+    def test_search_gives_genres_and_rating_from_the_same_request(self):
+        nodes = [
+            {'node': _mal_node(1, mean=9.3, genres=[{'id': 2, 'name': 'Adventure'}, {'id': 8, 'name': 'Drama'}])},
+            {'node': _mal_node(2, mean=7)},
+        ]
+        with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'data': nodes})) as get_mock:
+            results = MALProvider('anime').search('frieren')
+
+        self.assertEqual(get_mock.call_count, 1)
+        self.assertIn('&fields=id,title,main_picture,start_date,end_date,mean,genres', get_mock.call_args.args[0])
+        self.assertEqual(results[0].genres, ['Adventure', 'Drama'])
+        self.assertEqual(results[0].provider_rating, 9.3)
+        # MAL leaves out an empty genre list.
+        self.assertEqual(results[1].genres, [])
+        self.assertEqual(results[1].provider_rating, 7)
+
     def test_search_without_results_is_not_found(self):
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data={'data': []})):
             with self.assertRaises(ItemNotFound) as ctx:
@@ -395,6 +411,16 @@ class MALProviderTest(SimpleTestCase):
         self.assertEqual(ctx.exception.message, 'Missing prefix in item id.')
         get_mock.assert_not_called()
 
+    def test_details_rejects_invalid_ids(self):
+        for item_id in ['mal_anime_abc', 'mal_anime_052991', 'mal_anime_', 'mal_anime_1/2', 'mal_anime_1?x=2']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_GET) as get_mock:
+                    with self.assertRaises(InvalidItemId) as ctx:
+                        MALProvider('anime').get_details(item_id)
+
+                self.assertEqual(ctx.exception.message, 'Invalid anime id.')
+                get_mock.assert_not_called()
+
     def test_optional_fields_null_or_missing(self):
         optional = ['main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis']
         for missing in (_DROP, None):
@@ -448,16 +474,18 @@ class MALProviderTest(SimpleTestCase):
             ('picture url not text', {'main_picture': {'large': 5}}),
             ('start_date not text', {'start_date': 2019}),
             ('end_date not text', {'end_date': ['2019']}),
-        ]
-        anime_cases = [
             ('genres not a list', {'genres': 'Action'}),
             ('genres not objects', {'genres': [1, 2]}),
             ('genre name not text', {'genres': [{'id': 1, 'name': 5}]}),
+            ('mean text', {'mean': '8.5'}),
+            ('mean bool', {'mean': True}),
+            ('mean NaN', {'mean': float('nan')}),
+            ('mean infinite', {'mean': float('inf')}),
+        ]
+        anime_cases = [
             ('studios not a list', {'studios': {'name': 'MAPPA'}}),
             ('studios not objects', {'studios': [1]}),
             ('studio name not text', {'studios': [{'id': 1, 'name': ['MAPPA']}]}),
-            ('mean text', {'mean': '8.5'}),
-            ('mean bool', {'mean': True}),
             ('synopsis not text', {'synopsis': 5}),
             ('media_type not text', {'media_type': ['tv']}),
         ]
@@ -692,6 +720,16 @@ class OMDbProviderTest(SimpleTestCase):
                 OMDbProvider('movie').get_details('tt0903747')
 
         get_mock.assert_not_called()
+
+    def test_details_rejects_invalid_ids(self):
+        for item_id in ['omdb_TT0903747', 'omdb_tt', 'omdb_nm0000206', 'omdb_tt1&type=series', 'omdb_tt1 ']:
+            with self.subTest(item_id=item_id):
+                with mock.patch(REQUESTS_GET) as get_mock:
+                    with self.assertRaises(InvalidItemId) as ctx:
+                        OMDbProvider(None).get_details(item_id)
+
+                self.assertEqual(ctx.exception.message, 'Invalid IMDb id.')
+                get_mock.assert_not_called()
 
     def test_optional_keys_missing_or_null(self):
         optional = ['Poster', 'Year', 'Genre', 'Director', 'Writer', 'Actors', 'Plot', 'imdbRating', 'Language', 'Type']
@@ -1337,6 +1375,17 @@ class OpenLibraryProviderTest(SimpleTestCase):
             },
         ])
 
+    def test_search_gives_rating_but_not_genres(self):
+        docs = [ol_search_doc(), ol_search_doc('OL1W', ratings_average=None), ol_search_doc('OL2W', ratings_average=0)]
+        with mock.patch(REQUESTS_GET, side_effect=ol_requests_get(search_docs=docs)) as get_mock:
+            results = OpenLibraryProvider().search('hobbit')
+
+        self.assertEqual(get_mock.call_count, 1)
+        self.assertIn('&fields=key,title,author_name,first_publish_year,cover_i,ratings_average', get_mock.call_args.args[0])
+        self.assertEqual([result.provider_rating for result in results], [8.6, None, None])
+        # Genres would need a request per work, so they stay unknown.
+        self.assertEqual([result.genres for result in results], [None, None, None])
+
     def test_requests_identify_the_app(self):
         with mock.patch(REQUESTS_GET, side_effect=ol_requests_get()) as get_mock:
             OpenLibraryProvider().search('hobbit')
@@ -1505,12 +1554,13 @@ class OpenLibraryProviderTest(SimpleTestCase):
             ('key not text', {'docs': [ol_search_doc(key=27482)]}),
             ('cover_i text', {'docs': [ol_search_doc(cover_i='14627509')]}),
             ('first_publish_year text', {'docs': [ol_search_doc(first_publish_year='1937')]}),
+            ('ratings_average text', {'docs': [ol_search_doc(ratings_average='4.3')]}),
+            ('ratings_average NaN', {'docs': [ol_search_doc(ratings_average=float('nan'))]}),
         ]
         search_cases = search_body_cases + [
             ('one bad doc among good ones', {'docs': [ol_search_doc(), ol_search_doc('OL1W', cover_i='14627509')]}),
         ]
         details_cases = [(name, {'search_json': body}) for name, body in search_body_cases] + [
-            ('ratings_average text', {'search_json': {'docs': [ol_search_doc(ratings_average='4.3')]}}),
             ('number_of_pages_median text', {'search_json': {'docs': [ol_search_doc(number_of_pages_median='310')]}}),
             ('author_name a string', {'search_json': {'docs': [ol_search_doc(author_name='J.R.R. Tolkien')]}}),
             ('work body is a list', {'work_json': [ol_work()]}),

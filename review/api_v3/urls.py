@@ -3,9 +3,13 @@
 from django.urls import path
 
 from .categories import CategoryListView
+from .items import ItemDetailView
+from .search import SearchView
 from .tags import TagListView
 
 urlpatterns = [
     path('categories', CategoryListView.as_view(), name='v3-categories'),
     path('tags', TagListView.as_view(), name='v3-tags'),
+    path('search', SearchView.as_view(), name='v3-search'),
+    path('items/<str:item_id>', ItemDetailView.as_view(), name='v3-item'),
 ]

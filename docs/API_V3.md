@@ -14,6 +14,8 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 |---|---|---|---|
 | GET | `/api/v3/categories` | public | Categories, with filter subcategories, data source and rating label |
 | GET | `/api/v3/tags` | public; defaults to the logged-in user | A user's most-used tags |
+| GET | `/api/v3/search` | logged in; throttle `search` | Search a category's data source |
+| GET | `/api/v3/items/{item_id}` | logged in | An item, stored or fetched from its data source |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
 
@@ -65,6 +67,100 @@ A user's most-used tags, for tag suggestions. `GET /api/v3/tags?username=alice&l
 - The view keeps the default authentication classes, because the result can
   depend on who is logged in. Unlike `/categories`, an invalid or expired
   `Authorization` token gets 401 `UNAUTHENTICATED`.
+
+### Items
+
+An item is a title (a movie, game, book, ...). `/items` returns this shape;
+search results are a shorter form of it (see `/search`):
+
+```json
+{
+  "id": "mal_anime_52991",
+  "category": "anime",
+  "title": "Sousou no Frieren",
+  "image_url": "https://...",
+  "start_year": 2023,
+  "end_year": 2024,
+  "genres": ["Adventure", "Drama", "Fantasy"],
+  "creators": ["Madhouse"],
+  "languages": [],
+  "description": "...",
+  "provider_rating": 9.3,
+  "details": {"media_type": "tv"}
+}
+```
+
+- The id's prefix names the data source: `omdb_` (movies and series),
+  `igdb_` (games), `mal_anime_` / `mal_manga_`, and `olib_` (books). Stored
+  `rawg_` games from before IGDB are still served, but can't be fetched.
+- `details` holds the category's own fields. In the schema, `Item` is a
+  union discriminated by `category`:
+
+  | Category | `details` |
+  |---|---|
+  | movie, series | `{"media_type": "movie"}` (OMDb type) |
+  | anime, manga | `{"media_type": "tv"}` (MyAnimeList media type) |
+  | game | `{"platforms": ["PC (Microsoft Windows)", "PlayStation 5"]}` |
+  | book | `{"pages": 412}` |
+
+- `start_year` / `end_year` come from the stored year text. `end_year` is
+  `null` both for a single year and for a title that's still running.
+- `provider_rating` is the data source's rating on a 0-10 scale.
+- Items are stored in the old `ReviewItem` columns (`attr1` = genres,
+  `attr2` = creators, `attr3` = details, comma-separated text); the
+  serializer in `review/api_v3/items.py` maps them.
+
+### `GET /api/v3/search`
+
+`GET /api/v3/search?category=movie&q=detective pikachu`:
+
+```json
+{
+  "data": [
+    {
+      "id": "omdb_tt5884052", "category": "movie", "title": "Pokémon Detective Pikachu",
+      "image_url": "https://...", "start_year": 2019, "end_year": null,
+      "genres": null, "provider_rating": null,
+      "my_review": {"id": 42, "rating": 7.5}
+    }
+  ],
+  "meta": {}
+}
+```
+
+- `category` (one of the categories above) and `q` (at most 100 characters)
+  are required; otherwise 400 `VALIDATION_ERROR`.
+- For `movie` and `series`, `q` may be a full IMDb title URL; the result is
+  that one title, with `genres` and `provider_rating` filled (OMDb's lookup
+  by id gives them in the same request). The URL of a series in a movie
+  search (or the other way round) is 400 `VALIDATION_ERROR` on `q`.
+- `genres` and `provider_rating` are filled only when the data source's
+  search gives them, with no extra requests. `null` means unknown, `[]`
+  means the source reported no genres:
+
+  | Source | `genres` | `provider_rating` |
+  |---|---|---|
+  | IGDB | yes | yes |
+  | MyAnimeList | yes | yes |
+  | Open Library | `null` | yes |
+  | OMDb | `null` | `null` |
+
+- `my_review` is the logged-in user's review of the item, or `null`.
+- Nothing found is `200` with `data: []`. A failing data source is 502
+  `UPSTREAM_ERROR`. Search spends the sources' quotas, so it needs a login
+  and uses the `search` rate limit.
+
+### `GET /api/v3/items/{item_id}`
+
+Returns the item in the shape above. A stored item is returned as it is;
+otherwise it's fetched from the data source its prefix names, stored, and
+returned.
+
+| Case | Response |
+|---|---|
+| Unknown prefix (or an unstored `rawg_` id) | 404 `NOT_FOUND` |
+| The data source has no such item | 404 `NOT_FOUND` |
+| The data source fails | 502 `UPSTREAM_ERROR` |
 
 ## Successful responses
 
@@ -120,6 +216,7 @@ sent with `Content-Type: application/problem+json`:
 | `NOT_ACCEPTABLE` | 406 | `Accept` doesn't allow JSON |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Body isn't `application/json` |
 | `RATE_LIMITED` | 429 | Throttled. Sent with a `Retry-After` header (seconds) |
+| `UPSTREAM_ERROR` | 502 | An external data source (OMDb, IGDB, MyAnimeList, Open Library) failed |
 | `INTERNAL_ERROR` | 500 | Unhandled exception |
 
 Any other DRF exception gets its own status and `code` = its `default_code`
