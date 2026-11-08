@@ -2,10 +2,13 @@ from datetime import timedelta
 from itertools import count
 from unittest import mock
 
+import yaml
 from django.contrib.auth import get_user_model
+from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from critic.api.tests.test_schema import COMMITTED_SCHEMA
 from review.api_v3 import reviews as reviews_module
 from review.models import Review, ReviewItem
 from review.providers import InvalidItemId, ItemNotFound, UpstreamError
@@ -561,3 +564,21 @@ class DeleteTest(ReviewsApiTestCase):
         self.assertEqual(response.status_code, 204)
         self.assertEqual(response.content, b'')
         self.assertFalse(Review.objects.filter(pk=review.pk).exists())
+
+
+class CommittedSchemaTest(SimpleTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.schema = yaml.safe_load(COMMITTED_SCHEMA.read_text())
+
+    def test_create_request_rating_is_a_number(self):
+        rating = self.schema['components']['schemas']['ReviewCreateRequest']['properties']['rating']
+        self.assertEqual(rating['type'], 'number')
+
+    def test_list_documents_every_filter_param(self):
+        parameters = self.schema['paths']['/api/v3/reviews']['get']['parameters']
+        self.assertLessEqual(
+            {'username', 'q', 'category', 'exclude_category', 'language', 'sort', 'limit', 'offset'},
+            {parameter['name'] for parameter in parameters if parameter['in'] == 'query'},
+        )

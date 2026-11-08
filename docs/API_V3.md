@@ -16,6 +16,11 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | GET | `/api/v3/tags` | public; defaults to the logged-in user | A user's most-used tags |
 | GET | `/api/v3/search` | logged in; throttle `search` | Search a category's data source |
 | GET | `/api/v3/items/{item_id}` | logged in | An item, stored or fetched from its data source |
+| GET | `/api/v3/reviews` | public | Reviews, filtered, sorted and paginated |
+| POST | `/api/v3/reviews` | logged in | Review an item |
+| GET | `/api/v3/reviews/{id}` | public | One review |
+| PATCH | `/api/v3/reviews/{id}` | owner | Change a review's rating, text or tags |
+| DELETE | `/api/v3/reviews/{id}` | owner | Delete a review |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
 
@@ -162,6 +167,91 @@ returned.
 | The data source has no such item | 404 `NOT_FOUND` |
 | The data source fails | 502 `UPSTREAM_ERROR` |
 
+### Reviews
+
+A review, as every reviews endpoint returns it (`item` is the shape under
+Items):
+
+```json
+{
+  "id": 42,
+  "user": {"username": "alice"},
+  "item": { ... },
+  "rating": 7.5,
+  "text": "Great ending.",
+  "tags": ["favourite", "rewatch"],
+  "created_at": "2026-11-08T10:15:00Z",
+  "updated_at": "2026-11-08T10:15:00Z"
+}
+```
+
+- `text` is `null` when empty. `tags` is always a list.
+- `created_at` is `null` for reviews older than this field.
+- GETs ignore credentials, so a stale token or session can't turn a public
+  read into a 401. POST, PATCH and DELETE use the default authentication
+  classes on the same views, so an invalid token there gets 401
+  `UNAUTHENTICATED`.
+
+### `GET /api/v3/reviews`
+
+Paginated, with the usual `limit` and `offset`. All params are optional:
+
+- `username`: only this user's reviews.
+- `q`: search text. Every word has to match the item's details or the
+  review's tags.
+- `category`, `exclude_category`: the ids from `/categories`, including
+  subcategories like `anime:series`. Anything else is 400 `VALIDATION_ERROR`.
+- `language`: whole language names, ignoring case.
+- `category`, `exclude_category` and `language` are lists. Repeat the param,
+  separate values with commas, or both: `?category=movie,series&category=game`.
+- `sort`: `updated`, `-updated` (the default), `title`, `-title`, `rating` or
+  `-rating`. A leading `-` means descending. `title` ignores case. Ties are
+  broken by newest id first. Anything else is 400 `VALIDATION_ERROR`.
+
+### Writing reviews
+
+`POST /api/v3/reviews` takes `item_id` and `rating`, with optional `text` and
+`tags`. `PATCH /api/v3/reviews/{id}` takes the same fields except `item_id`,
+and changes only the fields sent.
+
+- `rating`: a number from 0 to 10, with at most 2 decimal places.
+- `text`: at most 5000 characters. Blank text is stored as `null`.
+- `tags`: at most 10 tags, 100 characters joined with commas. Each is at most
+  50 characters of letters, digits and hyphens. Case-insensitive duplicates
+  keep the first spelling.
+- On PATCH, `text: null` and `tags: []` clear them. Sending `item_id` is 400
+  `VALIDATION_ERROR`: a review's item can't be changed.
+- A user has one review per item.
+
+`POST /api/v3/reviews` fetches and stores the item if it isn't stored yet, as
+`/items/{item_id}` does:
+
+| Case | Response |
+|---|---|
+| Created | 201 with the review and a `Location` header |
+| Invalid fields | 400 `VALIDATION_ERROR` |
+| Not logged in | 401 `UNAUTHENTICATED` |
+| Unknown prefix, or the data source has no such item | 404 `NOT_FOUND` |
+| The user already reviewed the item | 409 `DUPLICATE_REVIEW` |
+| The data source fails | 502 `UPSTREAM_ERROR` |
+
+The 409 body has the id of the existing review:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "code": "DUPLICATE_REVIEW",
+  "detail": "You've already reviewed this item.",
+  "existing_review_id": 42
+}
+```
+
+`PATCH` returns 200 with the review, and `DELETE` returns 204 with no body.
+Both are 401 when not logged in, 403 for another user's review, and 404 for
+a missing id. PUT isn't supported (405).
+
 ## Successful responses
 
 ```json
@@ -214,6 +304,7 @@ sent with `Content-Type: application/problem+json`:
 | `NOT_FOUND` | 404 | No such object, or an unknown `/api/v3/...` path |
 | `METHOD_NOT_ALLOWED` | 405 | Wrong method. Sent with an `Allow` header |
 | `NOT_ACCEPTABLE` | 406 | `Accept` doesn't allow JSON |
+| `DUPLICATE_REVIEW` | 409 | The user already reviewed the item. The body has `existing_review_id` |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Body isn't `application/json` |
 | `RATE_LIMITED` | 429 | Throttled. Sent with a `Retry-After` header (seconds) |
 | `UPSTREAM_ERROR` | 502 | An external data source (OMDb, IGDB, MyAnimeList, Open Library) failed |
