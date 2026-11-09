@@ -1,0 +1,53 @@
+import type { RouteObject } from 'react-router'
+import { LoginPage } from '../auth/LoginPage'
+import { AddReviewPage } from '../features/add-review/AddReviewPage'
+import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
+import { ReviewListPage } from '../features/review-list/ReviewListPage'
+import { AppLayout } from '../layout/AppLayout'
+import { NotFoundPage } from '../layout/NotFoundPage'
+import { ServerErrorPage } from '../layout/ServerErrorPage'
+import { Root } from './Root'
+
+export const routes: RouteObject[] = [
+  {
+    element: <Root />,
+    // Only when the layout itself throws.
+    errorElement: <ServerErrorPage standalone />,
+    children: [
+      // Outside the shell: the login page has no header or footer.
+      { path: 'login', element: <LoginPage />, handle: { title: 'Log in' } },
+      {
+        element: <AppLayout />,
+        children: [
+          {
+            // Pathless, so the header and footer survive a page crash.
+            errorElement: <ServerErrorPage />,
+            children: [
+              {
+                path: '/',
+                element: <ReviewListPage />,
+                children: [
+                  {
+                    path: 'reviews/:id',
+                    element: <ReviewDetailPage />,
+                    handle: { title: 'Review' },
+                  },
+                  {
+                    path: 'add',
+                    element: <AddReviewPage />,
+                    handle: { title: 'Add review' },
+                  },
+                ],
+              },
+              {
+                path: '*',
+                element: <NotFoundPage />,
+                handle: { title: 'Page not found' },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+]

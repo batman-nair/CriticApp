@@ -1,20 +1,10 @@
-import { useCategories } from '../api/queries/categories'
+// Not from 'react-router/dom', which under Vitest loads a second copy of the
+// router and leaves Link without its context.
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { routes } from './routes'
+
+const router = createBrowserRouter(routes)
 
 export function App() {
-  const categories = useCategories()
-
-  return (
-    <>
-      <h1>Critic</h1>
-      {categories.isPending && <p>Loading categories…</p>}
-      {categories.isError && <p role="alert">Couldn't load categories.</p>}
-      {categories.data && (
-        <ul>
-          {categories.data.map((category) => (
-            <li key={category.id}>{category.label}</li>
-          ))}
-        </ul>
-      )}
-    </>
-  )
+  return <RouterProvider router={router} />
 }

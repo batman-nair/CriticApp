@@ -39,4 +39,7 @@ if (typeof document !== 'undefined') {
   Element.prototype.hasPointerCapture = () => false
   Element.prototype.setPointerCapture = () => {}
   Element.prototype.releasePointerCapture = () => {}
+
+  // Nor this, which React Router's ScrollRestoration calls.
+  window.scrollTo = () => {}
 }
