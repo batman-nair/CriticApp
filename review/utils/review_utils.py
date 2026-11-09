@@ -116,11 +116,8 @@ def get_filtered_review_objects(
     return reviews
 
 
-def get_review_languages(username: str='') -> list[str]:
-    """Languages of the reviewed items, most common first, then by name."""
-    reviews = Review.objects.all()
-    if username:
-        reviews = reviews.filter(user__username=username)
+def count_review_languages(reviews) -> list[tuple[str, int]]:
+    """(language, review count) for a review queryset, most common first, then by name."""
     counts = Counter()
     # One row per distinct language string, not per review.
     rows = reviews.values_list('review_item__language').annotate(review_count=Count('id')).order_by()
@@ -128,7 +125,28 @@ def get_review_languages(username: str='') -> list[str]:
         for part in language_list.split(','):
             if part.strip():
                 counts[part.strip()] += review_count
-    return sorted(counts, key=lambda language: (-counts[language], language))
+    return sorted(counts.items(), key=lambda entry: (-entry[1], entry[0]))
+
+
+def get_review_languages(username: str='') -> list[str]:
+    """Languages of the reviewed items, most common first, then by name."""
+    reviews = Review.objects.all()
+    if username:
+        reviews = reviews.filter(user__username=username)
+    return [language for language, _ in count_review_languages(reviews)]
+
+
+def count_reviews_by_category(reviews, categories: list) -> tuple[int, dict[str, int]]:
+    """(total, {category: count}) for a review queryset, in one query.
+
+    `categories` are the ids the category filters take, subcategories included.
+    """
+    # Aliased by position, so an id like "anime:series" isn't a SQL alias.
+    counts = reviews.aggregate(
+        total=Count('id'),
+        **{f'c{index}': Count('id', filter=_categories_to_q([category])) for index, category in enumerate(categories)},
+    )
+    return counts['total'], {category: counts[f'c{index}'] for index, category in enumerate(categories)}
 
 def convert_reviews_to_json(reviews: list) -> dict:
     json_data = {'results': []}

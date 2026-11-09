@@ -3,6 +3,7 @@
 from django.urls import path
 
 from .categories import CategoryListView
+from .facets import ReviewFacetsView
 from .items import ItemDetailView
 from .reviews import ReviewDetailView, ReviewListCreateView
 from .search import SearchView
@@ -14,5 +15,6 @@ urlpatterns = [
     path('search', SearchView.as_view(), name='v3-search'),
     path('items/<str:item_id>', ItemDetailView.as_view(), name='v3-item'),
     path('reviews', ReviewListCreateView.as_view(), name='v3-reviews'),
+    path('reviews/facets', ReviewFacetsView.as_view(), name='v3-review-facets'),
     path('reviews/<int:pk>', ReviewDetailView.as_view(), name='v3-review'),
 ]
