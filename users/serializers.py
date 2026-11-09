@@ -29,6 +29,10 @@ class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(trim_whitespace=False, write_only=True)
 
+    def validate_username(self, value):
+        # Usernames are stored normalized, and the Django login form normalizes too.
+        return User.normalize_username(value)
+
 
 class LoginDataSerializer(serializers.Serializer):
     user = SessionUserSerializer()

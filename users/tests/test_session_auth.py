@@ -88,6 +88,11 @@ class LoginTest(SessionAuthTestCase):
         response = self.client.post(LOGIN_URL, {'username': 'spaced', 'password': ' spaced pass '}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_username_is_normalized_like_the_login_page(self):
+        User.objects.create_user(username='José', password=PASSWORD)
+        response = self.client.post(LOGIN_URL, {'username': 'José', 'password': PASSWORD}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_wrong_password(self):
         response = self.client.post(LOGIN_URL, {'username': 'alice', 'password': 'wrong'}, format='json')
         self.assert_problem(response, status.HTTP_401_UNAUTHORIZED, 'INVALID_CREDENTIALS')
@@ -197,6 +202,11 @@ class RegistrationGateTest(SessionAuthTestCase):
         response = self.client.post(REGISTER_URL, {'username': 'newuser', 'password': PASSWORD})
         self.assert_problem(response, status.HTTP_403_FORBIDDEN, 'REGISTRATION_DISABLED')
         self.assertFalse(User.objects.filter(username='newuser').exists())
+
+    @override_settings(REGISTRATION_ENABLED=False)
+    def test_disabled_comes_before_validation(self):
+        response = self.client.post(REGISTER_URL, {})
+        self.assert_problem(response, status.HTTP_403_FORBIDDEN, 'REGISTRATION_DISABLED')
 
 
 class PathsTest(SessionAuthTestCase):
