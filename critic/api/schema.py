@@ -13,6 +13,14 @@ from rest_framework import serializers
 from .errors import PROBLEM_CONTENT_TYPE, ProblemSerializer, status_title
 
 V3_PATH_PREFIX = '/api/v3/'
+# Unversioned, but part of the v3 schema. By exact path: the JWT endpoints
+# under /api/auth/ stay in v2.
+V3_SESSION_AUTH_PATHS = frozenset({
+    '/api/auth/csrf',
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/session',
+})
 
 V3_SCHEMA_SETTINGS = {
     'TITLE': 'CriticApp API v3',
@@ -33,13 +41,17 @@ V3_SCHEMA_SETTINGS = {
         {'name': 'search', 'description': "Search a category's data source"},
         {'name': 'items', 'description': 'Items (titles) by id'},
         {'name': 'reviews', 'description': "Users' reviews of items"},
+        {'name': 'auth', 'description': 'Browser sessions: CSRF cookie, login, logout, current user'},
     ],
 }
 
 
 def exclude_v3_paths(endpoints, **kwargs):
-    """Preprocessing hook for the v2 schema: leave out /api/v3/ endpoints."""
-    return [endpoint for endpoint in endpoints if not endpoint[0].startswith(V3_PATH_PREFIX)]
+    """Preprocessing hook for the v2 schema: leave out what's in the v3 schema."""
+    return [
+        endpoint for endpoint in endpoints
+        if not endpoint[0].startswith(V3_PATH_PREFIX) and endpoint[0] not in V3_SESSION_AUTH_PATHS
+    ]
 
 
 class PaginationSerializer(serializers.Serializer):

@@ -18,3 +18,25 @@ class UserRegistrationSerializer(serializers.Serializer):
     def validate_password(self, value):
         validate_password(value)
         return value
+
+
+class SessionUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(trim_whitespace=False, write_only=True)
+
+    def validate_username(self, value):
+        # Usernames are stored normalized, and the Django login form normalizes too.
+        return User.normalize_username(value)
+
+
+class LoginDataSerializer(serializers.Serializer):
+    user = SessionUserSerializer()
+
+
+class SessionDataSerializer(serializers.Serializer):
+    user = SessionUserSerializer(allow_null=True)

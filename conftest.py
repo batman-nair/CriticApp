@@ -1,8 +1,11 @@
 import socket
+import sys
+from importlib import import_module
 
 import pytest
 
 
+PRODUCTION_SETTINGS = 'critic.settings.production'
 _LOCAL_HOSTS = {'localhost', '127.0.0.1', '::1'}
 _real_connect = socket.socket.connect
 _real_connect_ex = socket.socket.connect_ex
@@ -28,6 +31,21 @@ def _blocked(target):
         f'Test tried to reach {target!r}. Mock the external API, '
         f'or mark the test with @pytest.mark.integration.'
     )
+
+
+@pytest.fixture
+def production_settings(monkeypatch):
+    """The production settings module, evaluated with the env vars it requires.
+
+    Importing it doesn't change the active (test) settings. It is removed from
+    sys.modules afterwards so a later import runs it again.
+    """
+    monkeypatch.setenv('DB_NAME', 'test')
+    monkeypatch.setenv('DB_USER', 'test')
+    monkeypatch.setenv('DB_PASSWORD', 'test')
+    sys.modules.pop(PRODUCTION_SETTINGS, None)
+    yield import_module(PRODUCTION_SETTINGS)
+    sys.modules.pop(PRODUCTION_SETTINGS, None)
 
 
 @pytest.fixture(autouse=True)

@@ -12,7 +12,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.mixins import ListModelMixin
 
-from critic.api.schema import V3_SCHEMA_SETTINGS, wrapped
+from critic.api.schema import V3_SCHEMA_SETTINGS, V3_SESSION_AUTH_PATHS, wrapped
 from critic.api.views import V3GenericAPIView
 
 COMMITTED_SCHEMA = Path(settings.BASE_DIR) / 'openapi' / 'v3.yaml'
@@ -94,7 +94,9 @@ class TestV3Schema(TestCase):
         # Without versioning_class=None the global versioning reports "3.0 (2.0)".
         self.assertEqual(schema['info']['version'], '3.0')
         self.assertIn('/api/v3/categories', schema['paths'])
-        self.assertFalse([p for p in schema['paths'] if not p.startswith('/api/v3/')])
+        paths = set(schema['paths'])
+        self.assertLessEqual(V3_SESSION_AUTH_PATHS, paths)
+        self.assertFalse([p for p in paths - V3_SESSION_AUTH_PATHS if not p.startswith('/api/v3/')])
         responses = schema['paths']['/api/v3/categories']['get']['responses']
         self.assertIn('application/json', responses['200']['content'])
         self.assertIn('application/problem+json', responses['500']['content'])
@@ -110,3 +112,7 @@ class TestV3Schema(TestCase):
         schema = out.getvalue()
         self.assertIn('/api/v2/reviews/', schema)
         self.assertNotIn('/api/v3/', schema)
+        for path in V3_SESSION_AUTH_PATHS:
+            self.assertNotIn(f'{path}:', schema)
+        self.assertIn('/api/auth/me/', schema)
+        self.assertIn('/api/auth/token/blacklist/', schema)

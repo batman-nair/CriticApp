@@ -117,6 +117,12 @@ kubectl create configmap criticapp-config -n criticapp \
 kubectl apply -f k8s/deployment.yaml
 ```
 
+Sign-ups through `POST /api/auth/register/` are off by default. To allow them,
+add `--from-literal=REGISTRATION_ENABLED="True"` to the ConfigMap, and to the
+same `kubectl create configmap` step in `.github/workflows/deploy-k8s.yml`:
+every deploy rebuilds the ConfigMap from that list, so a value set only by hand
+is lost on the next push.
+
 Apply issuer and ingress with your domains:
 
 ```bash

@@ -27,6 +27,8 @@ class V3ViewMixin:
     first one (JWT) provides that header, and turns 401s into 403s otherwise.
     Public views whose response is the same for everyone may set
     `authentication_classes = []` (their throttles then count per IP).
+    The session auth views set their own classes, without JWT, so a stale
+    token can't turn them into 401s.
     """
     versioning_class = None
     renderer_classes = [JSONRenderer]
