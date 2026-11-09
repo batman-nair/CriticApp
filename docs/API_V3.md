@@ -18,6 +18,7 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | GET | `/api/v3/items/{item_id}` | logged in | An item, stored or fetched from its data source |
 | GET | `/api/v3/reviews` | public | Reviews, filtered, sorted and paginated |
 | POST | `/api/v3/reviews` | logged in | Review an item |
+| GET | `/api/v3/reviews/facets` | public | Review counts per category and language, for filter chips |
 | GET | `/api/v3/reviews/{id}` | public | One review |
 | PATCH | `/api/v3/reviews/{id}` | owner | Change a review's rating, text or tags |
 | DELETE | `/api/v3/reviews/{id}` | owner | Delete a review |
@@ -207,6 +208,44 @@ Paginated, with the usual `limit` and `offset`. All params are optional:
 - `sort`: `updated`, `-updated` (the default), `title`, `-title`, `rating` or
   `-rating`. A leading `-` means descending. `title` ignores case. Ties are
   broken by newest id first. Anything else is 400 `VALIDATION_ERROR`.
+
+### `GET /api/v3/reviews/facets`
+
+Takes the same `username`, `q`, `category`, `exclude_category` and `language`
+params as `GET /api/v3/reviews`, validated the same way. `sort`, `limit` and
+`offset` are ignored.
+
+```json
+{
+  "data": {
+    "total": 7,
+    "categories": [
+      { "id": "movie", "count": 1 },
+      { "id": "series", "count": 0 },
+      { "id": "game", "count": 1 },
+      { "id": "anime:series", "count": 4 },
+      { "id": "anime:movie", "count": 0 },
+      { "id": "manga", "count": 1 },
+      { "id": "book", "count": 0 }
+    ],
+    "languages": [
+      { "name": "English", "count": 12 },
+      { "name": "Japanese", "count": 3 }
+    ]
+  },
+  "meta": {}
+}
+```
+
+- A chip shows what you'd get by switching to it. `total` and the category
+  counts apply every filter except `category` and `exclude_category`, so
+  `total` differs from the list's `count` when a category is selected. The
+  language counts apply every filter except `language`.
+- `categories` always has every chip, zero counts included, in `/categories`
+  order. A category with subcategories appears as those, so there's no `anime`
+  entry.
+- `languages` is most common first, then by name. An item with several
+  languages counts once for each.
 
 ### Writing reviews
 
