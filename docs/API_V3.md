@@ -24,6 +24,10 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | DELETE | `/api/v3/reviews/{id}` | owner | Delete a review |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
+| GET | `/api/auth/csrf` | public | Set the CSRF cookie |
+| POST | `/api/auth/login` | public; CSRF token; throttle `login` | Start a session |
+| POST | `/api/auth/logout` | public; CSRF token when logged in | End the session |
+| GET | `/api/auth/session` | public | The logged-in user, or `null` |
 
 ### `GET /api/v3/categories`
 
@@ -291,6 +295,32 @@ The 409 body has the id of the existing review:
 Both are 401 when not logged in, 403 for another user's review, and 404 for
 a missing id. There is no `PUT` (405 when logged in, 401 otherwise).
 
+### Session auth
+
+The frontend uses Django session cookies plus CSRF. These endpoints are
+outside `/api/v3/` (they're unversioned, under `/api/auth/`) but follow the
+same conventions and are in the v3 schema.
+
+1. `GET /api/auth/csrf` returns 204 and sets the `csrftoken` cookie.
+2. Every write sends the cookie's value in an `X-CSRFToken` header.
+3. `POST /api/auth/login` rotates the token, so read the cookie for each write
+   rather than keeping the value.
+
+| Endpoint | Response |
+|---|---|
+| `POST /api/auth/login` | 200 with the user. Body: `{"username": "...", "password": "..."}` |
+| `POST /api/auth/logout` | 204. Also 204 when there's no session; no CSRF token is needed then |
+| `GET /api/auth/session` | 200 with the user, or `{"user": null}` when logged out. Never 401, so public pages can call it on load |
+
+```json
+{ "data": { "user": { "id": 1, "username": "alice" } }, "meta": {} }
+```
+
+Login errors: 400 `VALIDATION_ERROR` for missing fields, 401
+`INVALID_CREDENTIALS`, 403 `PERMISSION_DENIED` without a valid CSRF token, and
+429 `RATE_LIMITED`. A request rejected for CSRF doesn't count against the rate
+limit.
+
 ## Successful responses
 
 ```json
@@ -338,8 +368,10 @@ sent with `Content-Type: application/problem+json`:
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | Invalid fields; see `errors` |
 | `PARSE_ERROR` | 400 | Malformed request body |
-| `UNAUTHENTICATED` | 401 | Not logged in, or invalid credentials. Sent with a `WWW-Authenticate` header |
-| `PERMISSION_DENIED` | 403 | Logged in but not allowed (including a missing CSRF token) |
+| `UNAUTHENTICATED` | 401 | Not logged in, or an invalid token. Sent with a `WWW-Authenticate` header |
+| `INVALID_CREDENTIALS` | 401 | Wrong username or password on login. No `WWW-Authenticate` header |
+| `PERMISSION_DENIED` | 403 | Logged in but not allowed, or a missing CSRF token (on login, also when not logged in) |
+| `REGISTRATION_DISABLED` | 403 | `POST /api/auth/register/` while `REGISTRATION_ENABLED` is off |
 | `NOT_FOUND` | 404 | No such object, or an unknown `/api/v3/...` path |
 | `METHOD_NOT_ALLOWED` | 405 | Wrong method. Sent with an `Allow` header |
 | `NOT_ACCEPTABLE` | 406 | `Accept` doesn't allow JSON |
@@ -369,7 +401,9 @@ in upper case (that's where `NOT_ACCEPTABLE` comes from).
 - Endpoints whose response is the same for everyone (like `/categories`) set
   `authentication_classes = []`, so a stale token or session can't turn a
   public read into a 401. Other views keep the default authentication
-  classes: JWT must stay first for 401s to carry `WWW-Authenticate`.
+  classes: JWT must stay first for 401s to carry `WWW-Authenticate`. The
+  session endpoints under `/api/auth/` set their own classes, without JWT, so
+  a stale token can't turn them into 401s.
 - Limit/offset pagination (`?limit=&offset=`): the default limit is 20, and the
   maximum is 100. Larger limits are cut down to 100. Invalid values fall back
   to the defaults.
@@ -385,7 +419,7 @@ The rates are in `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']`:
 | `login` | 5/min |
 
 - Rates apply per user when the request is logged in, otherwise per client
-  IP.
+  IP. `login` always counts per client IP.
 - The client IP is the last `X-Forwarded-For` entry (`NUM_PROXIES = 1`:
   Traefik is the one proxy in prod), so a forged header prefix doesn't give a
   fresh bucket.
@@ -397,8 +431,8 @@ The rates are in `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']`:
 ## Schema
 
 - The v3 schema is served at `/api/v3/schema`, with Swagger at
-  `/api/v3/docs`. It covers `/api/v3/...` only (later also the session auth
-  endpoints). The v2 schema at `/api/schema/` leaves out `/api/v3/`.
+  `/api/v3/docs`. It covers `/api/v3/...` and the session auth endpoints. The
+  v2 schema at `/api/schema/` leaves those out.
 - It's generated from `critic/api/schema_urls.py` with
   `V3_SCHEMA_SETTINGS` (`critic/api/schema.py`).
 - Every v3 endpoint documents its real response types, never `dict`. Use
