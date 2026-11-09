@@ -534,16 +534,6 @@ export function Gallery() {
             <Skeleton width={120} aspectRatio="2 / 3" radius={12} />
             <Skeleton width={52} aspectRatio="2 / 3" radius={8} delay={0.15} />
           </Row>
-          <Row label="Composed card">
-            <div className={styles.skeletonCard}>
-              <Skeleton width={120} aspectRatio="2 / 3" radius={12} />
-              <div className={styles.skeletonBars}>
-                <Skeleton height={18} width="85%" delay={0.1} />
-                <Skeleton height={14} width="60%" delay={0.2} />
-                <Skeleton height={28} width={64} radius={8} delay={0.3} />
-              </div>
-            </div>
-          </Row>
         </Section>
       </main>
     </div>

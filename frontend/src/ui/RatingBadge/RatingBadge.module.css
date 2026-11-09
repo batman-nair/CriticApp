@@ -1,8 +1,16 @@
 .root {
   display: inline-flex;
   border-radius: var(--radius-8);
-  background: color-mix(in srgb, var(--cat-base) var(--tint-badge), var(--surface));
-  color: color-mix(in srgb, var(--cat-base), var(--badge-ink) var(--badge-ink-mix));
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-badge),
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--cat-base),
+    var(--badge-ink) var(--badge-ink-mix)
+  );
 }
 
 .score {

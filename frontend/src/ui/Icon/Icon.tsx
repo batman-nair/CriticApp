@@ -49,7 +49,12 @@ interface IconProps {
   className?: string
 }
 
-export function Icon({ name, size = 16, strokeWidth = 2, className }: IconProps) {
+export function Icon({
+  name,
+  size = 16,
+  strokeWidth = 2,
+  className,
+}: IconProps) {
   return (
     <svg
       aria-hidden="true"

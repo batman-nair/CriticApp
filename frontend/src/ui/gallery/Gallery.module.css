@@ -86,12 +86,6 @@
   --poster-radius: 7px;
 }
 
-.skeletonCard {
-  display: flex;
-  gap: var(--space-14);
-  width: min(100%, 360px);
-}
-
 .skeletonBars {
   display: flex;
   flex: 1;

@@ -3,9 +3,30 @@ import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import { Chip } from './Chip'
+import styles from './Chip.module.css'
 
 const dotIn = (button: HTMLElement) =>
   button.querySelector('[aria-hidden="true"]')
+
+it('tints a selected chip only when it has a category', () => {
+  const { rerender } = render(
+    <Chip selected category="movie">
+      Movies
+    </Chip>,
+  )
+  const classes = () => screen.getByRole('button').className.split(' ')
+  expect(classes()).toEqual(
+    expect.arrayContaining([styles.selected, styles.tinted]),
+  )
+
+  rerender(<Chip selected>All</Chip>)
+  expect(classes()).toContain(styles.selected)
+  expect(classes()).not.toContain(styles.tinted)
+
+  rerender(<Chip category="movie">Movies</Chip>)
+  expect(classes()).not.toContain(styles.selected)
+  expect(classes()).not.toContain(styles.tinted)
+})
 
 it('has aria-pressed on a filter chip that follows selected', () => {
   const { rerender } = render(<Chip>All</Chip>)

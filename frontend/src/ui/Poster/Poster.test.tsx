@@ -17,6 +17,15 @@ it('renders the image lazily with its alt text', () => {
   expect(screen.queryByText('D')).not.toBeInTheDocument()
 })
 
+it('tints the placeholder by category', () => {
+  const { container } = render(<Poster title="Dune" category="movie" />)
+
+  const root = container.firstElementChild as HTMLElement
+  expect(root.style.getPropertyValue('--cat-base')).toBe(
+    'var(--cat-movie-base)',
+  )
+})
+
 it('renders a decorative image with an empty alt', () => {
   const { container } = render(<Poster src={SRC} title="Dune" />)
 

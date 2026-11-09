@@ -45,7 +45,7 @@ export function SearchField({
       <VisuallyHidden>
         <label htmlFor={id}>{label}</label>
       </VisuallyHidden>
-      <Icon name="search" size={tone === 'panel' ? 21 : 18} strokeWidth={1.9} />
+      <Icon name="search" size={tone === 'panel' ? 21 : 20} strokeWidth={1.9} />
       <input
         {...rest}
         ref={inputRef}
