@@ -135,3 +135,9 @@ GitHub.sublime-settings
 
 # Claude #
 .claude/
+
+# Frontend #
+node_modules/
+*.local
+# The Python and Django rules above (lib/, parts/, media, db.*) would otherwise drop frontend source
+!frontend/src/**
