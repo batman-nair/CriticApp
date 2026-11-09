@@ -11,7 +11,9 @@
     "format": "prettier --write .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "gen:api": "openapi-typescript ../openapi/v3.yaml -o src/api/schema.d.ts",
+    "check:api": "npm run gen:api -- --check",
+    "check": "npm run check:api && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@tanstack/react-query": "5.107.1",

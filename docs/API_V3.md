@@ -448,3 +448,6 @@ The rates are in `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']`:
   command runs in the Docker image, so the output matches CI. A test fails
   when the committed file is stale, including after dependency bumps of
   drf-spectacular.
+- `make schema` also regenerates `frontend/src/api/schema.d.ts`. Commit it
+  together with `openapi/v3.yaml`; the frontend's `npm run check` fails when
+  the types are stale.
