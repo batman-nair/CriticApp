@@ -139,5 +139,5 @@ GitHub.sublime-settings
 # Frontend #
 node_modules/
 *.local
-# The Python "lib/" rule above would otherwise drop this source directory
-!frontend/src/lib/
+# The Python and Django rules above (lib/, parts/, media, db.*) would otherwise drop frontend source
+!frontend/src/**
