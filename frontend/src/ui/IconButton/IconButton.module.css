@@ -1,0 +1,44 @@
+.root {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-12);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ghost {
+  background: transparent;
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--soft);
+}
+
+.soft {
+  background: var(--soft);
+}
+
+.outline {
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.sm {
+  width: 40px;
+  height: 40px;
+}
+
+.md {
+  width: 44px;
+  height: 44px;
+}
