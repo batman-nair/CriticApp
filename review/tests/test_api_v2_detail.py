@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -5,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from review.models import Review, ReviewItem
+from review.tests.test_api_v2 import V2_REVIEW_KEYS
 
 
 class ReviewDetailV2Test(APITestCase):
@@ -40,6 +42,11 @@ class ReviewDetailV2Test(APITestCase):
         self.assertEqual(json_data['meta']['version'], '2.0')
         self.assertEqual(json_data['data']['review_data'], 'Original review text')
 
+    def test_retrieve_review_exact_keys(self):
+        response = self.client.get(f'/api/v2/reviews/{self.review.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.json()['data']), V2_REVIEW_KEYS)
+
     def test_retrieve_review_unauthenticated(self):
         self.client.logout()
         response = self.client.get(f'/api/v2/reviews/{self.review.pk}/')
@@ -57,6 +64,19 @@ class ReviewDetailV2Test(APITestCase):
         self.review.refresh_from_db()
         self.assertEqual(self.review.review_rating, Decimal('9.0'))
         self.assertEqual(self.review.review_data, 'Updated text')
+
+    def test_update_review_exact_keys_and_sets_updated_at(self):
+        stale = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        Review.objects.filter(pk=self.review.pk).update(updated_at=stale)
+
+        response = self.client.put(
+            f'/api/v2/reviews/{self.review.pk}/',
+            {'review_item': self.item.pk, 'review_rating': '9.0', 'review_data': 'Updated text'},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.json()['data']), V2_REVIEW_KEYS)
+        self.review.refresh_from_db()
+        self.assertGreater(self.review.updated_at, stale)
 
     def test_update_review_as_non_owner_forbidden(self):
         self.client.logout()

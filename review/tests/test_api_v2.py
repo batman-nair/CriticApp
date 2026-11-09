@@ -19,6 +19,8 @@ from review.tests.test_api_utils import (
     ol_work,
 )
 
+V2_REVIEW_KEYS = {'id', 'user', 'review_item', 'review_rating', 'review_data', 'review_tags', 'modified_date'}
+
 
 class _FakeLookupAPI:
     def __init__(self, category):
@@ -108,6 +110,15 @@ class ReviewV2Phase2Test(APITestCase):
         self.assertEqual(json_data['meta']['pagination']['limit'], 1)
         self.assertEqual(json_data['meta']['pagination']['offset'], 0)
         self.assertEqual(len(json_data['data']), 1)
+
+    def test_v2_review_list_exact_keys(self):
+        response = self.client.get('/api/v2/reviews/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        rows = response.json()['data']
+        self.assertEqual(len(rows), 3)
+        for row in rows:
+            self.assertEqual(set(row), V2_REVIEW_KEYS)
 
     def test_v2_review_list_without_limit_offset(self):
         response = self.client.get('/api/v2/reviews/')
@@ -224,6 +235,30 @@ class ReviewV2Phase2Test(APITestCase):
         self.assertIn('meta', json_data)
         self.assertEqual(json_data['meta']['version'], '2.0')
         self.assertEqual(json_data['data']['user'], 'phase2_user')
+
+    def test_v2_create_review_exact_keys_and_sets_updated_at(self):
+        new_item = ReviewItem.objects.create(
+            item_id='omdb_8888888',
+            category='movie',
+            title='Another Movie',
+            image_url='https://example.com/another.png',
+            year='2025',
+            attr1='Drama',
+            attr2='Cast',
+            attr3='Movie',
+            description='Another movie',
+            rating='7.0',
+        )
+        response = self.client.post('/api/v2/reviews/', {
+            'review_item': new_item.pk,
+            'review_rating': '8.0',
+            'review_data': 'Great film!',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        data = response.json()['data']
+        self.assertEqual(set(data), V2_REVIEW_KEYS)
+        self.assertIsNotNone(Review.objects.get(pk=data['id']).updated_at)
 
     def test_v2_create_review_duplicate(self):
         response = self.client.post('/api/v2/reviews/', {
