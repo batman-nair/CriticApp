@@ -25,7 +25,7 @@ export function NotFoundPage() {
           <StatusDigit tone="book">4</StatusDigit>
         </>
       }
-      title="This page isn't on the shelf"
+      title="This page isn’t on the shelf"
       text="The link might be old, or the review was deleted."
       actions={
         <Link

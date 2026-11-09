@@ -23,7 +23,7 @@ function search() {
 it('links back home', () => {
   renderPage()
   expect(
-    screen.getByRole('heading', { name: "This page isn't on the shelf" }),
+    screen.getByRole('heading', { name: 'This page isn’t on the shelf' }),
   ).toBeInTheDocument()
   expect(
     screen.getByRole('link', { name: 'Back to my reviews' }),

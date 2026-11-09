@@ -24,7 +24,7 @@ export function ServerErrorPage({ standalone = false }: ServerErrorPageProps) {
           </>
         }
         title="Something broke on our end"
-        text="It's not you. Give it a moment and try again."
+        text="It’s not you. Give it a moment and try again."
         actions={
           <>
             <Button

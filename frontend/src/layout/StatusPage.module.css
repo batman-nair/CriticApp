@@ -33,6 +33,8 @@
 .tile {
   --poster-width: 132px;
   --poster-radius: var(--radius-18);
+  /* The border goes outside the poster's 2:3 size. */
+  box-sizing: content-box;
   border: 4px solid var(--surface);
   box-shadow: 0 20px 44px var(--shadow-color);
 }

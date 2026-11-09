@@ -34,7 +34,7 @@ vi.mock('../layout/Header', async (importOriginal) => {
 })
 
 const HERO = 'Everything I’ve watched, played and read.'
-const NOT_FOUND = "This page isn't on the shelf"
+const NOT_FOUND = 'This page isn’t on the shelf'
 const SERVER_ERROR = 'Something broke on our end'
 
 function hero() {

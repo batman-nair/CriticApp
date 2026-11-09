@@ -29,6 +29,7 @@
   border-radius: var(--radius-10);
   background: var(--fg);
   color: var(--bg);
+  font-size: var(--text-16);
 }
 
 .actions {
@@ -70,6 +71,7 @@
     width: 30px;
     height: 30px;
     border-radius: 9px;
+    font-size: var(--text-14);
   }
 
   .actions {
