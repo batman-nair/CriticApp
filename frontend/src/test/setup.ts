@@ -33,4 +33,10 @@ if (typeof document !== 'undefined') {
     server.close()
     expectNoUnhandledRequests()
   })
+
+  // jsdom doesn't implement these, and Radix Select calls them.
+  Element.prototype.scrollIntoView = () => {}
+  Element.prototype.hasPointerCapture = () => false
+  Element.prototype.setPointerCapture = () => {}
+  Element.prototype.releasePointerCapture = () => {}
 }
