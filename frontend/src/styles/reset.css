@@ -22,6 +22,11 @@ video {
   max-width: 100%;
 }
 
+img,
+video {
+  height: auto;
+}
+
 button,
 input,
 select,
