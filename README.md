@@ -30,7 +30,7 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 - Use `make dev` to run the app. It serves two URLs:
   - http://devbox:8000: Django, the current site
   - http://devbox:5173: the new frontend, with hot reload and `/api` forwarded to Django
-- To run the frontend outside Compose, use `npm run dev` in `frontend/`. Set `VITE_API_PROXY_TARGET` if Django isn't at `http://localhost:8000`
+- To run the frontend outside Compose, use `npm run dev` in `frontend/`. If Django isn't at `http://localhost:8000`, set `VITE_API_PROXY_TARGET` in your shell (`.env` files aren't read for it)
 - Use `make test` to run tests
 
 ## Environment Notes

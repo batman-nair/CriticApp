@@ -43,7 +43,7 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-  await vite.close()
+  await vite?.close()
   upstream.close()
 })
 
