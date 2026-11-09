@@ -11,14 +11,19 @@
     "format": "prettier --write .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run build"
+    "gen:api": "openapi-typescript ../openapi/v3.yaml -o src/api/schema.d.ts",
+    "check:api": "npm run gen:api -- --check",
+    "check": "npm run check:api && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.107.1",
+    "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@tanstack/react-query-devtools": "5.107.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -31,6 +36,9 @@
     "eslint-plugin-react-refresh": "0.5.7",
     "globals": "17.14.0",
     "jsdom": "31.0.0",
+    "msw": "2.15.0",
+    "openapi-msw": "2.1.1",
+    "openapi-typescript": "7.13.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
@@ -39,5 +47,10 @@
   },
   "engines": {
     "node": ">=24.15 <25"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

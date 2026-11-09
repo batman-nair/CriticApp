@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterAll, afterEach, expect } from 'vitest'
+import { rejectUnhandledRequest, server, takeUnhandledRequests } from './server'
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean
@@ -11,3 +12,25 @@ declare global {
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 afterEach(cleanup)
+
+// setupFiles also runs for tests in the node environment, and MSW would
+// intercept the real local HTTP traffic in vite.config.test.ts.
+if (typeof document !== 'undefined') {
+  // Not in beforeAll: openapi-fetch captures fetch when client.ts is imported,
+  // which happens before any beforeAll, and would then bypass MSW.
+  server.listen({ onUnhandledRequest: rejectUnhandledRequest })
+
+  const expectNoUnhandledRequests = () =>
+    expect(takeUnhandledRequests(), 'requests with no MSW handler').toEqual([])
+
+  afterEach(() => {
+    server.resetHandlers()
+    expectNoUnhandledRequests()
+  })
+
+  // Also catches a request made while the last test tore down, such as on unmount.
+  afterAll(() => {
+    server.close()
+    expectNoUnhandledRequests()
+  })
+}
