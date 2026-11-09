@@ -173,6 +173,19 @@ describe('scroll position', () => {
     expect(scrollTo).not.toHaveBeenCalled()
   })
 
+  it.each(['/add', '/reviews/5'])(
+    'stays put when %s links back to the list',
+    async (path) => {
+      const user = userEvent.setup()
+      const scrollTo = vi.spyOn(window, 'scrollTo')
+      renderRoute(path)
+      scrollTo.mockClear()
+      await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+      expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
+      expect(scrollTo).not.toHaveBeenCalled()
+    },
+  )
+
   it('resets on an ordinary navigation', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo')
