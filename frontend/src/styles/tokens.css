@@ -1,0 +1,202 @@
+/*
+ * Design tokens, with values from the boards in #76.
+ *
+ * Category colours. Set `--cat` and `--cat-base` on an element with
+ * categoryVars() from lib/categories.ts, then in its CSS:
+ *
+ *   dot, ruler accent   var(--cat)
+ *   selected chip       color-mix(in srgb, var(--cat) var(--tint-chip), var(--surface))
+ *   card                color-mix(in srgb, var(--cat-base) var(--tint-card), var(--surface))
+ *   card border         color-mix(in srgb, var(--cat-base) var(--tint-card-line), var(--line))
+ *   dialog              color-mix(in srgb, var(--cat-base) var(--tint-dialog), var(--surface))
+ *   badge background    color-mix(in srgb, var(--cat-base) var(--tint-badge), var(--surface))
+ *   badge text          color-mix(in srgb, var(--cat-base), var(--badge-ink) var(--badge-ink-mix))
+ *
+ * Write these in the component's CSS. A custom property on :root that refers
+ * to --cat would resolve here, where --cat isn't set.
+ *
+ * Tints mix from the mid-tone --cat-base: the pale dark-theme accents would
+ * lift the card enough to take muted text below AA contrast.
+ *
+ * The sizes are named by pixel value on purpose. The boards use many close
+ * sizes with no underlying scale.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --bg: #f4f1ec;
+  --panel: #eae5de;
+  --surface: #fffdfa;
+  --soft: #efeae3;
+  --line: #e5dfd6;
+  --fg: #2a2622;
+  --muted: #6f675f;
+  --btn: #2a2622;
+  --btn-fg: #f4f1ec;
+  --shadow-color: rgba(60, 40, 20, 0.14);
+  --scrim: rgba(42, 34, 26, 0.45);
+  --warn: #8a5a16;
+  --danger-bg: #f8e6e1;
+  --danger-fg: #7a2a20;
+  --danger-btn: #a3342b;
+  --danger-btn-fg: #ffffff;
+  --danger-text: #a3342b;
+
+  /* Category mid-tones: the same in both themes */
+  --cat-movie-base: #b0533a;
+  --cat-series-base: #3d6a94;
+  --cat-game-base: #4f7a43;
+  --cat-anime-series-base: #86539a;
+  --cat-anime-movie-base: #946a22;
+  --cat-manga-base: #2a7670;
+  --cat-book-base: #954560;
+
+  /* Category accents: the mid-tones in light, paler in dark */
+  --cat-movie: var(--cat-movie-base);
+  --cat-series: var(--cat-series-base);
+  --cat-game: var(--cat-game-base);
+  --cat-anime-series: var(--cat-anime-series-base);
+  --cat-anime-movie: var(--cat-anime-movie-base);
+  --cat-manga: var(--cat-manga-base);
+  --cat-book: var(--cat-book-base);
+
+  /* Tint strengths */
+  --tint-card: 9%;
+  --tint-card-line: 22%;
+  --tint-badge: 16%;
+  --tint-dialog: 5%;
+  --tint-chip: 14%;
+  --badge-ink: #15110d;
+  --badge-ink-mix: 42%;
+
+  /* Fonts */
+  --font-sans: 'Figtree Variable', system-ui, -apple-system, sans-serif;
+  --numeric-rating: tabular-nums;
+
+  /* Type */
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-15: 15px;
+  --text-16: 16px;
+  --text-17: 17px;
+  --text-18: 18px;
+  --text-20: 20px;
+  --text-21: 21px;
+  --text-22: 22px;
+  --text-24: 24px;
+  --text-26: 26px;
+  --text-28: 28px;
+  --text-30: 30px;
+  --text-36: 36px;
+  --text-hero: 44px;
+  --text-hero-phone: 30px;
+  --text-rating: 40px;
+  --text-rating-phone: 38px;
+  --text-rating-sheet: 36px;
+
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  --tracking-tightest: -0.04em;
+  --tracking-tighter: -0.03em;
+  --tracking-tight: -0.02em;
+  --tracking-caps: 0.08em;
+
+  --leading-100: 1;
+  --leading-105: 1.05;
+  --leading-108: 1.08;
+  --leading-110: 1.1;
+  --leading-120: 1.2;
+  --leading-125: 1.25;
+  --leading-145: 1.45;
+  --leading-150: 1.5;
+
+  /* Radii */
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-10: 10px;
+  --radius-12: 12px;
+  --radius-14: 14px;
+  --radius-16: 16px;
+  --radius-18: 18px;
+  --radius-20: 20px;
+  --radius-22: 22px;
+  --radius-26: 26px;
+  --radius-full: 999px;
+
+  /* Spacing */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+  --space-48: 48px;
+
+  /* Shadows */
+  --shadow-poster: 0 6px 16px var(--shadow-color);
+  --shadow-card-hover: 0 16px 34px var(--shadow-color);
+  --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-dialog: 0 30px 80px rgba(0, 0, 0, 0.3);
+  --shadow-sheet: 0 -20px 50px rgba(0, 0, 0, 0.25);
+
+  /* Motion */
+  --duration-fast: 0.15s;
+  --duration-medium: 0.25s;
+  --duration-theme: 0.3s;
+  --duration-slow: 0.35s;
+  --duration-pulse: 1.4s;
+  --ease: ease;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #181614;
+  --panel: #201d1a;
+  --surface: #262320;
+  --soft: #322e29;
+  --line: #3a352e;
+  --fg: #eee8e0;
+  --muted: #a39a90;
+  --btn: #eee8e0;
+  --btn-fg: #181614;
+  --shadow-color: rgba(0, 0, 0, 0.45);
+  --scrim: rgba(8, 6, 4, 0.62);
+  --warn: #e0ba76;
+  --danger-bg: #3a2420;
+  --danger-fg: #f2c4bc;
+  --danger-btn: #e8a49a;
+  --danger-btn-fg: #1a1210;
+  --danger-text: #f2a89c;
+
+  --cat-movie: #e39a80;
+  --cat-series: #93b8dd;
+  --cat-game: #a3c995;
+  --cat-anime-series: #cda6de;
+  --cat-anime-movie: #e0ba76;
+  --cat-manga: #83c8c0;
+  --cat-book: #dd94ab;
+
+  --tint-card: 13.5%;
+  --tint-card-line: 28%;
+  --tint-badge: 30%;
+  --tint-dialog: 10%;
+  --tint-chip: 22%;
+  --badge-ink: #ffffff;
+  --badge-ink-mix: 62%;
+}
