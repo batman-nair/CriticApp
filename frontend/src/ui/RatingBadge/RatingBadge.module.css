@@ -1,0 +1,43 @@
+.root {
+  display: inline-flex;
+  border-radius: var(--radius-8);
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-badge),
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--cat-base),
+    var(--badge-ink) var(--badge-ink-mix)
+  );
+}
+
+.score {
+  align-items: baseline;
+  gap: 3px;
+  padding: var(--space-4) var(--space-10);
+  font-size: var(--text-16);
+  font-weight: var(--weight-extrabold);
+  font-variant-numeric: var(--numeric-rating);
+  letter-spacing: var(--tracking-tight);
+}
+
+.unrated {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.scale {
+  font-size: var(--text-11);
+  font-weight: var(--weight-semibold);
+  opacity: 0.75;
+}
+
+.provider {
+  align-items: center;
+  gap: 5px;
+  padding: var(--space-4) 9px;
+  font-size: var(--text-13);
+  font-weight: var(--weight-bold);
+}

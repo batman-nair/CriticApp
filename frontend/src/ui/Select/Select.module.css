@@ -1,0 +1,80 @@
+.trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 34px 0 var(--space-14);
+  border: 0;
+  border-radius: var(--radius-12);
+  background: var(--soft);
+  color: var(--fg);
+  font-size: var(--text-14);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chevron {
+  position: absolute;
+  top: 0;
+  right: var(--space-12);
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+/* Radix copies this z-index to the popper wrapper it positions. */
+.content {
+  z-index: 1000;
+  min-width: var(--radix-select-trigger-width);
+  max-height: var(--radix-select-content-available-height);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.viewport {
+  padding: var(--space-4);
+}
+
+.scrollButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  color: var(--muted);
+}
+
+.up {
+  transform: rotate(180deg);
+}
+
+/* The highlight is the focus indication. */
+.item {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-8);
+  color: var(--fg);
+  font-size: var(--text-14);
+  white-space: nowrap;
+  outline: none;
+  cursor: pointer;
+}
+
+.item[data-highlighted] {
+  background: var(--soft);
+}
+
+.item[data-state='checked'] {
+  font-weight: var(--weight-bold);
+}

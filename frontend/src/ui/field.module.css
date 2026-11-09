@@ -1,0 +1,47 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.label {
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+}
+
+.error {
+  font-size: var(--text-13);
+  color: var(--danger-text);
+}
+
+.control {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  /* The border colour is the focus indicator. */
+  outline: none;
+  color: var(--fg);
+}
+
+.control::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.control:focus {
+  border-color: var(--fg);
+}
+
+.control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--danger-text);
+}
+
+/* The border is already this colour at rest, so focus needs its own mark. */
+.invalid:focus {
+  border-color: var(--danger-text);
+  outline: 1.5px solid var(--danger-text);
+}

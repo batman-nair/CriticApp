@@ -1,0 +1,95 @@
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-16);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+.title {
+  font-size: var(--text-24);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-120);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24) 0;
+  border-top: 1px solid var(--line);
+}
+
+.heading {
+  font-size: var(--text-20);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-120);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.groupLabel,
+.caption {
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+.groupLabel {
+  font-weight: var(--weight-semibold);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-16);
+}
+
+.captioned {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.poster120 {
+  --poster-width: 120px;
+  --poster-radius: var(--radius-12);
+}
+
+.poster52 {
+  --poster-width: 52px;
+  --poster-radius: var(--radius-8);
+}
+
+.poster44 {
+  --poster-width: 44px;
+  /* No token: the boards use 7px only here. */
+  --poster-radius: 7px;
+}
+
+.skeletonBars {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: min(100%, 160px);
+}

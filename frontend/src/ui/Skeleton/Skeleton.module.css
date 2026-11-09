@@ -1,0 +1,23 @@
+.root {
+  display: block;
+  width: var(--skeleton-width, auto);
+  /* auto unless given, so aspect-ratio can take effect. */
+  height: var(--skeleton-height, auto);
+  aspect-ratio: var(--skeleton-aspect-ratio, auto);
+  border-radius: var(--skeleton-radius, var(--radius-8));
+  background: var(--soft);
+  animation: pulse var(--duration-pulse) ease-in-out infinite;
+  /* After the shorthand, which would reset it. */
+  animation-delay: var(--skeleton-delay, 0s);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

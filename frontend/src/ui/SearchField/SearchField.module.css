@@ -1,0 +1,53 @@
+.root {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-16);
+  color: var(--muted);
+}
+
+.root:focus-within {
+  border-color: var(--fg);
+}
+
+.panel {
+  height: 60px;
+  padding: 0 var(--space-10) 0 var(--space-20);
+  border: 1.5px solid transparent;
+  background: var(--surface);
+  gap: var(--space-14);
+}
+
+.sheet {
+  height: 58px;
+  padding: 0 var(--space-16);
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  gap: var(--space-12);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  /* The wrapper's border colour is the focus indicator. */
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--text-18);
+  font-weight: var(--weight-medium);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* The clear button replaces the native one. */
+.input::-webkit-search-cancel-button {
+  display: none;
+}

@@ -1,0 +1,7 @@
+.control {
+  height: 46px;
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-12);
+  background: var(--bg);
+  font-size: var(--text-15);
+}
