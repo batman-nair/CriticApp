@@ -34,6 +34,17 @@ it('does not retry a 4xx', async () => {
   expect(requests).toBe(1)
 })
 
+it('does not retry a 200 with an unreadable body', async () => {
+  const requests = await countRequests(
+    () =>
+      new HttpResponse('<html></html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+  )
+  expect(requests).toBe(1)
+})
+
 it('retries a 5xx twice', async () => {
   const requests = await countRequests(
     () => new HttpResponse(null, { status: 503 }),

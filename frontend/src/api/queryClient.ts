@@ -5,7 +5,7 @@ const MAX_RETRIES = 2
 
 export function shouldRetry(failureCount: number, error: unknown) {
   if (!(error instanceof ApiError)) return false
-  if (error.status >= 400 && error.status < 500) return false
+  if (error.kind !== 'network' && error.status < 500) return false
   return failureCount < MAX_RETRIES
 }
 
