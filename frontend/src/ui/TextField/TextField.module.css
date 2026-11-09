@@ -1,0 +1,26 @@
+.control {
+  width: 100%;
+  height: 46px;
+  padding: 0 var(--space-14);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-12);
+  /* The border colour is the focus indicator. */
+  outline: none;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--text-15);
+}
+
+.control::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.control:focus {
+  border-color: var(--fg);
+}
+
+.invalid,
+.invalid:focus {
+  border-color: var(--danger-text);
+}

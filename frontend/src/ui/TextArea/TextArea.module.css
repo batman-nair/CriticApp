@@ -1,0 +1,46 @@
+.control {
+  width: 100%;
+  padding: var(--space-12) var(--space-14);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-14);
+  /* The border colour is the focus indicator. */
+  outline: none;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-17);
+  line-height: var(--leading-145);
+  resize: none;
+}
+
+.control::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.control:focus {
+  border-color: var(--fg);
+}
+
+.invalid,
+.invalid:focus {
+  border-color: var(--danger-text);
+}
+
+.footer {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-12);
+}
+
+.counter {
+  flex-shrink: 0;
+  /* Stays right-aligned with no error beside it. */
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-variant-numeric: var(--numeric-rating);
+}
+
+.over {
+  color: var(--warn);
+}
