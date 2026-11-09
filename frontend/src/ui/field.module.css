@@ -1,0 +1,15 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.label {
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+}
+
+.error {
+  font-size: var(--text-13);
+  color: var(--danger-text);
+}
