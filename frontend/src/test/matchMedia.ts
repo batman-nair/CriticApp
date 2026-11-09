@@ -1,6 +1,5 @@
 import { vi } from 'vitest'
-
-type Theme = 'light' | 'dark'
+import type { Theme } from '../layout/useTheme'
 
 /**
  * jsdom has no matchMedia. Undo with vi.unstubAllGlobals().

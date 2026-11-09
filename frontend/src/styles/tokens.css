@@ -44,15 +44,6 @@
   --danger-btn-fg: #ffffff;
   --danger-text: #a3342b;
 
-  /* Category accents */
-  --cat-movie: #b0533a;
-  --cat-series: #3d6a94;
-  --cat-game: #4f7a43;
-  --cat-anime-series: #86539a;
-  --cat-anime-movie: #946a22;
-  --cat-manga: #2a7670;
-  --cat-book: #954560;
-
   /* Category mid-tones: the same in both themes */
   --cat-movie-base: #b0533a;
   --cat-series-base: #3d6a94;
@@ -61,6 +52,15 @@
   --cat-anime-movie-base: #946a22;
   --cat-manga-base: #2a7670;
   --cat-book-base: #954560;
+
+  /* Category accents: the mid-tones in light, paler in dark */
+  --cat-movie: var(--cat-movie-base);
+  --cat-series: var(--cat-series-base);
+  --cat-game: var(--cat-game-base);
+  --cat-anime-series: var(--cat-anime-series-base);
+  --cat-anime-movie: var(--cat-anime-movie-base);
+  --cat-manga: var(--cat-manga-base);
+  --cat-book: var(--cat-book-base);
 
   /* Tint strengths */
   --tint-card: 9%;
