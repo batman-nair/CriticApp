@@ -1,0 +1,91 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: var(--space-18) var(--space-32);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-10);
+  color: inherit;
+  font-size: var(--text-20);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+  text-decoration: none;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-10);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.addLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.login {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-10);
+  color: inherit;
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+/* Below 640px. A media query can't read a custom property. */
+@media (max-width: 639px) {
+  .header {
+    gap: var(--space-8);
+    padding: var(--space-18) var(--space-16) 0 var(--space-20);
+  }
+
+  .logo {
+    gap: var(--space-8);
+    font-size: var(--text-18);
+  }
+
+  .tile {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .actions {
+    gap: var(--space-4);
+  }
+
+  /* Two classes: Button's .md sets the padding at one. */
+  .actions .add {
+    padding: 0 var(--space-14);
+  }
+
+  .addLabel {
+    gap: var(--space-6);
+  }
+
+  .addSuffix {
+    display: none;
+  }
+}
