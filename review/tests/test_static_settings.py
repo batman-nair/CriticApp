@@ -57,4 +57,26 @@ def test_templates_render_with_production_static_storage(tmp_path, production_se
         for name in template_names:
             get_template(name).render({})
 
-        assert re.fullmatch(r'/static/css/base\.[0-9a-f]{12}\.css', static('css/base.css'))
+        assert re.fullmatch(r'/api/static/css/base\.[0-9a-f]{12}\.css', static('css/base.css'))
+
+
+@pytest.mark.parametrize('path', ['/api/static/css/base.css', '/api/static/admin/css/base.css'])
+def test_static_files_are_served_from_the_api_prefix(client, path):
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response['Content-Type'].startswith('text/css')
+    # Consuming the stream makes the test client close the response. Closing
+    # it again here would fire request_finished and touch the database.
+    assert b''.join(response.streaming_content)
+
+
+def test_static_files_are_gone_from_the_old_prefix(client):
+    assert client.get('/static/css/base.css').status_code == 404
+
+
+def test_favicon_redirects_to_the_api_static_prefix(client):
+    response = client.get('/favicon.ico')
+
+    assert response.status_code == 302
+    assert response['Location'] == '/api/static/favicon.ico'
