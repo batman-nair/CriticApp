@@ -11,3 +11,8 @@ it('records a request with no handler and fails it', async () => {
     'GET http://localhost:3000/api/v3/tags',
   ])
 })
+
+// it.fails also covers afterEach, which is where setup.ts fails this test.
+it.fails('fails a test that handles the failed request itself', async () => {
+  await client.GET('/api/v3/tags')
+})

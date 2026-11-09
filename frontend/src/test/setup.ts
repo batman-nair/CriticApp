@@ -20,10 +20,17 @@ if (typeof document !== 'undefined') {
   // which happens before any beforeAll, and would then bypass MSW.
   server.listen({ onUnhandledRequest: rejectUnhandledRequest })
 
+  const expectNoUnhandledRequests = () =>
+    expect(takeUnhandledRequests(), 'requests with no MSW handler').toEqual([])
+
   afterEach(() => {
     server.resetHandlers()
-    expect(takeUnhandledRequests(), 'requests with no MSW handler').toEqual([])
+    expectNoUnhandledRequests()
   })
 
-  afterAll(() => server.close())
+  // Also catches a request that arrived after the last test's check.
+  afterAll(() => {
+    server.close()
+    expectNoUnhandledRequests()
+  })
 }
