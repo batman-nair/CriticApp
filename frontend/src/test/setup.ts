@@ -28,7 +28,7 @@ if (typeof document !== 'undefined') {
     expectNoUnhandledRequests()
   })
 
-  // Also catches a request that arrived after the last test's check.
+  // Also catches a request made while the last test tore down, such as on unmount.
   afterAll(() => {
     server.close()
     expectNoUnhandledRequests()
