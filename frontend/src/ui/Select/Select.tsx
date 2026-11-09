@@ -2,7 +2,7 @@ import * as RadixSelect from '@radix-ui/react-select'
 import { Icon } from '../Icon/Icon'
 import styles from './Select.module.css'
 
-// Radix treats '' as "no value" and forbids it on an Item.
+// Radix treats '' as "no value", which would leave the trigger blank.
 const EMPTY_VALUE = '__critic-select-empty__'
 
 const toRadix = (value: string) => (value === '' ? EMPTY_VALUE : value)
