@@ -11,3 +11,19 @@ services:
   db:
     ports:
       - "5432:5432"
+  frontend:
+    image: node:24-slim
+    working_dir: /frontend
+    command: sh -c "npm ci && exec npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./frontend:/frontend
+      - frontend_node_modules:/frontend/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_PROXY_TARGET=http://web:8000
+    depends_on:
+      - web
+
+volumes:
+  frontend_node_modules:
