@@ -6,6 +6,118 @@ info:
     {"data": ..., "meta": {...}}; errors are RFC 9457 problem+json with a stable `code`.
     See docs/API_V3.md.'
 paths:
+  /api/auth/csrf:
+    get:
+      operationId: auth_csrf_retrieve
+      description: Sets the `csrftoken` cookie. Send its value as `X-CSRFToken` on
+        writes.
+      summary: Set the CSRF cookie
+      tags:
+      - auth
+      responses:
+        '204':
+          description: No response body
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+  /api/auth/login:
+    post:
+      operationId: auth_login_create
+      description: Starts a session. This also rotates the CSRF token, so read the
+        cookie again afterwards.
+      summary: Log in
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginDataResponse'
+          description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '429':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+  /api/auth/logout:
+    post:
+      operationId: auth_logout_create
+      description: Ends the session on the server. Succeeds when there is no session
+        too.
+      summary: Log out
+      tags:
+      - auth
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+  /api/auth/session:
+    get:
+      operationId: auth_session_retrieve
+      description: 'The logged-in user, or `user: null`. Never 401, so public pages
+        can call it on load.'
+      summary: Get the session user
+      tags:
+      - auth
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDataResponse'
+          description: ''
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
   /api/v3/categories:
     get:
       operationId: categories_list
@@ -976,6 +1088,38 @@ components:
       required:
       - count
       - name
+    LoginData:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/SessionUser'
+      required:
+      - user
+    LoginDataResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LoginData'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
     MangaItem:
       type: object
       properties:
@@ -1456,6 +1600,37 @@ components:
       - series
       type: string
       description: '* `series` - series'
+    SessionData:
+      type: object
+      properties:
+        user:
+          allOf:
+          - $ref: '#/components/schemas/SessionUser'
+          nullable: true
+      required:
+      - user
+    SessionDataResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/SessionData'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    SessionUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+      - id
+      - username
     Subcategory:
       type: object
       properties:
@@ -1511,3 +1686,5 @@ tags:
   description: Items (titles) by id
 - name: reviews
   description: Users' reviews of items
+- name: auth
+  description: 'Browser sessions: CSRF cookie, login, logout, current user'
