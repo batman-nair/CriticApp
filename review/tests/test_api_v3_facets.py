@@ -125,6 +125,11 @@ class LanguagesTest(FacetsTestCase):
         add_review(self.alice, language='Spanish')
         self.assertEqual(self.languages(), [('Spanish', 2), ('German', 1), ('Korean', 1)])
 
+    def test_tie_is_ordered_by_name_within_one_stored_string(self):
+        # One row, so the database's row order can't hide a missing tiebreak.
+        add_review(self.alice, language='Zulu, Arabic')
+        self.assertEqual(self.languages(), [('Arabic', 1), ('Zulu', 1)])
+
     def test_comma_separated_entries_are_split_and_trimmed(self):
         add_review(self.alice, language='Japanese,  English ,')
         add_review(self.alice, language='English')
