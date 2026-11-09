@@ -154,6 +154,16 @@ UPSTREAM_API_QUOTA_WARN_AT = (80, 100)
 ALERT_TELEGRAM_BOT_TOKEN = os.environ.get('ALERT_TELEGRAM_BOT_TOKEN', '')
 ALERT_TELEGRAM_CHAT_ID = os.environ.get('ALERT_TELEGRAM_CHAT_ID', '')
 
+REGISTRATION_ENABLED = os.environ.get('REGISTRATION_ENABLED', 'False').lower() == 'true'
+
+# The frontend is on the same domain and uses session cookies plus CSRF. It
+# reads the CSRF cookie, so that one can't be HttpOnly. `Secure` is set in
+# production.py.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
