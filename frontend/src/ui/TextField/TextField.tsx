@@ -29,7 +29,12 @@ export function TextField({
       <input
         {...rest}
         id={id}
-        className={cx(styles.control, error && styles.invalid, className)}
+        className={cx(
+          fieldStyles.control,
+          styles.control,
+          error && fieldStyles.invalid,
+          className,
+        )}
         aria-invalid={error ? true : ariaInvalid}
         aria-describedby={cx(ariaDescribedBy, error && errorId) || undefined}
       />

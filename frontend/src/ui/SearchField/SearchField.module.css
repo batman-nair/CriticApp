@@ -37,6 +37,11 @@
   font-weight: var(--weight-medium);
 }
 
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .input::placeholder {
   color: var(--muted);
   opacity: 1;

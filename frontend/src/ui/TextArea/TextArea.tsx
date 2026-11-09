@@ -27,6 +27,8 @@ export function TextArea({
   const errorId = `${id}-error`
   const counterId = `${id}-counter`
   const hasCounter = counterMax !== undefined
+  // By code point, as the backend's limit counts; .length counts emoji as two.
+  const length = Array.from(value).length
 
   return (
     <div className={fieldStyles.field}>
@@ -38,7 +40,12 @@ export function TextArea({
         id={id}
         value={value}
         rows={rows}
-        className={cx(styles.control, error && styles.invalid, className)}
+        className={cx(
+          fieldStyles.control,
+          styles.control,
+          error && fieldStyles.invalid,
+          className,
+        )}
         aria-invalid={error ? true : ariaInvalid}
         aria-describedby={
           cx(ariaDescribedBy, hasCounter && counterId, error && errorId) ||
@@ -55,12 +62,9 @@ export function TextArea({
           {hasCounter && (
             <span
               id={counterId}
-              className={cx(
-                styles.counter,
-                value.length > counterMax && styles.over,
-              )}
+              className={cx(styles.counter, length > counterMax && styles.over)}
             >
-              {`${value.length} / ${counterMax}`}
+              {`${length} / ${counterMax}`}
             </span>
           )}
         </div>

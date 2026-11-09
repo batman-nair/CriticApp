@@ -110,6 +110,12 @@ it('warns only above the limit', () => {
   )
 })
 
+it('counts an emoji as one character, as the backend does', () => {
+  render(<TextArea label="Notes" value="😀😀" counterMax={2} readOnly />)
+
+  expect(screen.getByText('2 / 2').className).toBe(styles.counter)
+})
+
 it('never sets maxLength from the counter', () => {
   render(<TextArea label="Notes" value="abcde" counterMax={4} readOnly />)
 
