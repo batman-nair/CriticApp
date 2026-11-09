@@ -1,0 +1,65 @@
+.root {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter {
+  height: 40px;
+  padding: 0 var(--space-14);
+  border: 0;
+  border-radius: var(--radius-12);
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--text-14);
+  font-weight: var(--weight-medium);
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+/* Not on selected chips, so the state stays visible under the pointer. */
+.filter:not(.selected, :disabled):hover {
+  background: var(--soft);
+}
+
+.selected {
+  background: var(--surface);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-chip);
+}
+
+.tinted {
+  background: color-mix(in srgb, var(--cat) var(--tint-chip), var(--surface));
+}
+
+.suggestion {
+  height: 34px;
+  padding: 0 var(--space-12);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat);
+}
+
+.count {
+  font-size: var(--text-12);
+  opacity: 0.65;
+}
