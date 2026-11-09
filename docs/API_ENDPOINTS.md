@@ -127,7 +127,7 @@ Versioning options:
 
 ## Staff Pages
 
-- `GET /usage/` — HTML page with external API usage (today, this month, last 30 days) against quotas; non-staff users are redirected to the admin login
+- `GET /api/usage/` — HTML page with external API usage (today, this month, last 30 days) against quotas; non-staff users are redirected to the admin login
 
 ## Schema and Interactive Docs
 

@@ -30,7 +30,7 @@ server {
     client_max_body_size 100M;
 
     # Serve static files directly from bind mount
-    location /static/ {
+    location /api/static/ {
         alias /var/www/criticapp/static/;
         expires 30d;
         add_header Cache-Control "public, immutable";
