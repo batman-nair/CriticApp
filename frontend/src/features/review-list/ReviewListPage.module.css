@@ -1,0 +1,32 @@
+.hero {
+  padding: var(--space-48) 0 var(--space-24);
+}
+
+.title {
+  font-size: var(--text-hero);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tightest);
+  line-height: var(--leading-105);
+}
+
+.watched {
+  color: var(--cat-movie);
+}
+
+.played {
+  color: var(--cat-game);
+}
+
+.read {
+  color: var(--cat-book);
+}
+
+@media (max-width: 639px) {
+  .hero {
+    padding: 26px 0 var(--space-18);
+  }
+
+  .title {
+    font-size: var(--text-hero-phone);
+  }
+}
