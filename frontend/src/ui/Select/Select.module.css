@@ -45,6 +45,18 @@
   padding: var(--space-4);
 }
 
+.scrollButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  color: var(--muted);
+}
+
+.up {
+  transform: rotate(180deg);
+}
+
 /* The highlight is the focus indication. */
 .item {
   display: flex;

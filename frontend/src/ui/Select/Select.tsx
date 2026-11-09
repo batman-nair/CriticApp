@@ -41,6 +41,10 @@ export function Select({
           sideOffset={6}
           className={styles.content}
         >
+          {/* Radix hides the scrollbar, so these show that a long list scrolls. */}
+          <RadixSelect.ScrollUpButton className={styles.scrollButton}>
+            <Icon name="chevron-down" size={14} className={styles.up} />
+          </RadixSelect.ScrollUpButton>
           <RadixSelect.Viewport className={styles.viewport}>
             {options.map((option) => (
               <RadixSelect.Item
@@ -52,6 +56,9 @@ export function Select({
               </RadixSelect.Item>
             ))}
           </RadixSelect.Viewport>
+          <RadixSelect.ScrollDownButton className={styles.scrollButton}>
+            <Icon name="chevron-down" size={14} />
+          </RadixSelect.ScrollDownButton>
         </RadixSelect.Content>
       </RadixSelect.Portal>
     </RadixSelect.Root>
