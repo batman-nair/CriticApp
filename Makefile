@@ -9,6 +9,7 @@ SCHEMA_CMD = python manage.py spectacular --urlconf critic.api.schema_urls \
 	--custom-settings critic.api.schema.V3_SCHEMA_SETTINGS --validate --fail-on-warn
 
 dev:
+	mkdir -p frontend/node_modules
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 prod:
@@ -30,7 +31,7 @@ build:
 	docker compose build
 
 down:
-	docker compose down
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 schema:
 	docker build -q -t $(SCHEMA_IMAGE) . >/dev/null
