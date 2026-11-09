@@ -1,5 +1,4 @@
 import re
-import sys
 from importlib import import_module
 from pathlib import Path
 
@@ -10,24 +9,6 @@ from django.template.loader import get_template
 from django.templatetags.static import static
 from django.test import override_settings
 from django.urls import get_resolver
-
-
-PRODUCTION_SETTINGS = 'critic.settings.production'
-
-
-@pytest.fixture
-def production_settings(monkeypatch):
-    """The production settings module, evaluated with the env vars it requires.
-
-    Importing it doesn't change the active (test) settings. It is removed from
-    sys.modules afterwards so a later import runs it again.
-    """
-    monkeypatch.setenv('DB_NAME', 'test')
-    monkeypatch.setenv('DB_USER', 'test')
-    monkeypatch.setenv('DB_PASSWORD', 'test')
-    sys.modules.pop(PRODUCTION_SETTINGS, None)
-    yield import_module(PRODUCTION_SETTINGS)
-    sys.modules.pop(PRODUCTION_SETTINGS, None)
 
 
 def test_production_uses_hashed_static_storage(production_settings):

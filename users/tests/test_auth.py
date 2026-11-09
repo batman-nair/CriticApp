@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -6,7 +7,7 @@ User = get_user_model()
 
 TOKEN_URL = '/api/auth/token/'
 REFRESH_URL = '/api/auth/token/refresh/'
-LOGOUT_URL = '/api/auth/logout/'
+BLACKLIST_URL = '/api/auth/token/blacklist/'
 ME_URL = '/api/auth/me/'
 REGISTER_URL = '/api/auth/register/'
 
@@ -46,11 +47,11 @@ class JWTLogoutTest(APITestCase):
         self.refresh_token = login.data['refresh']
 
     def test_logout_blacklists_refresh_token(self):
-        response = self.client.post(LOGOUT_URL, {'refresh': self.refresh_token})
+        response = self.client.post(BLACKLIST_URL, {'refresh': self.refresh_token})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_blacklisted_token_cannot_refresh(self):
-        self.client.post(LOGOUT_URL, {'refresh': self.refresh_token})
+        self.client.post(BLACKLIST_URL, {'refresh': self.refresh_token})
         response = self.client.post(REFRESH_URL, {'refresh': self.refresh_token})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -73,6 +74,7 @@ class MeViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
+@override_settings(REGISTRATION_ENABLED=True)
 class RegisterViewTest(APITestCase):
     def test_register_creates_user_and_returns_tokens(self):
         response = self.client.post(REGISTER_URL, {
