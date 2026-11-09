@@ -1,0 +1,123 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-18);
+  padding: 40px 0 96px;
+  text-align: center;
+}
+
+.art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-18);
+  height: 260px;
+}
+
+.digit {
+  font-size: 220px;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: -0.06em;
+  line-height: var(--leading-100);
+}
+
+.movie {
+  color: var(--cat-movie);
+}
+
+.book {
+  color: var(--cat-book);
+}
+
+.tile {
+  --poster-width: 132px;
+  --poster-radius: var(--radius-18);
+  /* The border goes outside the poster's 2:3 size. */
+  box-sizing: content-box;
+  border: 4px solid var(--surface);
+  box-shadow: 0 20px 44px var(--shadow-color);
+}
+
+.left {
+  rotate: -6deg;
+}
+
+.right {
+  rotate: 7deg;
+}
+
+.title {
+  margin-top: var(--space-12);
+  font-size: 38px;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tightest);
+  line-height: var(--leading-110);
+}
+
+.text {
+  max-width: 460px;
+  color: var(--muted);
+  font-size: var(--text-17);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-10);
+  margin-top: var(--space-10);
+}
+
+/* Two classes: Button's .md sets these at one. */
+.actions .action {
+  height: 50px;
+  padding: 0 22px;
+  border-radius: var(--radius-14);
+  font-size: var(--text-16);
+}
+
+@media (max-width: 639px) {
+  .page {
+    gap: var(--space-14);
+    padding: 30px var(--space-4) 40px;
+  }
+
+  .art {
+    gap: var(--space-10);
+    height: 170px;
+  }
+
+  .digit {
+    font-size: 132px;
+  }
+
+  .tile {
+    --poster-width: 82px;
+    --poster-radius: var(--radius-12);
+    border-width: 3px;
+    box-shadow: 0 14px 30px var(--shadow-color);
+  }
+
+  .title {
+    margin-top: var(--space-6);
+    font-size: var(--text-28);
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+  }
+
+  .text {
+    font-size: var(--text-16);
+  }
+
+  .actions {
+    align-self: stretch;
+    flex-direction: column;
+    margin-top: var(--space-8);
+  }
+
+  .actions .action {
+    width: 100%;
+    height: 52px;
+  }
+}

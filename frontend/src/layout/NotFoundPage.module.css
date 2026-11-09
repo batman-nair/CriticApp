@@ -1,0 +1,45 @@
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+  max-width: 440px;
+  margin-top: var(--space-18);
+}
+
+.caption {
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Two classes: SearchField's tone sets these at one. */
+.search .field {
+  height: 54px;
+  background: var(--surface);
+}
+
+/* The size is on SearchField's inner input. */
+.search .field input {
+  font-size: var(--text-16);
+}
+
+@media (max-width: 639px) {
+  .search {
+    margin-top: var(--space-14);
+  }
+
+  .caption {
+    font-size: var(--text-12);
+    text-align: left;
+  }
+
+  .search .field {
+    gap: var(--space-10);
+    height: 52px;
+    padding: 0 var(--space-14);
+    border-radius: var(--radius-14);
+  }
+}

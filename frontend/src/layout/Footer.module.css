@@ -1,0 +1,28 @@
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-12);
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: var(--space-28) var(--space-32) 44px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+.footer a {
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 639px) {
+  .footer {
+    padding-inline: var(--space-20);
+  }
+}
