@@ -118,8 +118,6 @@
 
 /* Two classes, so these beat IconButton's whatever the CSS order. */
 .content .close {
-  width: 44px;
-  height: 44px;
   background: var(--dialog-button-bg, var(--soft));
 }
 

@@ -10,7 +10,10 @@ const items = () => screen.getAllByRole('listitem')
 it('renders the steps in order inside a labelled list', () => {
   render(<Stepper label="Progress" steps={steps} current={0} />)
 
-  expect(screen.getByRole('list', { name: 'Progress' })).toBeInTheDocument()
+  expect(screen.getByRole('list', { name: 'Progress' })).toHaveAttribute(
+    'role',
+    'list',
+  )
   expect(items().map((item) => item.textContent)).toEqual(steps)
 })
 

@@ -12,7 +12,9 @@ interface StepperProps {
 
 export function Stepper({ label, steps, current, category }: StepperProps) {
   return (
+    // The role is explicit because VoiceOver drops it with list-style: none.
     <ol
+      role="list"
       aria-label={label}
       className={styles.root}
       style={category ? categoryVars(category) : undefined}
