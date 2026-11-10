@@ -16,7 +16,7 @@ import { IconButton } from '../IconButton/IconButton'
 import { VisuallyHidden } from '../VisuallyHidden/VisuallyHidden'
 import styles from './RulerPicker.module.css'
 
-// Must match .tick's width in the stylesheet.
+// Must match .tick's width and .spacer's half step in the stylesheet.
 const STEP_PX = 12
 const MAX_TENTHS = 100
 const TENTHS_PER_UNIT = 10

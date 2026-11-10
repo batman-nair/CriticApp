@@ -350,14 +350,26 @@ describe('mouse drag', () => {
     },
   )
 
-  it('stops when a move arrives with the button already released', () => {
+  it.each([0, 2])(
+    'stops when a move arrives with buttons %d, the primary released',
+    (buttons) => {
+      const { onChange, slider } = setup(5)
+
+      mouseDown(slider, 200)
+      fireEvent.pointerMove(slider, { pointerId: 1, buttons, clientX: 100 })
+      pointerMove(slider, 100)
+
+      expect(onChange).not.toHaveBeenCalled()
+    },
+  )
+
+  it('keeps going when another button joins the primary', () => {
     const { onChange, slider } = setup(5)
 
     mouseDown(slider, 200)
-    fireEvent.pointerMove(slider, { pointerId: 1, buttons: 0, clientX: 100 })
-    pointerMove(slider, 100)
+    fireEvent.pointerMove(slider, { pointerId: 1, buttons: 3, clientX: 176 })
 
-    expect(onChange).not.toHaveBeenCalled()
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(5.2)
   })
 
   it('ignores a move with no drag in progress', () => {
