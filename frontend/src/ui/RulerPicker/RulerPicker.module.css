@@ -27,7 +27,6 @@
 .scale {
   color: var(--muted);
   font-weight: var(--weight-semibold);
-  letter-spacing: normal;
 }
 
 .ruler {
