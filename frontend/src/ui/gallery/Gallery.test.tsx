@@ -14,6 +14,7 @@ const SECTIONS = [
   'TextField',
   'TextArea',
   'SearchField',
+  'TagInput',
   'Poster',
   'RatingBadge',
   'Skeleton',
