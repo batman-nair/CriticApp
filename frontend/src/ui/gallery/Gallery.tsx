@@ -19,6 +19,7 @@ import { SearchField } from '../SearchField/SearchField'
 import { Select } from '../Select/Select'
 import { Skeleton } from '../Skeleton/Skeleton'
 import { Stepper } from '../Stepper/Stepper'
+import { TagInput } from '../TagInput/TagInput'
 import { TextArea } from '../TextArea/TextArea'
 import { TextField } from '../TextField/TextField'
 import styles from './Gallery.module.css'
@@ -83,6 +84,12 @@ const EDIT_STEPS = ['Rate', 'Write']
 const LONG_BODY = Array.from({ length: 30 }, (_, index) => (
   <p key={index}>{LONG_TEXT}</p>
 ))
+
+const TAG_SUGGESTIONS = ['favourite', 'rewatch', 'comfort', 'slow-burn']
+const LONG_SUGGESTION = 'a-very-long-suggestion-right-at-the-fifty-char-max'
+const TOO_MANY_TAGS = Array.from({ length: 11 }, (_, index) => `tag-${index}`)
+const OVER_LONG_TAG = 'a'.repeat(51)
+const OVER_LONG_JOINED = ['a'.repeat(50), 'b'.repeat(50)]
 
 type ChipDemoProps = Omit<
   ComponentProps<typeof Chip>,
@@ -165,6 +172,19 @@ function SearchFieldDemo({ initial = '', ...props }: SearchFieldDemoProps) {
   const [value, setValue] = useState(initial)
 
   return <SearchField {...props} value={value} onValueChange={setValue} />
+}
+
+type TagInputDemoProps = Omit<
+  ComponentProps<typeof TagInput>,
+  'value' | 'onValueChange'
+> & {
+  initial?: string[]
+}
+
+function TagInputDemo({ initial = [], ...props }: TagInputDemoProps) {
+  const [value, setValue] = useState(initial)
+
+  return <TagInput {...props} value={value} onValueChange={setValue} />
 }
 
 // Distributes over the props union, which a plain Omit would flatten.
@@ -486,6 +506,56 @@ export function Gallery() {
               disabled
             />
           </div>
+        </Section>
+
+        <Section title="TagInput">
+          <div className={styles.fields}>
+            <TagInputDemo label="Empty tags" suggestions={TAG_SUGGESTIONS} />
+            <TagInputDemo
+              label="Optional tags"
+              optional
+              suggestions={TAG_SUGGESTIONS}
+            />
+            <TagInputDemo
+              label="Tags, one suggestion used"
+              initial={['sci-fi', 'favourite']}
+              suggestions={TAG_SUGGESTIONS}
+            />
+            <TagInputDemo label="Tags, no suggestions" initial={['sci-fi']} />
+            <TagInputDemo
+              label="Tags, 50-character suggestion"
+              suggestions={[LONG_SUGGESTION, 'rewatch']}
+            />
+            <TagInputDemo label="Too many tags" initial={TOO_MANY_TAGS} />
+            <TagInputDemo label="Tag too long" initial={[OVER_LONG_TAG]} />
+            <TagInputDemo label="Bad characters" initial={['sci fi']} />
+            <TagInputDemo
+              label="Tags too long joined"
+              initial={OVER_LONG_JOINED}
+            />
+            <TagInputDemo
+              label="Tags with a server error"
+              initial={['sci-fi']}
+              error="Could not save the tags."
+            />
+            <TagInputDemo
+              label="Disabled tags"
+              initial={['sci-fi']}
+              suggestions={TAG_SUGGESTIONS}
+              disabled
+            />
+          </div>
+          <TagInputDemo
+            label="Inline tags"
+            layout="inline"
+            suggestions={TAG_SUGGESTIONS}
+          />
+          <TagInputDemo
+            label="Inline tags with an error"
+            layout="inline"
+            initial={['sci fi']}
+            suggestions={TAG_SUGGESTIONS}
+          />
         </Section>
 
         <Section title="Poster">

@@ -1,0 +1,95 @@
+.optional {
+  color: var(--muted);
+  font-weight: var(--weight-medium);
+}
+
+/* Two classes, so this doesn't depend on the order the modules load in. */
+.root.stacked {
+  gap: var(--space-10);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+}
+
+.stacked .row {
+  gap: var(--space-10);
+}
+
+.inline .row {
+  gap: var(--space-8);
+}
+
+.control {
+  min-width: 0;
+}
+
+.stacked .control {
+  height: 46px;
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-12);
+  background: var(--bg);
+  font-size: var(--text-15);
+}
+
+.inline .control {
+  height: 40px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-10);
+  background: var(--surface);
+  font-size: var(--text-14);
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+/* A 50-character tag can be wider than a phone. */
+.suggestions .suggestion {
+  max-width: 100%;
+}
+
+.suggestion > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 640px) {
+  .inline .row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  .inline .control {
+    flex: 1 1 200px;
+  }
+
+  /* The chips flow after the input one at a time, as its siblings. */
+  .inline .suggestions {
+    display: contents;
+  }
+}
+
+/* 16px on phones also stops iOS zooming on focus. */
+@media (max-width: 639px) {
+  .stacked .control {
+    height: 48px;
+    font-size: var(--text-16);
+  }
+
+  .inline .control {
+    height: 44px;
+    border-radius: var(--radius-12);
+    font-size: var(--text-16);
+  }
+
+  .suggestions .suggestion {
+    height: 36px;
+  }
+}
