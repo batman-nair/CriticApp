@@ -1,0 +1,236 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.label {
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+}
+
+.number {
+  font-size: var(--text-rating);
+  font-weight: var(--weight-extrabold);
+  font-variant-numeric: var(--numeric-rating);
+  letter-spacing: var(--tracking-tightest);
+  line-height: var(--leading-100);
+}
+
+.scale {
+  color: var(--muted);
+  font-weight: var(--weight-semibold);
+}
+
+.ruler {
+  display: flex;
+  align-items: center;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.scroller {
+  display: flex;
+  height: 66px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+  user-select: none;
+}
+
+.scroller:active {
+  cursor: grabbing;
+}
+
+.spacer {
+  flex: none;
+  width: calc(50% - 6px);
+}
+
+.ticks {
+  display: flex;
+  flex: none;
+}
+
+.tick {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  width: 12px;
+  scroll-snap-align: center;
+}
+
+.line {
+  flex: none;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.major {
+  height: 34px;
+  background: var(--fg);
+}
+
+.middle {
+  height: 24px;
+}
+
+.minor {
+  height: 14px;
+}
+
+.tickLabel {
+  height: 14px;
+  color: var(--muted);
+  font-size: var(--text-11);
+  font-weight: var(--weight-bold);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.indicator {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 4px;
+  height: 44px;
+  margin-left: -2px;
+  border-radius: var(--radius-4);
+  background: var(--cat);
+  pointer-events: none;
+}
+
+.fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 48px;
+  pointer-events: none;
+}
+
+.fadeStart {
+  left: 0;
+  background: linear-gradient(
+    to right,
+    var(--ruler-fade, var(--surface)),
+    transparent
+  );
+}
+
+.fadeEnd {
+  right: 0;
+  background: linear-gradient(
+    to left,
+    var(--ruler-fade, var(--surface)),
+    transparent
+  );
+}
+
+/* Number beside the label. */
+.inline {
+  gap: var(--space-10);
+}
+
+.inline .scale {
+  font-size: var(--text-15);
+}
+
+.inline .ruler {
+  gap: var(--space-8);
+}
+
+/* Number centred under the label row. */
+.stacked {
+  gap: var(--space-6);
+}
+
+.stacked .header {
+  padding: 0 var(--space-4);
+}
+
+.stacked .number {
+  text-align: center;
+}
+
+.stacked .scale {
+  font-size: var(--text-14);
+}
+
+.stacked .ruler {
+  gap: var(--space-6);
+}
+
+/* Two classes, to beat IconButton's .md whatever the bundle order. */
+.stacked .nudge {
+  width: 40px;
+}
+
+.stacked .fade {
+  width: 40px;
+}
+
+@media (max-width: 639px) {
+  /* Two classes, to beat IconButton's .root whatever the bundle order. */
+  .root .nudge {
+    display: none;
+  }
+
+  .ruler {
+    margin-inline: calc(-1 * var(--ruler-bleed, 0px));
+  }
+
+  .root .fade {
+    width: 56px;
+  }
+
+  .inline .number {
+    font-size: var(--text-rating-sheet);
+  }
+
+  .inline .scale {
+    font-size: var(--text-14);
+  }
+
+  .stacked {
+    gap: var(--space-4);
+  }
+
+  .stacked .header {
+    padding: 0;
+  }
+
+  .stacked .number {
+    font-size: var(--text-rating-phone);
+  }
+
+  .stacked .scale {
+    font-size: var(--text-13);
+  }
+
+  .stacked .ruler {
+    margin-top: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A flick stops at the next tenth instead of gliding. */
+  .tick {
+    scroll-snap-stop: always;
+  }
+}

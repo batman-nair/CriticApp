@@ -13,6 +13,7 @@ import { Icon, type IconName } from '../Icon/Icon'
 import { IconButton } from '../IconButton/IconButton'
 import { Poster } from '../Poster/Poster'
 import { RatingBadge } from '../RatingBadge/RatingBadge'
+import { RulerPicker } from '../RulerPicker/RulerPicker'
 import { SearchField } from '../SearchField/SearchField'
 import { Select } from '../Select/Select'
 import { Skeleton } from '../Skeleton/Skeleton'
@@ -155,6 +156,18 @@ function SearchFieldDemo({ initial = '', ...props }: SearchFieldDemoProps) {
   const [value, setValue] = useState(initial)
 
   return <SearchField {...props} value={value} onValueChange={setValue} />
+}
+
+// Distributes over the props union, which a plain Omit would flatten.
+type RulerPickerDemoProps<P = ComponentProps<typeof RulerPicker>> =
+  P extends unknown
+    ? Omit<P, 'value' | 'onChange'> & { initial: number }
+    : never
+
+function RulerPickerDemo({ initial, ...props }: RulerPickerDemoProps) {
+  const [value, setValue] = useState(initial)
+
+  return <RulerPicker {...props} value={value} onChange={setValue} />
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -534,6 +547,56 @@ export function Gallery() {
             <Skeleton width={120} aspectRatio="2 / 3" radius={12} />
             <Skeleton width={52} aspectRatio="2 / 3" radius={8} delay={0.15} />
           </Row>
+        </Section>
+
+        <Section title="RulerPicker">
+          <div className={styles.rulers}>
+            <RulerPickerDemo label="Inline" category="movie" initial={7.5} />
+            <RulerPickerDemo
+              layout="stacked"
+              label="Stacked, with an aside"
+              category="series"
+              initial={8.2}
+              labelAside={
+                <RatingBadge
+                  variant="provider"
+                  provider="IMDb"
+                  category="series"
+                  rating={8}
+                />
+              }
+            />
+            <RulerPickerDemo label="At 0" category="game" initial={0} />
+            <RulerPickerDemo label="At 10" category="game" initial={10} />
+            <RulerPickerDemo
+              label="Two decimals (7.55)"
+              category="manga"
+              initial={7.55}
+            />
+            {CATEGORIES.map(({ id, label }, index) => (
+              <RulerPickerDemo
+                key={id}
+                label={label}
+                category={id}
+                initial={index + 2.5}
+              />
+            ))}
+            <div className={styles.rulerTinted}>
+              <RulerPickerDemo
+                layout="stacked"
+                label="Tinted fade"
+                category="game"
+                initial={6.4}
+              />
+            </div>
+            <div className={styles.rulerBleed}>
+              <RulerPickerDemo
+                label="Bleeds into the padding on phones"
+                category="book"
+                initial={5}
+              />
+            </div>
+          </div>
         </Section>
       </main>
     </div>
