@@ -1,0 +1,48 @@
+.root {
+  display: flex;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  color: var(--muted);
+  font-size: var(--text-12);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+}
+
+.step::before {
+  height: 4px;
+  border-radius: var(--radius-4);
+  background: var(--soft);
+  content: '';
+}
+
+.done::before {
+  background: var(--fg);
+}
+
+.current {
+  color: var(--fg);
+}
+
+.current::before {
+  background: var(--cat, var(--fg));
+}
+
+/* Below 640px. A media query can't read a custom property. */
+@media (max-width: 639px) {
+  .root {
+    gap: 5px;
+  }
+
+  .step {
+    font-size: var(--text-11);
+  }
+}
