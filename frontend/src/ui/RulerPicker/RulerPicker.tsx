@@ -16,6 +16,7 @@ import { IconButton } from '../IconButton/IconButton'
 import { VisuallyHidden } from '../VisuallyHidden/VisuallyHidden'
 import styles from './RulerPicker.module.css'
 
+// Must match .tick's width in the stylesheet.
 const STEP_PX = 12
 const MAX_TENTHS = 100
 const TENTHS_PER_UNIT = 10
@@ -169,6 +170,11 @@ export function RulerPicker(props: RulerPickerProps) {
   function handlePointerMove(event: PointerEvent) {
     const drag = dragRef.current
     if (drag?.pointerId !== event.pointerId) return
+    // The release can go missing, e.g. when Ctrl+click opens a context menu.
+    if ((event.buttons & 1) === 0) {
+      dragRef.current = null
+      return
+    }
     moveTo(
       drag.startTenths + Math.round((drag.startX - event.clientX) / STEP_PX),
     )

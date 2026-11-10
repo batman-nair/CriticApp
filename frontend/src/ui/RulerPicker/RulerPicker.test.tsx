@@ -71,7 +71,7 @@ function mouseDown(slider: HTMLElement, clientX: number) {
 }
 
 function pointerMove(slider: HTMLElement, clientX: number) {
-  fireEvent.pointerMove(slider, { pointerId: 1, clientX })
+  fireEvent.pointerMove(slider, { pointerId: 1, buttons: 1, clientX })
 }
 
 describe('keyboard', () => {
@@ -349,6 +349,16 @@ describe('mouse drag', () => {
       expect(onChange).not.toHaveBeenCalled()
     },
   )
+
+  it('stops when a move arrives with the button already released', () => {
+    const { onChange, slider } = setup(5)
+
+    mouseDown(slider, 200)
+    fireEvent.pointerMove(slider, { pointerId: 1, buttons: 0, clientX: 100 })
+    pointerMove(slider, 100)
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
 
   it('ignores a move with no drag in progress', () => {
     const { onChange, slider } = setup(5)
