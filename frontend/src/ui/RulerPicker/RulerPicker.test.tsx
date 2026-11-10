@@ -289,6 +289,34 @@ describe('scroll position', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('clamps a scroll past the end', () => {
+    const { onChange, slider } = setup(9.9)
+
+    scrollTo(slider, 1300)
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(10)
+  })
+
+  it('calls the latest onChange', () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const element = (onChange: (value: number) => void) => (
+      <RulerPicker
+        label={NAME}
+        category="movie"
+        value={5}
+        onChange={onChange}
+      />
+    )
+    const { rerender } = render(element(first))
+
+    rerender(element(second))
+    fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowRight' })
+
+    expect(first).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledExactlyOnceWith(5.1)
+  })
+
   it('moves the scroller for a key press', () => {
     const { slider } = setup(5)
 
@@ -396,7 +424,11 @@ describe('wheel with focus', () => {
     wheel(slider, { deltaY: 50 })
     wheel(slider, { deltaY: -50 })
     wheel(slider, { deltaY: 50 })
+    expect(onChange).not.toHaveBeenCalled()
 
+    // Would add up to 100 without the reset.
+    wheel(slider, { deltaY: -10 })
+    wheel(slider, { deltaY: 60 })
     expect(onChange).not.toHaveBeenCalled()
   })
 
@@ -443,6 +475,20 @@ describe('wheel with focus', () => {
     wheel(slider, { deltaY: 150 })
     expect(onChange).toHaveBeenCalledExactlyOnceWith(10)
 
+    fireEvent.keyDown(slider, { key: 'ArrowLeft' })
+    onChange.mockClear()
+
+    wheel(slider, { deltaY: 50 })
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('forgets the sum when a wheel event finds it already at the limit', () => {
+    const { onChange, slider } = setup(9.9)
+    focusSlider(slider)
+
+    wheel(slider, { deltaY: 50 })
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    wheel(slider, { deltaY: 50 })
     fireEvent.keyDown(slider, { key: 'ArrowLeft' })
     onChange.mockClear()
 
