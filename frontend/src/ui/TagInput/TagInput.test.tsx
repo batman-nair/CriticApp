@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createRef, useState, type ComponentProps } from 'react'
 import { expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
+import fieldStyles from '../field.module.css'
 import { TagInput } from './TagInput'
 import styles from './TagInput.module.css'
 
@@ -228,6 +229,7 @@ it.each([
   expect(screen.getByText(message)).toBeInTheDocument()
   expect(textbox()).toHaveAttribute('aria-invalid', 'true')
   expect(textbox()).toHaveAccessibleDescription(message)
+  expect(textbox()).toHaveClass(fieldStyles.invalid!)
 })
 
 it('clears the message once the tags are fixed', async () => {
@@ -240,6 +242,7 @@ it('clears the message once the tags are fixed', async () => {
 
   expect(textbox()).not.toHaveAttribute('aria-invalid')
   expect(textbox()).not.toHaveAccessibleDescription()
+  expect(textbox()).not.toHaveClass(fieldStyles.invalid!)
   expect(screen.queryByText(/letters, numbers/)).not.toBeInTheDocument()
 })
 
