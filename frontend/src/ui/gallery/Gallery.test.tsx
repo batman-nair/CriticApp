@@ -17,6 +17,7 @@ const SECTIONS = [
   'Poster',
   'RatingBadge',
   'Skeleton',
+  'RulerPicker',
 ]
 
 const root = document.documentElement
