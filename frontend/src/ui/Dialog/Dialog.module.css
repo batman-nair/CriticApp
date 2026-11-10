@@ -1,0 +1,316 @@
+/* Below Select's 1000, so a Select inside a dialog opens above it. */
+.overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  background: var(--scrim);
+}
+
+.overlay[data-state='open'] {
+  animation: fade-in var(--duration-medium) var(--ease);
+}
+
+.overlay[data-state='closed'] {
+  animation: fade-out var(--duration-medium) var(--ease) forwards;
+}
+
+.content {
+  position: fixed;
+  z-index: 100;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-26);
+  background: var(--surface);
+  box-shadow: var(--shadow-dialog);
+  transform: translateX(-50%);
+}
+
+.content[data-state='open'] {
+  animation: dialog-in var(--duration-medium) var(--ease);
+}
+
+.content[data-state='closed'] {
+  animation: dialog-out var(--duration-medium) var(--ease) forwards;
+}
+
+.tinted {
+  --dialog-button-bg: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-dialog-button),
+    var(--surface)
+  );
+
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line));
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-dialog),
+    var(--surface)
+  );
+}
+
+.detail {
+  top: 48px;
+  width: min(820px, calc(100% - 32px));
+  max-height: calc(100dvh - 96px);
+}
+
+.add {
+  top: 64px;
+  width: min(620px, calc(100% - 32px));
+  max-height: calc(100dvh - 128px);
+}
+
+.handle {
+  display: none;
+}
+
+.header {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: space-between;
+}
+
+.detail .header {
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-16) var(--space-18) 0;
+}
+
+.add .header {
+  align-items: flex-start;
+  gap: var(--space-16);
+  padding: 26px var(--space-28) 0;
+}
+
+.start {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.detail .start {
+  min-height: 40px;
+}
+
+.add .start {
+  flex: 1;
+  gap: var(--space-12);
+}
+
+.end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-28);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+  line-height: var(--leading-110);
+}
+
+/* Two classes, so these beat IconButton's whatever the CSS order. */
+.content .close {
+  width: 44px;
+  height: 44px;
+  background: var(--dialog-button-bg, var(--soft));
+}
+
+.detail .close {
+  width: 40px;
+  height: 40px;
+}
+
+.close svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.detail .close svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.2;
+}
+
+/* The padding is here, not on the content, so the body doesn't clip outlines. */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  outline-offset: -2px;
+}
+
+.detail .body {
+  padding: var(--space-18) var(--space-32) 30px;
+}
+
+.add .body {
+  padding: 22px var(--space-28) 0;
+}
+
+.footer {
+  flex-shrink: 0;
+}
+
+.add .footer {
+  margin: 22px var(--space-28) var(--space-24);
+  padding-top: var(--space-18);
+  border-top: 1px solid var(--line);
+}
+
+/* Below 640px. A media query can't read a custom property. */
+@media (max-width: 639px) {
+  .content {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-26) var(--radius-26) 0 0;
+    box-shadow: var(--shadow-sheet);
+    transform: none;
+  }
+
+  .content[data-state='open'] {
+    animation-name: sheet-in;
+  }
+
+  .content[data-state='closed'] {
+    animation-name: sheet-out;
+  }
+
+  .tinted {
+    border: 0;
+  }
+
+  /* A fixed height, so ‹ › stay put between reviews of different lengths. */
+  .detail {
+    top: 48px;
+    width: auto;
+    max-height: none;
+  }
+
+  .add {
+    top: auto;
+    width: auto;
+    max-height: calc(100dvh - 64px);
+  }
+
+  .handle {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+  }
+
+  .handle::before {
+    width: 38px;
+    height: 5px;
+    border-radius: 5px;
+    background: var(--line);
+    content: '';
+  }
+
+  .detail .handle {
+    padding: var(--space-8) 0 var(--space-6);
+  }
+
+  .add .handle {
+    padding: var(--space-10) 0 var(--space-4);
+  }
+
+  .detail .header {
+    gap: var(--space-8);
+    padding: 0 var(--space-14) var(--space-6);
+  }
+
+  .add .header {
+    gap: var(--space-12);
+    padding: var(--space-8) var(--space-12) var(--space-14) var(--space-20);
+  }
+
+  .detail .start {
+    min-height: 44px;
+  }
+
+  .add .start {
+    gap: var(--space-10);
+    padding-top: var(--space-6);
+  }
+
+  .detail .end {
+    gap: var(--space-4);
+  }
+
+  .title {
+    font-size: var(--text-24);
+  }
+
+  .detail .close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .content .close svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.2;
+  }
+
+  .detail .body {
+    padding: var(--space-10) var(--space-20) var(--space-32);
+  }
+
+  .add .body {
+    padding: 0 var(--space-20) var(--space-16);
+  }
+
+  .add .footer {
+    margin: 0;
+    padding: var(--space-12) var(--space-20) 30px;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Each keeps the centring translate, which the animation would otherwise replace. */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
