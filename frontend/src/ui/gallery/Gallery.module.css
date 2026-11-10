@@ -111,6 +111,21 @@
   --ruler-bleed: var(--space-16);
 }
 
+.dialogButtons {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.dialogButtons button {
+  background: var(--dialog-button-bg, var(--soft));
+}
+
+.steppers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-24);
+}
+
 .skeletonBars {
   display: flex;
   flex: 1;
