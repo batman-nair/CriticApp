@@ -18,6 +18,8 @@ const SECTIONS = [
   'RatingBadge',
   'Skeleton',
   'RulerPicker',
+  'Dialog',
+  'Stepper',
 ]
 
 const root = document.documentElement

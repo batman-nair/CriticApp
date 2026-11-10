@@ -9,6 +9,7 @@ import {
   type ButtonVariant,
 } from '../Button/buttonClass'
 import { Chip } from '../Chip/Chip'
+import { Dialog } from '../Dialog/Dialog'
 import { Icon, type IconName } from '../Icon/Icon'
 import { IconButton } from '../IconButton/IconButton'
 import { Poster } from '../Poster/Poster'
@@ -17,6 +18,7 @@ import { RulerPicker } from '../RulerPicker/RulerPicker'
 import { SearchField } from '../SearchField/SearchField'
 import { Select } from '../Select/Select'
 import { Skeleton } from '../Skeleton/Skeleton'
+import { Stepper } from '../Stepper/Stepper'
 import { TextArea } from '../TextArea/TextArea'
 import { TextField } from '../TextField/TextField'
 import styles from './Gallery.module.css'
@@ -74,6 +76,13 @@ const POSTER_IMAGE = `data:image/svg+xml,${encodeURIComponent(
 
 const LONG_TEXT =
   'A slow, patient film that keeps its best idea back until the last act.'
+
+const ADD_STEPS = ['Find', 'Rate', 'Write']
+const EDIT_STEPS = ['Rate', 'Write']
+
+const LONG_BODY = Array.from({ length: 30 }, (_, index) => (
+  <p key={index}>{LONG_TEXT}</p>
+))
 
 type ChipDemoProps = Omit<
   ComponentProps<typeof Chip>,
@@ -168,6 +177,52 @@ function RulerPickerDemo({ initial, ...props }: RulerPickerDemoProps) {
   const [value, setValue] = useState(initial)
 
   return <RulerPicker {...props} value={value} onChange={setValue} />
+}
+
+type DialogDemoProps = Omit<
+  ComponentProps<typeof Dialog>,
+  'open' | 'onOpenChange'
+> & {
+  opener: string
+}
+
+function DialogDemo({ opener, ...props }: DialogDemoProps) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        {opener}
+      </Button>
+      <Dialog {...props} open={open} onOpenChange={setOpen} />
+    </>
+  )
+}
+
+function DialogNavButtons() {
+  return (
+    <div className={styles.dialogButtons}>
+      <IconButton variant="soft" label="Previous review">
+        <Icon name="chevron-left" size={18} />
+      </IconButton>
+      <IconButton variant="soft" label="Next review">
+        <Icon name="chevron-right" size={18} />
+      </IconButton>
+    </div>
+  )
+}
+
+function DialogActionButtons() {
+  return (
+    <div className={styles.dialogButtons}>
+      <IconButton variant="soft" label="Edit">
+        <Icon name="pencil" size={17} />
+      </IconButton>
+      <IconButton variant="soft" label="Delete">
+        <Icon name="trash" size={17} />
+      </IconButton>
+    </div>
+  )
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -596,6 +651,83 @@ export function Gallery() {
                 initial={5}
               />
             </div>
+          </div>
+        </Section>
+        <Section title="Dialog">
+          <Row label="Detail">
+            <DialogDemo
+              opener="Detail, with category"
+              title="Arrival"
+              category="movie"
+              headerStart={<DialogNavButtons />}
+              headerEnd={<DialogActionButtons />}
+            >
+              <p>{LONG_TEXT}</p>
+            </DialogDemo>
+            <DialogDemo
+              opener="Detail, long body"
+              title="Arrival"
+              category="series"
+              headerEnd={<DialogActionButtons />}
+            >
+              {LONG_BODY}
+            </DialogDemo>
+            <DialogDemo opener="Detail, hidden title" title="Arrival" hideTitle>
+              <p>{LONG_TEXT}</p>
+            </DialogDemo>
+          </Row>
+          <Row label="Add sheet">
+            <DialogDemo
+              opener="Add sheet"
+              title="Add a review"
+              size="add"
+              category="game"
+              headerStart={
+                <Stepper
+                  label="Add review progress"
+                  steps={ADD_STEPS}
+                  current={1}
+                  category="game"
+                />
+              }
+              footer={<Button>Next</Button>}
+            >
+              <p>{LONG_TEXT}</p>
+            </DialogDemo>
+          </Row>
+        </Section>
+
+        <Section title="Stepper">
+          <div className={styles.steppers}>
+            {[0, 1, 2].map((current) => (
+              <Stepper
+                key={current}
+                label={`Step ${current + 1}, no category`}
+                steps={ADD_STEPS}
+                current={current}
+              />
+            ))}
+            {CATEGORIES.map(({ id, label }) => (
+              <Stepper
+                key={id}
+                label={`${label} progress`}
+                steps={ADD_STEPS}
+                current={1}
+                category={id}
+              />
+            ))}
+            <Stepper
+              label="All done"
+              steps={ADD_STEPS}
+              current={ADD_STEPS.length}
+              category="movie"
+            />
+            <Stepper
+              label="Two steps"
+              steps={EDIT_STEPS}
+              current={0}
+              category="book"
+            />
           </div>
         </Section>
       </main>
