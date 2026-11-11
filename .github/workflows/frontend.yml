@@ -35,3 +35,5 @@ jobs:
 
       - name: Run checks
         run: npm run check
+        env:
+          VITE_OWNER_USERNAME: ci-owner
