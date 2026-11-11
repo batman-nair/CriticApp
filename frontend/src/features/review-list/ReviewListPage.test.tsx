@@ -3,9 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { reviewKeys } from '../../api/queries/reviews'
-import type { ReviewPage } from '../../api/types'
+import type { ReviewFacets, ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
-import { makeItem, makeReview, makeReviewPage } from '../../test/fixtures'
+import {
+  makeItem,
+  makeReview,
+  makeReviewFacets,
+  makeReviewPage,
+} from '../../test/fixtures'
 import { http } from '../../test/handlers'
 import { stubIntersectionObserver } from '../../test/intersectionObserver'
 import { stubSystemTheme } from '../../test/matchMedia'
@@ -71,6 +76,32 @@ function servePages(
   }
 }
 
+type ServedFacets = Partial<ReviewFacets> | 'error'
+
+/**
+ * Serves the counts `respond` gives for each request's params, after `gate`
+ * when there is one, and records each request.
+ */
+function serveFacets(
+  respond: ServedFacets | ((params: URLSearchParams) => ServedFacets),
+  gate?: Promise<void>,
+) {
+  const requests: URLSearchParams[] = []
+  server.use(
+    http.get('/api/v3/reviews/facets', async ({ request, response }) => {
+      const params = new URL(request.url).searchParams
+      requests.push(params)
+      await gate
+      const served = typeof respond === 'function' ? respond(params) : respond
+      if (served === 'error') {
+        return response.untyped(new HttpResponse(null, { status: 500 }))
+      }
+      return response(200).json(makeReviewFacets(served))
+    }),
+  )
+  return { requests }
+}
+
 function cards() {
   return screen.queryAllByRole('article')
 }
@@ -82,6 +113,8 @@ async function waitForCards(count: number) {
 it('shows skeletons, in the list and the hero, until the first page', async () => {
   const gate = deferred()
   servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
+  // The hero's count comes from the counts.
+  serveFacets({}, gate.promise)
   const { container } = renderRoute('/')
 
   expect(screen.getByRole('status')).toHaveTextContent('Loading your reviews')
@@ -99,6 +132,7 @@ it('shows the first page of the owner’s reviews with the count', async () => {
   const { requests } = servePages({
     0: makeReviewPage(reviews(20), { count: 45 }),
   })
+  serveFacets({ total: 45 })
   renderRoute('/')
 
   expect(
@@ -111,6 +145,7 @@ it('shows the first page of the owner’s reviews with the count', async () => {
 
 it('counts a single review in the singular', async () => {
   servePages({ 0: makeReviewPage(reviews(1)) })
+  serveFacets({ total: 1 })
   renderRoute('/')
 
   expect(
@@ -166,6 +201,7 @@ it('stops at the last page', async () => {
 
 it('shows the empty shelf when there are no reviews', async () => {
   servePages({ 0: makeReviewPage([]) })
+  serveFacets({ total: 0 })
   const { container } = renderRoute('/')
 
   expect(
