@@ -15,6 +15,8 @@ const names: IconName[] = [
   'trash',
   'star',
   'lock',
+  'cloud-off',
+  'refresh',
 ]
 
 it.each(names)(

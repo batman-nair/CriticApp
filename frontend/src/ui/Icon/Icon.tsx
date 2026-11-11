@@ -38,6 +38,13 @@ const paths = {
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
     </>
   ),
+  'cloud-off': (
+    <>
+      <path d="M7 18h10a4 4 0 0 0 .9-7.9A6 6 0 0 0 6.3 9.4 4.3 4.3 0 0 0 7 18z" />
+      <path d="M3 3l18 18" />
+    </>
+  ),
+  refresh: <path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" />,
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths
