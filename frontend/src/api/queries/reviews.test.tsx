@@ -8,7 +8,13 @@ import { queryWrapper } from '../../test/render'
 import { server } from '../../test/server'
 import { ApiError } from '../client'
 import type { ReviewPage } from '../types'
-import { REVIEW_PAGE_SIZE, reviewKeys, useReviewList } from './reviews'
+import {
+  REVIEW_PAGE_SIZE,
+  reviewKeys,
+  useReviewFacets,
+  useReviewList,
+  type ReviewListParams,
+} from './reviews'
 
 function reviews(count: number, firstId = 1) {
   return Array.from({ length: count }, (_, i) =>
@@ -115,4 +121,93 @@ it('keys every list under the lists key', () => {
 
   expect(key.slice(0, 2)).toEqual(reviewKeys.lists())
   expect(reviewKeys.lists().slice(0, 1)).toEqual(reviewKeys.all)
+})
+
+it('keeps the previous reviews while the next filter loads', async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  server.use(
+    http.get('/api/v3/reviews', async ({ request, response }) => {
+      const q = new URL(request.url).searchParams.get('q')
+      if (q === null) return response(200).json(makeReviewPage(reviews(2)))
+      await gate
+      return response(200).json(makeReviewPage(reviews(1, 10)))
+    }),
+  )
+  const { result, rerender } = renderHook(
+    (params: ReviewListParams) => useReviewList(params),
+    {
+      wrapper: queryWrapper(),
+      initialProps: { username: OWNER_USERNAME } as ReviewListParams,
+    },
+  )
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+  rerender({ username: OWNER_USERNAME, q: 'dune' })
+
+  expect(result.current.isPlaceholderData).toBe(true)
+  expect(result.current.data?.pages[0]?.data.map((r) => r.id)).toEqual([1, 2])
+
+  release()
+  await waitFor(() => expect(result.current.isPlaceholderData).toBe(false))
+  expect(result.current.data?.pages[0]?.data.map((r) => r.id)).toEqual([10])
+})
+
+it('asks for the facets with the filters and returns the counts', async () => {
+  const requests: URLSearchParams[] = []
+  const facets = {
+    total: 3,
+    categories: [{ id: 'movie', count: 3 }],
+    languages: [{ name: 'English', count: 3 }],
+  }
+  server.use(
+    http.get('/api/v3/reviews/facets', ({ request, response }) => {
+      requests.push(new URL(request.url).searchParams)
+      return response(200).json({ data: facets, meta: {} })
+    }),
+  )
+  const { result } = renderHook(
+    () =>
+      useReviewFacets({
+        username: OWNER_USERNAME,
+        q: 'dune',
+        category: ['movie'],
+        language: ['English'],
+      }),
+    { wrapper: queryWrapper() },
+  )
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  expect(requests.map((params) => Object.fromEntries(params))).toEqual([
+    {
+      username: OWNER_USERNAME,
+      q: 'dune',
+      category: 'movie',
+      language: 'English',
+    },
+  ])
+  expect(result.current.data).toEqual(facets)
+})
+
+it('exposes a facets failure as an ApiError', async () => {
+  server.use(
+    http.get('/api/v3/reviews/facets', ({ response }) =>
+      response.untyped(new HttpResponse(null, { status: 500 })),
+    ),
+  )
+  const { result } = renderHook(
+    () => useReviewFacets({ username: OWNER_USERNAME }),
+    { wrapper: queryWrapper() },
+  )
+
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(result.current.error).toBeInstanceOf(ApiError)
+  expect(result.current.error).toMatchObject({ status: 500 })
+})
+
+it('keys the facets under all, outside the lists', () => {
+  const key = reviewKeys.facets({ username: 'someone' })
+
+  expect(key.slice(0, 1)).toEqual(reviewKeys.all)
+  expect(key.slice(0, 2)).not.toEqual(reviewKeys.lists())
 })
