@@ -63,6 +63,15 @@ describe('routes', () => {
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
   })
 
+  it('lists the owner’s reviews at /', async () => {
+    renderRoute('/')
+    expect(
+      await screen.findByRole('link', { name: 'Cowboy Bebop' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'The Matrix' })).toBeInTheDocument()
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+  })
+
   it.each([
     ['/reviews/5', 'Review 5'],
     ['/add', 'Add review'],
@@ -181,7 +190,10 @@ describe('scroll position', () => {
       renderRoute(path)
       scrollTo.mockClear()
       await user.click(screen.getByRole('link', { name: 'Back to the list' }))
-      expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
+      // By name: the cards' titles are h2s too.
+      expect(
+        screen.queryByRole('heading', { name: /^(Add review|Review 5)$/ }),
+      ).toBeNull()
       expect(scrollTo).not.toHaveBeenCalled()
     },
   )
