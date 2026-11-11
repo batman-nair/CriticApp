@@ -1,4 +1,12 @@
-import type { Category, Item, Problem, Review, ReviewPage } from '../api/types'
+import type { components } from '../api/schema'
+import type {
+  Category,
+  Item,
+  Problem,
+  Review,
+  ReviewFacets,
+  ReviewPage,
+} from '../api/types'
 import { OWNER_USERNAME } from '../config'
 
 export function makeCategory(overrides: Partial<Category> = {}): Category {
@@ -64,6 +72,33 @@ export function makeReviewPage(
         offset,
       },
     },
+  }
+}
+
+/**
+ * The counts for the default list handler's two reviews: an anime series and
+ * a movie, both Japanese. Every chip is listed, in /categories order.
+ */
+export function makeReviewFacets(
+  overrides: Partial<ReviewFacets> = {},
+): components['schemas']['ReviewFacetsResponse'] {
+  const counts: Record<string, number> = { movie: 1, 'anime:series': 1 }
+  return {
+    data: {
+      total: 2,
+      categories: [
+        'movie',
+        'series',
+        'game',
+        'anime:series',
+        'anime:movie',
+        'manga',
+        'book',
+      ].map((id) => ({ id, count: counts[id] ?? 0 })),
+      languages: [{ name: 'Japanese', count: 2 }],
+      ...overrides,
+    },
+    meta: {},
   }
 }
 

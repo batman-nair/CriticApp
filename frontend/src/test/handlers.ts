@@ -1,6 +1,12 @@
 import { createOpenApiHttp } from 'openapi-msw'
 import type { paths } from '../api/schema'
-import { makeCategory, makeItem, makeReview, makeReviewPage } from './fixtures'
+import {
+  makeCategory,
+  makeItem,
+  makeReview,
+  makeReviewFacets,
+  makeReviewPage,
+} from './fixtures'
 
 // jsdom's URL under Vitest. Not read from window, because setup.ts also loads
 // this file for tests in the node environment.
@@ -40,5 +46,9 @@ export const handlers = [
         }),
       ]),
     ),
+  ),
+  // The counts for the two reviews above.
+  http.get('/api/v3/reviews/facets', ({ response }) =>
+    response(200).json(makeReviewFacets()),
   ),
 ]
