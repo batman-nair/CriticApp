@@ -1,7 +1,10 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 
 interface LoadMoreOptions {
-  /** False while a page loads, when there are no more, or after a failure. */
+  /**
+   * False while a page loads or refetches, when there are no more, or after a
+   * failure.
+   */
   enabled: boolean
   onLoadMore: () => void
 }

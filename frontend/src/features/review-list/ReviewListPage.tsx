@@ -37,14 +37,15 @@ export function ReviewListPage() {
   const {
     data,
     hasNextPage,
-    isFetching,
+    fetchStatus,
     isFetchingNextPage,
     isFetchNextPageError,
     fetchNextPage,
   } = query
   const sentinelRef = useLoadMoreOnScroll({
-    // Not during a background refetch either: fetchNextPage would cancel it.
-    enabled: hasNextPage && !isFetching && !isFetchNextPageError,
+    // Not during a background refetch either, even one paused offline:
+    // fetchNextPage would cancel it.
+    enabled: hasNextPage && fetchStatus === 'idle' && !isFetchNextPageError,
     onLoadMore: () => void fetchNextPage(),
   })
 
