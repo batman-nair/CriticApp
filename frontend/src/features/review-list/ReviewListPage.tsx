@@ -37,12 +37,14 @@ export function ReviewListPage() {
   const {
     data,
     hasNextPage,
+    isFetching,
     isFetchingNextPage,
     isFetchNextPageError,
     fetchNextPage,
   } = query
   const sentinelRef = useLoadMoreOnScroll({
-    enabled: hasNextPage && !isFetchingNextPage && !isFetchNextPageError,
+    // Not during a background refetch either: fetchNextPage would cancel it.
+    enabled: hasNextPage && !isFetching && !isFetchNextPageError,
     onLoadMore: () => void fetchNextPage(),
   })
 
@@ -107,7 +109,8 @@ export function ReviewListPage() {
             <p role="status" className={styles.more}>
               {isFetchingNextPage ? 'Loading more…' : ''}
             </p>
-            {isFetchNextPageError && (
+            {/* The error flag stays set while its retry runs. */}
+            {isFetchNextPageError && !isFetchingNextPage && (
               <div className={styles.moreError}>
                 <span>Couldn’t load more reviews.</span>
                 <Button

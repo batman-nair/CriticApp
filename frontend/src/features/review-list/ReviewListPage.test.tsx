@@ -215,13 +215,68 @@ it('keeps the cards when the next page fails, and retries it inline', async () =
   // The sentinel waits for the retry rather than asking again by itself.
   expect(offsets()).toEqual(['0', '20'])
 
+  // Hold the retry, to see the page while it loads.
+  const retry = deferred()
+  const retried: (string | null)[] = []
+  server.use(
+    http.get('/api/v3/reviews', async ({ request, response }) => {
+      retried.push(new URL(request.url).searchParams.get('offset'))
+      await retry.promise
+      return response(200).json(
+        makeReviewPage(reviews(20, 21), { count: 40, offset: 20 }),
+      )
+    }),
+  )
   await user.click(screen.getByRole('button', { name: 'Try again' }))
 
+  await waitFor(() =>
+    expect(screen.getByRole('status')).toHaveTextContent('Loading more…'),
+  )
+  expect(
+    screen.queryByText('Couldn’t load more reviews.'),
+  ).not.toBeInTheDocument()
+
+  retry.resolve()
   await waitForCards(40)
   expect(
     screen.queryByText('Couldn’t load more reviews.'),
   ).not.toBeInTheDocument()
-  expect(offsets()).toEqual(['0', '20', '20'])
+  expect(retried).toEqual(['20'])
+})
+
+it('waits for a background refetch before loading the next page', async () => {
+  const io = stubIntersectionObserver()
+  servePages({ 0: makeReviewPage(reviews(20), { count: 40 }) })
+  const { queryClient } = renderRoute('/')
+  await waitForCards(20)
+
+  // Hold the refetch of the first page; serve the second at once.
+  const refetch = deferred()
+  const requested: (string | null)[] = []
+  server.use(
+    http.get('/api/v3/reviews', async ({ request, response }) => {
+      const offset = new URL(request.url).searchParams.get('offset')
+      requested.push(offset)
+      if (offset === '0') {
+        await refetch.promise
+        return response(200).json(makeReviewPage(reviews(20), { count: 40 }))
+      }
+      return response(200).json(
+        makeReviewPage(reviews(20, 21), { count: 40, offset: 20 }),
+      )
+    }),
+  )
+  act(() => void queryClient.refetchQueries())
+  await waitFor(() => expect(requested).toEqual(['0']))
+  io.setIntersecting(true)
+
+  // Give a next-page request the time to reach the handler.
+  await act(() => new Promise((done) => setTimeout(done, 50)))
+  expect(requested).toEqual(['0'])
+
+  refetch.resolve()
+  await waitForCards(40)
+  expect(requested).toEqual(['0', '20'])
 })
 
 it('keeps the cards when a background refetch fails', async () => {
