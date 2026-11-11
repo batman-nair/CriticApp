@@ -89,10 +89,20 @@ export function ReviewListPage() {
       ? count
       : undefined)
 
+  // "Clear filters" starts the panel afresh: a search still being typed is
+  // dropped rather than written after the clear, and the search box takes the
+  // focus from the button, which goes away.
+  const [clears, setClears] = useState(0)
+  function clearAll() {
+    clearFilters()
+    setClears((n) => n + 1)
+  }
+
   function retry() {
     void query.refetch()
-    // So the chips get their counts back too.
+    // So the chips and the hero get their counts back too.
     if (facets.isError) void facets.refetch()
+    if (heroFacets.isError) void heroFacets.refetch()
   }
 
   // Branch on the data, not isError: a failed next page or background refetch
@@ -146,6 +156,8 @@ export function ReviewListPage() {
       {/* S3: the empty shelf has no filters. */}
       {!emptyShelf && (
         <FilterPanel
+          key={clears}
+          focusSearch={clears > 0}
           filters={filters}
           setFilters={setFilters}
           facets={facets.data}
@@ -161,7 +173,7 @@ export function ReviewListPage() {
             <button
               type="button"
               className={styles.clear}
-              onClick={clearFilters}
+              onClick={clearAll}
             >
               Clear filters
             </button>

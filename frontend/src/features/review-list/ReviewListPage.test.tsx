@@ -605,3 +605,36 @@ it('keeps the panel and the focused search while a cleared search loads', async 
     screen.queryByRole('heading', { name: 'Your shelf is empty' }),
   ).not.toBeInTheDocument()
 })
+
+it('drops a search still being typed on "Clear filters", and focuses the search', async () => {
+  const user = userEvent.setup()
+  const { router } = renderRoute('/?category=movie')
+  await waitForCards(2)
+
+  // Within the debounce, so the search hasn't reached the URL yet.
+  await user.type(searchBox(), 'du')
+  await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+  await waitFor(() => expect(router.state.location.search).toBe(''))
+  await act(() => new Promise((done) => setTimeout(done, 400)))
+  expect(router.state.location.search).toBe('')
+  expect(searchBox()).toHaveValue('')
+  expect(searchBox()).toHaveFocus()
+})
+
+it('refetches a failed hero count on "Try again" while a filter is set', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: ['error', makeReviewPage(reviews(2))] })
+  const facets = serveFacets('error')
+  renderRoute('/?category=game')
+  const alert = await screen.findByRole('alert')
+  await waitFor(() => expect(facets.requests).toHaveLength(2))
+
+  serveFacets({ total: 45 })
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  await waitForCards(2)
+  expect(
+    await screen.findByText('45 reviews, rated out of ten'),
+  ).toBeInTheDocument()
+})

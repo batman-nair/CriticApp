@@ -29,6 +29,8 @@ export interface FilterPanelProps {
   facets: ReviewFacets | undefined
   /** The S5/S6 placeholder panel, before the list has loaded once. */
   ghost: 'loading' | 'unavailable' | null
+  /** Focus the search box when the live panel mounts. */
+  focusSearch?: boolean
 }
 
 export function FilterPanel({ ghost, ...props }: FilterPanelProps) {
@@ -66,6 +68,7 @@ function LivePanel({
   filters,
   setFilters,
   facets,
+  focusSearch = false,
 }: Omit<FilterPanelProps, 'ghost'>) {
   // What's in the box. It reaches the URL as `q` after a pause in typing.
   const [draft, setDraft] = useState(filters.q)
@@ -119,6 +122,7 @@ function LivePanel({
         placeholder="Search my reviews — a title, a genre, a name, a word I used"
         value={draft}
         onValueChange={changeDraft}
+        autoFocus={focusSearch}
       />
       <div className={styles.row}>
         <div role="group" aria-label="Categories" className={styles.chips}>
