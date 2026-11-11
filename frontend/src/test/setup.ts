@@ -42,4 +42,19 @@ if (typeof document !== 'undefined') {
 
   // Nor this, which React Router's ScrollRestoration calls.
   window.scrollTo = () => {}
+
+  // Nor this. A no-op, so pages that load more on scroll render; tests of the
+  // loading use stubIntersectionObserver.
+  window.IntersectionObserver ??= class implements IntersectionObserver {
+    readonly root = null
+    readonly rootMargin = '0px 0px 0px 0px'
+    readonly scrollMargin = '0px'
+    readonly thresholds = [0]
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return []
+    }
+  }
 }
