@@ -3,9 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { reviewKeys } from '../../api/queries/reviews'
-import type { ReviewPage } from '../../api/types'
+import type { ReviewFacets, ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
-import { makeItem, makeReview, makeReviewPage } from '../../test/fixtures'
+import {
+  makeItem,
+  makeReview,
+  makeReviewFacets,
+  makeReviewPage,
+} from '../../test/fixtures'
 import { http } from '../../test/handlers'
 import { stubIntersectionObserver } from '../../test/intersectionObserver'
 import { stubSystemTheme } from '../../test/matchMedia'
@@ -71,6 +76,32 @@ function servePages(
   }
 }
 
+type ServedFacets = Partial<ReviewFacets> | 'error'
+
+/**
+ * Serves the counts `respond` gives for each request's params, after `gate`
+ * when there is one, and records each request.
+ */
+function serveFacets(
+  respond: ServedFacets | ((params: URLSearchParams) => ServedFacets),
+  gate?: Promise<void>,
+) {
+  const requests: URLSearchParams[] = []
+  server.use(
+    http.get('/api/v3/reviews/facets', async ({ request, response }) => {
+      const params = new URL(request.url).searchParams
+      requests.push(params)
+      await gate
+      const served = typeof respond === 'function' ? respond(params) : respond
+      if (served === 'error') {
+        return response.untyped(new HttpResponse(null, { status: 500 }))
+      }
+      return response(200).json(makeReviewFacets(served))
+    }),
+  )
+  return { requests }
+}
+
 function cards() {
   return screen.queryAllByRole('article')
 }
@@ -79,9 +110,21 @@ async function waitForCards(count: number) {
   await waitFor(() => expect(cards()).toHaveLength(count))
 }
 
+const searchBox = () =>
+  screen.getByRole('searchbox', { name: 'Search reviews' })
+
+/** A chip by its label, with or without a count. */
+const chip = (label: string) =>
+  within(screen.getByRole('group', { name: 'Categories' })).getByRole(
+    'button',
+    { name: new RegExp(`^${label}( \\d+)?$`) },
+  )
+
 it('shows skeletons, in the list and the hero, until the first page', async () => {
   const gate = deferred()
   servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
+  // The hero's count comes from the counts.
+  serveFacets({}, gate.promise)
   const { container } = renderRoute('/')
 
   expect(screen.getByRole('status')).toHaveTextContent('Loading your reviews')
@@ -99,6 +142,7 @@ it('shows the first page of the owner’s reviews with the count', async () => {
   const { requests } = servePages({
     0: makeReviewPage(reviews(20), { count: 45 }),
   })
+  serveFacets({ total: 45 })
   renderRoute('/')
 
   expect(
@@ -111,6 +155,7 @@ it('shows the first page of the owner’s reviews with the count', async () => {
 
 it('counts a single review in the singular', async () => {
   servePages({ 0: makeReviewPage(reviews(1)) })
+  serveFacets({ total: 1 })
   renderRoute('/')
 
   expect(
@@ -166,6 +211,7 @@ it('stops at the last page', async () => {
 
 it('shows the empty shelf when there are no reviews', async () => {
   servePages({ 0: makeReviewPage([]) })
+  serveFacets({ total: 0 })
   const { container } = renderRoute('/')
 
   expect(
@@ -173,6 +219,17 @@ it('shows the empty shelf when there are no reviews', async () => {
   ).toBeInTheDocument()
   expect(screen.getByText('No reviews yet')).toBeInTheDocument()
   expect(container.querySelector(`.${styles.sentinel}`)).toBeNull()
+})
+
+it('hides the filters and the count row on the empty shelf', async () => {
+  servePages({ 0: makeReviewPage([]) })
+  serveFacets({ total: 0 })
+  const { container } = renderRoute('/')
+
+  await screen.findByRole('heading', { name: 'Your shelf is empty' })
+  expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: 'Categories' })).toBeNull()
+  expect(container.querySelector(`.${styles.countRow}`)).toBeNull()
 })
 
 it('shows the error, and skeletons then cards after "Try again"', async () => {
@@ -306,4 +363,278 @@ it('shows a review that moved to the next page once', async () => {
 
   await waitForCards(39)
   expect(screen.getAllByRole('heading', { name: 'Title 20' })).toHaveLength(1)
+})
+
+it('sends the URL’s filters to the list, and all but the sort to the counts', async () => {
+  const list = servePages({ 0: makeReviewPage(reviews(1)) })
+  const facets = serveFacets({})
+  renderRoute('/?q=dune&category=movie&language=English&sort=-rating')
+  await waitForCards(1)
+
+  const [request] = list.requests
+  expect(request?.get('q')).toBe('dune')
+  expect(request?.get('category')).toBe('movie')
+  expect(request?.get('language')).toBe('English')
+  expect(request?.get('sort')).toBe('-rating')
+
+  // The panel's counts and the hero's.
+  await waitFor(() => expect(facets.requests).toHaveLength(2))
+  const filtered = facets.requests.find((params) => params.has('q'))
+  expect(filtered?.get('q')).toBe('dune')
+  expect(filtered?.get('category')).toBe('movie')
+  expect(filtered?.get('language')).toBe('English')
+  expect(facets.requests.some((params) => params.has('sort'))).toBe(false)
+})
+
+it('leaves out a category or sort the API would reject', async () => {
+  const list = servePages({ 0: makeReviewPage(reviews(1)) })
+  const facets = serveFacets({})
+  renderRoute('/?category=bogus&sort=nope')
+  await waitForCards(1)
+  await waitFor(() => expect(facets.requests).toHaveLength(1))
+
+  for (const params of [...list.requests, ...facets.requests]) {
+    expect(params.has('category')).toBe(false)
+    expect(params.has('sort')).toBe(false)
+  }
+})
+
+it('counts every review in the hero, and the matches in the count row', async () => {
+  servePages({ 0: makeReviewPage(reviews(3)) })
+  // The filtered counts differ, to show which ones the hero uses.
+  serveFacets((params) => (params.has('q') ? { total: 7 } : { total: 45 }))
+  renderRoute('/?q=dune&category=game')
+
+  expect(
+    await screen.findByText('45 reviews, rated out of ten'),
+  ).toBeInTheDocument()
+  expect(screen.getByText('3 reviews')).toHaveAttribute('aria-live', 'polite')
+  await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 7'))
+})
+
+it('counts a single match in the singular', async () => {
+  servePages({ 0: makeReviewPage(reviews(1)) })
+  renderRoute('/?category=movie')
+
+  expect(await screen.findByText('1 review')).toBeInTheDocument()
+})
+
+it('shows "no matches" with the filters, then the list after "Clear filters"', async () => {
+  const user = userEvent.setup()
+  const list = servePages({
+    0: [makeReviewPage([]), makeReviewPage(reviews(3))],
+  })
+  const { router } = renderRoute('/?q=zzz&sort=title')
+
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Haven’t reviewed anything like that',
+    }),
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Your shelf is empty' }),
+  ).not.toBeInTheDocument()
+  expect(searchBox()).toHaveValue('zzz')
+  expect(screen.getByText('0 reviews')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+  await waitForCards(3)
+  // The sort stays.
+  expect(router.state.location.search).toBe('?sort=title')
+  expect(list.requests[1]?.has('q')).toBe(false)
+  expect(searchBox()).toHaveValue('')
+  expect(
+    screen.queryByRole('button', { name: 'Clear filters' }),
+  ).not.toBeInTheDocument()
+})
+
+it('keeps the cards on screen while the next filter loads', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: makeReviewPage(reviews(2)) })
+  const { container } = renderRoute('/')
+  await waitForCards(2)
+  const results = container.querySelector(`.${styles.results}`)
+  expect(results).not.toHaveAttribute('aria-busy')
+
+  const gate = deferred()
+  const list = servePages(
+    { 0: makeReviewPage(reviews(1, 10)) },
+    { 0: gate.promise },
+  )
+  await user.click(chip('Movies'))
+
+  await waitFor(() => expect(list.requests).toHaveLength(1))
+  expect(list.requests[0]?.get('category')).toBe('movie')
+  expect(results).toHaveAttribute('aria-busy', 'true')
+  expect(cards()).toHaveLength(2)
+  expect(screen.queryByText('Loading your reviews')).not.toBeInTheDocument()
+
+  gate.resolve()
+  expect(
+    await screen.findByRole('heading', { name: 'Title 10' }),
+  ).toBeInTheDocument()
+  expect(cards()).toHaveLength(1)
+  expect(results).not.toHaveAttribute('aria-busy')
+})
+
+it('shows a disabled search until the first page, then the live panel', async () => {
+  const gate = deferred()
+  servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
+  const { container } = renderRoute('/')
+
+  expect(searchBox()).toBeDisabled()
+  expect(searchBox()).toHaveAttribute('placeholder', 'Loading your reviews…')
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(container.querySelector(`.${styles.countRow}`)).toBeNull()
+
+  gate.resolve()
+  await waitForCards(2)
+  expect(searchBox()).toBeEnabled()
+  expect(screen.getByRole('combobox', { name: 'Sort' })).toBeInTheDocument()
+  expect(screen.getByText('2 reviews')).toBeInTheDocument()
+})
+
+it('shows the search as unavailable when the first page fails', async () => {
+  servePages({ 0: 'error' })
+  const { container } = renderRoute('/?category=movie')
+
+  await screen.findByRole('alert')
+  expect(searchBox()).toBeDisabled()
+  expect(searchBox()).toHaveAttribute(
+    'placeholder',
+    'Search is unavailable right now',
+  )
+  expect(container.querySelector(`.${styles.countRow}`)).toBeNull()
+  expect(
+    screen.queryByRole('button', { name: 'Clear filters' }),
+  ).not.toBeInTheDocument()
+})
+
+it('keeps the live panel and the hero count when a filter fails later', async () => {
+  const user = userEvent.setup()
+  serveFacets({ total: 45 })
+  const { router } = renderRoute('/')
+  await waitForCards(2)
+  expect(screen.getByText('45 reviews, rated out of ten')).toBeInTheDocument()
+
+  servePages({ 0: 'error' })
+  await user.click(chip('Games'))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Couldn’t load your reviews',
+  )
+  expect(cards()).toHaveLength(0)
+  expect(screen.getByText('45 reviews, rated out of ten')).toBeInTheDocument()
+  // Still there to change or clear the filter.
+  expect(searchBox()).toBeEnabled()
+  await user.type(searchBox(), 'du')
+  expect(searchBox()).toHaveValue('du')
+  expect(chip('Games')).toHaveAttribute('aria-pressed', 'true')
+
+  servePages({ 0: makeReviewPage(reviews(2)) })
+  await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+  await waitForCards(2)
+  expect(router.state.location.search).toBe('')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+})
+
+it('keeps the live panel when only the counts fail', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: makeReviewPage(reviews(20), { count: 45 }) })
+  const facets = serveFacets('error')
+  const { router } = renderRoute('/')
+  await waitForCards(20)
+  await waitFor(() => expect(facets.requests).toHaveLength(1))
+
+  // The list's count stands in for the hero's.
+  expect(
+    await screen.findByText('45 reviews, rated out of ten'),
+  ).toBeInTheDocument()
+  expect(searchBox()).toBeEnabled()
+  expect(chip('All')).toHaveAccessibleName('All')
+  expect(chip('Movies')).toHaveAccessibleName('Movies')
+
+  await user.click(chip('Movies'))
+  await waitFor(() =>
+    expect(router.state.location.search).toBe('?category=movie'),
+  )
+})
+
+it('refetches the failed counts too on "Try again"', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: ['error', makeReviewPage(reviews(2))] })
+  const facets = serveFacets('error')
+  renderRoute('/')
+  const alert = await screen.findByRole('alert')
+  await waitFor(() => expect(facets.requests).toHaveLength(1))
+
+  serveFacets({ total: 2 })
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  await waitForCards(2)
+  await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
+  expect(screen.getByText('2 reviews, rated out of ten')).toBeInTheDocument()
+})
+
+it('keeps the panel and the focused search while a cleared search loads', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: makeReviewPage([]) })
+  const { router } = renderRoute('/?q=zzz')
+  await screen.findByRole('heading', {
+    name: 'Haven’t reviewed anything like that',
+  })
+
+  // Hold the unfiltered page, so the empty search result stands in for it.
+  const gate = deferred()
+  servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
+  await user.clear(searchBox())
+
+  await waitFor(() => expect(router.state.location.search).toBe(''))
+  await act(() => new Promise((done) => setTimeout(done, 50)))
+  expect(
+    screen.queryByRole('heading', { name: 'Your shelf is empty' }),
+  ).not.toBeInTheDocument()
+  expect(searchBox()).toHaveFocus()
+
+  gate.resolve()
+  await waitForCards(2)
+  expect(searchBox()).toHaveFocus()
+  expect(
+    screen.queryByRole('heading', { name: 'Your shelf is empty' }),
+  ).not.toBeInTheDocument()
+})
+
+it('drops a search still being typed on "Clear filters", and focuses the search', async () => {
+  const user = userEvent.setup()
+  const { router } = renderRoute('/?category=movie')
+  await waitForCards(2)
+
+  // Within the debounce, so the search hasn't reached the URL yet.
+  await user.type(searchBox(), 'du')
+  await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+  await waitFor(() => expect(router.state.location.search).toBe(''))
+  await act(() => new Promise((done) => setTimeout(done, 400)))
+  expect(router.state.location.search).toBe('')
+  expect(searchBox()).toHaveValue('')
+  expect(searchBox()).toHaveFocus()
+})
+
+it('refetches a failed hero count on "Try again" while a filter is set', async () => {
+  const user = userEvent.setup()
+  servePages({ 0: ['error', makeReviewPage(reviews(2))] })
+  const facets = serveFacets('error')
+  renderRoute('/?category=game')
+  const alert = await screen.findByRole('alert')
+  await waitFor(() => expect(facets.requests).toHaveLength(2))
+
+  serveFacets({ total: 45 })
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  await waitForCards(2)
+  expect(
+    await screen.findByText('45 reviews, rated out of ten'),
+  ).toBeInTheDocument()
 })

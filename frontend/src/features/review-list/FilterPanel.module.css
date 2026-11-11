@@ -1,0 +1,113 @@
+/* From boards 1 and 2. */
+.panel,
+.ghost {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  padding: var(--space-18);
+  border-radius: var(--radius-22);
+  background: var(--panel);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.selects {
+  display: flex;
+  gap: var(--space-6);
+}
+
+/* The S5 and S6 boards: the panel before the list has loaded. */
+.ghost {
+  opacity: 0.7;
+}
+
+/* Two classes: SearchField's .panel sets these at one. */
+.ghost .ghostSearch {
+  padding: 0 var(--space-20);
+  border: 0;
+}
+
+/* The whole panel is dimmed instead. */
+.ghostSearch input:disabled {
+  opacity: 1;
+}
+
+.ghostChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+/* Each chip but "All" gets its category's variables from categoryVars(). */
+.ghostChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-12);
+  color: var(--muted);
+  font-size: var(--text-14);
+  font-weight: var(--weight-medium);
+}
+
+.ghostDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat, var(--muted));
+}
+
+/* No board for the live panel on phones. */
+@media (max-width: 639px) {
+  /* One row of chips that scrolls sideways, with the selects below it. */
+  .chips {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    min-width: 0;
+    /* Room for the focus outline, which the scroll box would clip. */
+    margin: calc(-1 * var(--space-4));
+    padding: var(--space-4);
+    overflow-x: auto;
+  }
+
+  /* S13 and S14: only a search bar, without the panel around it. */
+  .ghost {
+    padding: 0;
+    background: none;
+    opacity: 1;
+  }
+
+  .ghost .ghostSearch {
+    gap: var(--space-12);
+    height: 54px;
+    padding: 0 var(--space-16);
+    background: var(--panel);
+    opacity: 0.75;
+  }
+
+  .ghostSearch svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .ghostSearch input {
+    font-size: var(--text-16);
+  }
+
+  .ghostChips {
+    display: none;
+  }
+}

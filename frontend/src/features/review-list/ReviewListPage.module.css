@@ -36,9 +36,37 @@
   margin-bottom: var(--space-10);
 }
 
+/* From board 1: the number of results and "Clear filters". */
+.countRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: 22px var(--space-4) var(--space-8);
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
+.clear {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 /* Holds the space below the list, so the load-more status sits above it. */
 .results {
   padding-bottom: 88px;
+}
+
+/* S5: 30px from the ghost panel to the skeleton, 8px of them the grid's. */
+.loading {
+  padding-top: 22px;
 }
 
 .sentinel {
@@ -88,5 +116,10 @@
 
   .results {
     padding-bottom: 40px;
+  }
+
+  /* S13: 18px from the search bar to the skeleton. */
+  .loading {
+    padding-top: var(--space-10);
   }
 }

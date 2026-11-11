@@ -1,16 +1,25 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router'
-import { useReviewList } from '../../api/queries/reviews'
+import { useReviewFacets, useReviewList } from '../../api/queries/reviews'
 import type { ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
+import { cx } from '../../lib/cx'
 import { Button } from '../../ui/Button/Button'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { EmptyShelf } from './EmptyShelf'
+import { FilterPanel } from './FilterPanel'
 import grid from './grid.module.css'
 import { LoadError } from './LoadError'
+import { NoMatches } from './NoMatches'
 import { ReviewCard } from './ReviewCard'
 import { ReviewListSkeleton } from './ReviewListSkeleton'
 import styles from './ReviewListPage.module.css'
 import { useLoadMoreOnScroll } from './useLoadMoreOnScroll'
+import {
+  toFacetParams,
+  toListParams,
+  useReviewFilters,
+} from './useReviewFilters'
 
 /**
  * Every page's reviews, each once. Offset paging under "recently updated" can
@@ -32,8 +41,17 @@ function countLabel(count: number) {
   return `${count} ${count === 1 ? 'review' : 'reviews'}, rated out of ten`
 }
 
+function resultsLabel(count: number) {
+  return count === 1 ? '1 review' : `${count} reviews`
+}
+
 export function ReviewListPage() {
-  const query = useReviewList({ username: OWNER_USERNAME })
+  const { filters, isFiltered, setFilters, clearFilters } = useReviewFilters()
+  const query = useReviewList(toListParams(filters))
+  // The chips' counts and the language menu, for the filters as they are.
+  const facets = useReviewFacets(toFacetParams(filters))
+  // The hero counts every review. Without filters, the same query as above.
+  const heroFacets = useReviewFacets({ username: OWNER_USERNAME })
   const {
     data,
     hasNextPage,
@@ -52,13 +70,50 @@ export function ReviewListPage() {
   const reviews = data ? uniqueReviews(data.pages) : []
   const count = data?.pages[0]?.meta.pagination.count
 
+  // The S5/S6 ghost panel shows until the list has loaded once. After that a
+  // slow or failed filter keeps the live panel, so typing is never cut off.
+  // Adjusted during render rather than in an effect.
+  const [listShown, setListShown] = useState(false)
+  if (data && !listShown) setListShown(true)
+  const ghost = listShown ? null : query.isError ? 'unavailable' : 'loading'
+
+  // Not while the last filter's page stands in: clearing a search that
+  // matched nothing would flash the empty shelf and drop the focused search.
+  const emptyShelf =
+    data && !query.isPlaceholderData && !isFiltered && count === 0
+
+  // When the counts fail, the list's own count stands in, if it's unfiltered.
+  const heroTotal =
+    heroFacets.data?.total ??
+    (heroFacets.isError && !isFiltered && !query.isPlaceholderData
+      ? count
+      : undefined)
+
+  // "Clear filters" starts the panel afresh: a search still being typed is
+  // dropped rather than written after the clear, and the search box takes the
+  // focus from the button, which goes away.
+  const [clears, setClears] = useState(0)
+  function clearAll() {
+    clearFilters()
+    setClears((n) => n + 1)
+  }
+
+  function retry() {
+    void query.refetch()
+    // So the chips and the hero get their counts back too.
+    if (facets.isError) void facets.refetch()
+    if (heroFacets.isError) void heroFacets.refetch()
+  }
+
   // Branch on the data, not isError: a failed next page or background refetch
   // also sets isError, and the list it already has should stay.
   let body
-  if (data) {
+  if (emptyShelf) {
+    body = <EmptyShelf />
+  } else if (data) {
     body =
       reviews.length === 0 ? (
-        <EmptyShelf />
+        <NoMatches />
       ) : (
         <ul className={grid.grid}>
           {reviews.map((review) => (
@@ -69,9 +124,7 @@ export function ReviewListPage() {
         </ul>
       )
   } else if (query.isError) {
-    body = (
-      <LoadError error={query.error} onRetry={() => void query.refetch()} />
-    )
+    body = <LoadError error={query.error} onRetry={retry} />
   } else {
     body = <ReviewListSkeleton />
   }
@@ -85,21 +138,53 @@ export function ReviewListPage() {
           <span className={styles.played}>played</span> and{' '}
           <span className={styles.read}>read</span>.
         </h1>
-        {count !== undefined ? (
-          <p className={styles.subtitle}>{countLabel(count)}</p>
-        ) : (
-          query.isPending && (
-            <Skeleton
-              className={styles.subtitleSkeleton}
-              width={170}
-              height={14}
-              radius={7}
-            />
-          )
-        )}
+        {/* S6 has no count. */}
+        {ghost !== 'unavailable' &&
+          (heroTotal !== undefined ? (
+            <p className={styles.subtitle}>{countLabel(heroTotal)}</p>
+          ) : (
+            heroFacets.isPending && (
+              <Skeleton
+                className={styles.subtitleSkeleton}
+                width={170}
+                height={14}
+                radius={7}
+              />
+            )
+          ))}
       </section>
-      {/* The filters (#87) go between the hero and the results. */}
-      <div className={styles.results}>
+      {/* S3: the empty shelf has no filters. */}
+      {!emptyShelf && (
+        <FilterPanel
+          key={clears}
+          focusSearch={clears > 0}
+          filters={filters}
+          setFilters={setFilters}
+          facets={facets.data}
+          ghost={ghost}
+        />
+      )}
+      {listShown && !emptyShelf && (
+        <div className={styles.countRow}>
+          <span aria-live="polite">
+            {count !== undefined ? resultsLabel(count) : ''}
+          </span>
+          {isFiltered && (
+            <button
+              type="button"
+              className={styles.clear}
+              onClick={clearAll}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+      <div
+        className={cx(styles.results, ghost === 'loading' && styles.loading)}
+        // The last filter's cards stay on screen while the next ones load.
+        aria-busy={query.isPlaceholderData || undefined}
+      >
         {body}
         {data && (
           <>
