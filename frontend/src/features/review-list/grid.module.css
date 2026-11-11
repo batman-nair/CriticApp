@@ -1,0 +1,15 @@
+/* The list's grid, shared with its skeleton so nothing moves when it loads. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr));
+  gap: var(--space-18);
+  margin: 0;
+  padding: var(--space-8) 0 88px;
+  list-style: none;
+}
+
+@media (max-width: 639px) {
+  .grid {
+    gap: var(--space-12);
+  }
+}
