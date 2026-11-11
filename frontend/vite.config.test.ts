@@ -4,6 +4,9 @@ import type { AddressInfo } from 'node:net'
 import { build, createServer, resolveConfig, type ViteDevServer } from 'vite'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
+// test.env in vite.config.ts also puts VITE_OWNER_USERNAME in process.env
+// here, so the dev server and the build below have an owner without a stub.
+
 const seen: { url?: string; host?: string }[] = []
 let upstream: http.Server
 let vite: ViteDevServer
@@ -45,6 +48,7 @@ beforeAll(async () => {
 
 afterEach(() => {
   seen.length = 0
+  vi.unstubAllEnvs()
 })
 
 afterAll(async () => {
@@ -73,6 +77,14 @@ it('defaults the proxy target to localhost:8000', async () => {
   })
 })
 
+it('refuses to serve without an owner', async () => {
+  // Blank, not unset: loadEnv also reads frontend/.env*, and process.env wins.
+  vi.stubEnv('VITE_OWNER_USERNAME', '')
+  await expect(
+    resolveConfig({ configFile: 'vite.config.ts' }, 'serve'),
+  ).rejects.toThrow('VITE_OWNER_USERNAME')
+})
+
 it('serves the UI gallery in dev', async () => {
   const { status, body } = await get('/ui-gallery.html', 'devbox:5173')
   expect(status).toBe(200)
@@ -98,3 +110,14 @@ it('leaves the UI gallery out of the production build', async () => {
     expect(text.includes('Critic UI gallery'), file.fileName).toBe(false)
   }
 }, 30_000)
+
+it('refuses to build without an owner', async () => {
+  vi.stubEnv('VITE_OWNER_USERNAME', '')
+  await expect(
+    build({
+      configFile: 'vite.config.ts',
+      logLevel: 'silent',
+      build: { write: false },
+    }),
+  ).rejects.toThrow('VITE_OWNER_USERNAME')
+})

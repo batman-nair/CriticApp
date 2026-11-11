@@ -1,0 +1,145 @@
+.shelf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-14);
+  margin-top: var(--space-8);
+  padding: 64px var(--space-32) 56px;
+  border-radius: var(--radius-28);
+  background: var(--panel);
+  text-align: center;
+}
+
+.art {
+  position: relative;
+  width: 260px;
+  height: 170px;
+  margin-bottom: var(--space-8);
+}
+
+/* Each tile gets its category's variables from categoryVars(). */
+.tile {
+  position: absolute;
+  top: 22px;
+  width: 92px;
+  height: 138px;
+  border: 2px dashed var(--cat);
+  border-radius: var(--radius-12);
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-card),
+    var(--surface)
+  );
+}
+
+.book {
+  left: 30px;
+  transform: rotate(-10deg);
+}
+
+.movie {
+  right: 30px;
+  transform: rotate(10deg);
+}
+
+.game {
+  top: 6px;
+  left: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 150px;
+  border-radius: var(--radius-14);
+  background: var(--surface);
+  color: var(--cat);
+}
+
+.plus {
+  width: 30px;
+  height: 30px;
+}
+
+.title {
+  font-size: var(--text-28);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+}
+
+.text {
+  max-width: 420px;
+  color: var(--muted);
+  font-size: var(--text-16);
+  text-wrap: pretty;
+}
+
+/* Two classes: Button's .lg sets these at one. */
+.shelf .add {
+  gap: var(--space-8);
+  height: 50px;
+  margin-top: var(--space-8);
+  padding: 0 22px;
+  font-size: var(--text-16);
+}
+
+/* Below 640px, from the S12 board. */
+@media (max-width: 639px) {
+  .shelf {
+    gap: var(--space-12);
+    margin-top: 0;
+    padding: 36px var(--space-20) 30px;
+    border-radius: var(--radius-24);
+  }
+
+  .art {
+    width: 200px;
+    height: 132px;
+    margin-bottom: var(--space-6);
+  }
+
+  .tile {
+    top: 18px;
+    width: 72px;
+    height: 108px;
+    border-radius: var(--radius-10);
+  }
+
+  .book {
+    left: 22px;
+  }
+
+  .movie {
+    right: 22px;
+  }
+
+  .game {
+    top: 4px;
+    left: 61px;
+    width: 78px;
+    height: 117px;
+    border-radius: var(--radius-12);
+  }
+
+  .plus {
+    width: 24px;
+    height: 24px;
+  }
+
+  .title {
+    font-size: var(--text-24);
+  }
+
+  .text {
+    font-size: var(--text-15);
+  }
+
+  .shelf .add {
+    width: 100%;
+    height: 52px;
+    margin-top: var(--space-6);
+  }
+
+  .addIcon {
+    display: none;
+  }
+}

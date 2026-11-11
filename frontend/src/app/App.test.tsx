@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { stubSystemTheme } from '../test/matchMedia'
+import { queryWrapper } from '../test/render'
 import { App } from './App'
 
 afterEach(() => {
@@ -12,7 +13,7 @@ afterEach(() => {
 // the other tests use the memory router.
 it('renders the shell, with working links', () => {
   stubSystemTheme('light')
-  render(<App />)
+  render(<App />, { wrapper: queryWrapper() })
   expect(screen.getByRole('link', { name: 'Add review' })).toHaveAttribute(
     'href',
     '/add',

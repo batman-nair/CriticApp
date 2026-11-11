@@ -1,0 +1,47 @@
+.card {
+  display: flex;
+  gap: var(--space-20);
+  padding: var(--space-16);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-20);
+  background: var(--surface);
+}
+
+/* Set here rather than as props, so phones can change them. */
+.poster {
+  --skeleton-width: 120px;
+  --skeleton-radius: var(--radius-12);
+
+  flex: none;
+}
+
+.lines {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding-top: var(--space-8);
+}
+
+.badge {
+  margin-top: auto;
+}
+
+/* Below 640px, from the S13 board. */
+@media (max-width: 639px) {
+  .card {
+    gap: var(--space-14);
+    padding: var(--space-12);
+    border-radius: var(--radius-18);
+  }
+
+  .poster {
+    --skeleton-width: 84px;
+    --skeleton-radius: var(--radius-10);
+  }
+
+  .lines {
+    gap: var(--space-10);
+    padding-top: var(--space-6);
+  }
+}

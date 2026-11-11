@@ -1,0 +1,96 @@
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-14);
+  margin-top: 30px;
+  padding: 64px var(--space-32);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-26);
+  background: var(--surface);
+  text-align: center;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.title {
+  margin-top: var(--space-4);
+  font-size: var(--text-26);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+}
+
+.text {
+  max-width: 440px;
+  color: var(--muted);
+  font-size: var(--text-16);
+  text-wrap: pretty;
+}
+
+/* Two classes: Button's .lg sets the padding at one. */
+.error .retry {
+  margin-top: var(--space-8);
+  padding: 0 22px;
+}
+
+.status {
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+/* Below 640px, from the S14 board. */
+@media (max-width: 639px) {
+  .error {
+    gap: var(--space-12);
+    margin-top: var(--space-18);
+    padding: 40px 22px;
+    border-radius: var(--radius-22);
+  }
+
+  .icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .title {
+    font-size: var(--text-22);
+  }
+
+  .text {
+    font-size: var(--text-15);
+  }
+
+  .error .retry {
+    width: 100%;
+    height: 52px;
+    margin-top: var(--space-6);
+    font-size: var(--text-16);
+  }
+
+  .retryIcon {
+    display: none;
+  }
+
+  .status {
+    font-size: var(--text-12);
+  }
+}

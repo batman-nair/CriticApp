@@ -52,6 +52,8 @@ const ICON_NAMES: IconName[] = [
   'trash',
   'star',
   'lock',
+  'cloud-off',
+  'refresh',
 ]
 
 const SORT_OPTIONS = [
