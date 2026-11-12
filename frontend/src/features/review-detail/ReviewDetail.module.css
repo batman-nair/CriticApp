@@ -1,0 +1,283 @@
+/*
+ * Boards 12 and 15. Desktop: the poster beside everything else. Phone: the
+ * poster beside the meta line and title, the rest full width below.
+ */
+.root {
+  display: grid;
+  grid-template-areas:
+    'poster head'
+    'poster main';
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: var(--space-16) var(--space-28);
+}
+
+.poster {
+  --poster-width: 220px;
+  --poster-radius: var(--radius-16);
+
+  grid-area: poster;
+  align-self: start;
+  box-shadow: 0 14px 30px var(--shadow-color);
+}
+
+.head {
+  display: flex;
+  grid-area: head;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-top: var(--space-4);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat);
+}
+
+.title {
+  font-size: var(--text-36);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: -0.035em;
+  line-height: var(--leading-108);
+}
+
+.main {
+  display: flex;
+  grid-area: main;
+  flex-direction: column;
+  gap: var(--space-16);
+  min-width: 0;
+}
+
+.ratings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-10);
+  margin: 0;
+}
+
+.mine,
+.provider {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-16);
+  border-radius: var(--radius-16);
+}
+
+.mine {
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-badge),
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--cat-base),
+    var(--badge-ink) var(--badge-ink-mix)
+  );
+}
+
+.provider {
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line));
+}
+
+.ratingLabel {
+  font-size: var(--text-11);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.mine .ratingLabel {
+  opacity: 0.8;
+}
+
+.provider .ratingLabel {
+  color: var(--muted);
+}
+
+.score,
+.providerScore {
+  margin: 0;
+  font-variant-numeric: var(--numeric-rating);
+}
+
+.score {
+  font-size: var(--text-30);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+  line-height: var(--leading-110);
+}
+
+.scale {
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+  letter-spacing: normal;
+  opacity: 0.7;
+}
+
+.providerScore {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--text-22);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.35;
+}
+
+.star {
+  flex: none;
+  color: var(--cat-base);
+}
+
+.quote {
+  font-size: var(--text-20);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.01em;
+  line-height: var(--leading-145);
+  text-wrap: pretty;
+  /* Keeps the paragraphs of a longer review. */
+  white-space: pre-line;
+}
+
+.noNotes {
+  color: var(--muted);
+  font-size: var(--text-17);
+  font-style: italic;
+}
+
+.divider {
+  height: 1px;
+  margin: var(--space-4) 0;
+  border: 0;
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-dialog-line),
+    var(--line)
+  );
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.aboutTitle {
+  color: var(--muted);
+  font-size: var(--text-12);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-6) var(--space-12);
+  margin: 0;
+  font-size: var(--text-14);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.factKey {
+  color: var(--muted);
+}
+
+/* Below 640px, from board 15. */
+@media (max-width: 639px) {
+  .root {
+    grid-template-areas:
+      'poster head'
+      'main main';
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .poster {
+    --poster-width: 112px;
+    --poster-radius: var(--radius-14);
+
+    box-shadow: 0 10px 24px var(--shadow-color);
+  }
+
+  .head {
+    padding-top: var(--space-6);
+  }
+
+  .meta {
+    gap: var(--space-6);
+    font-size: var(--text-12);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  .title {
+    font-size: 25px;
+    letter-spacing: var(--tracking-tighter);
+    line-height: 1.12;
+  }
+
+  .ratings {
+    flex-wrap: nowrap;
+    gap: var(--space-8);
+  }
+
+  .mine,
+  .provider {
+    flex: 1;
+    gap: 1px;
+    padding: var(--space-10) var(--space-14);
+  }
+
+  .score {
+    font-size: var(--text-28);
+  }
+
+  .scale {
+    font-size: var(--text-13);
+  }
+
+  .providerScore {
+    gap: 5px;
+    font-size: var(--text-20);
+    letter-spacing: normal;
+    line-height: 1.4;
+  }
+
+  .star {
+    width: 14px;
+    height: 14px;
+  }
+
+  .quote {
+    font-size: var(--text-18);
+    letter-spacing: normal;
+  }
+
+  .noNotes {
+    font-size: var(--text-16);
+  }
+}

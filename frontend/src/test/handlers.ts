@@ -3,6 +3,7 @@ import type { paths } from '../api/schema'
 import {
   makeCategory,
   makeItem,
+  makeProblem,
   makeReview,
   makeReviewFacets,
   makeReviewPage,
@@ -14,12 +15,40 @@ export const http = createOpenApiHttp<paths>({
   baseUrl: 'http://localhost:3000',
 })
 
+/**
+ * The default list's two reviews, also served one by one at
+ * /api/v3/reviews/{id}.
+ */
+export const defaultReviews = [
+  makeReview(),
+  makeReview({
+    id: 2,
+    item: makeItem({
+      id: 'tt0133093',
+      category: 'movie',
+      title: 'The Matrix',
+      start_year: 1999,
+      end_year: null,
+      genres: ['Action', 'Sci-Fi'],
+      details: { media_type: 'movie' },
+    }),
+    rating: 8,
+    text: null,
+  }),
+]
+
 export const handlers = [
   http.get('/api/v3/categories', ({ response }) =>
     response(200).json({
       data: [
         makeCategory(),
         makeCategory({ id: 'game', label: 'Games', source: 'IGDB' }),
+        makeCategory({
+          id: 'anime',
+          label: 'Anime',
+          source: 'MyAnimeList',
+          rating_label: 'MyAnimeList',
+        }),
       ],
       meta: {},
     }),
@@ -27,28 +56,18 @@ export const handlers = [
   // One page of two, so pages that list reviews render. Tests that care about
   // the list override it with server.use.
   http.get('/api/v3/reviews', ({ response }) =>
-    response(200).json(
-      makeReviewPage([
-        makeReview(),
-        makeReview({
-          id: 2,
-          item: makeItem({
-            id: 'tt0133093',
-            category: 'movie',
-            title: 'The Matrix',
-            start_year: 1999,
-            end_year: null,
-            genres: ['Action', 'Sci-Fi'],
-            details: { media_type: 'movie' },
-          }),
-          rating: 8,
-          text: null,
-        }),
-      ]),
-    ),
+    response(200).json(makeReviewPage(defaultReviews)),
   ),
   // The counts for the two reviews above.
   http.get('/api/v3/reviews/facets', ({ response }) =>
     response(200).json(makeReviewFacets()),
   ),
+  // After the facets, which {id} would match too. A test that overrides this
+  // with server.use also catches /facets.
+  http.get('/api/v3/reviews/{id}', ({ params, response }) => {
+    const review = defaultReviews.find((r) => r.id === Number(params.id))
+    return review
+      ? response(200).json({ data: review, meta: {} })
+      : response(404).json(makeProblem())
+  }),
 ]

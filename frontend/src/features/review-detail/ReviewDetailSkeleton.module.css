@@ -1,0 +1,86 @@
+/* The same grid as ReviewDetail.module.css, so content replaces it in place. */
+.root {
+  display: grid;
+  grid-template-areas:
+    'poster head'
+    'poster main';
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: var(--space-16) var(--space-28);
+}
+
+/* Set here rather than as props, so phones can change them. */
+.poster {
+  --skeleton-radius: var(--radius-16);
+
+  grid-area: poster;
+  align-self: start;
+}
+
+.head {
+  display: flex;
+  grid-area: head;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding-top: var(--space-6);
+}
+
+.title {
+  --skeleton-height: 36px;
+  --skeleton-radius: var(--radius-10);
+}
+
+.main {
+  display: flex;
+  grid-area: main;
+  flex-direction: column;
+  gap: var(--space-20);
+  min-width: 0;
+}
+
+.ratings {
+  display: flex;
+  gap: var(--space-10);
+}
+
+.box {
+  --skeleton-width: 112px;
+  --skeleton-height: 70px;
+  --skeleton-radius: var(--radius-16);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+/* Below 640px, from board 15. */
+@media (max-width: 639px) {
+  .root {
+    grid-template-areas:
+      'poster head'
+      'main main';
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .poster {
+    --skeleton-radius: var(--radius-14);
+  }
+
+  .title {
+    --skeleton-height: 28px;
+  }
+
+  .ratings {
+    gap: var(--space-8);
+  }
+
+  .box {
+    --skeleton-width: auto;
+    --skeleton-height: 66px;
+
+    flex: 1;
+  }
+}

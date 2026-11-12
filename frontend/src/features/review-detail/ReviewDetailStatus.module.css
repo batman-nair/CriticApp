@@ -1,0 +1,50 @@
+/*
+ * From the boards' "Review deleted" body, which fills the same space: 80px
+ * below the header and 96px above the bottom, less the dialog body's padding.
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: 62px 0 66px;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--text-22);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-125);
+}
+
+.text {
+  color: var(--muted);
+}
+
+/* Two classes: Button's .lg sets these at one. */
+.root .action {
+  height: 44px;
+  margin-top: var(--space-8);
+  padding: 0 var(--space-18);
+  border-radius: var(--radius-12);
+}
+
+/* Below 640px, from board 16. */
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-10);
+    padding: 70px var(--space-4) 48px;
+  }
+
+  .title {
+    font-size: var(--text-21);
+  }
+
+  .root .action {
+    height: 48px;
+    margin-top: var(--space-6);
+    padding: 0 var(--space-20);
+    border-radius: var(--radius-14);
+  }
+}

@@ -2,10 +2,13 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
 } from '@tanstack/react-query'
 import { client, unwrap } from '../client'
 import type { paths } from '../schema'
-import type { ReviewPage } from '../types'
+import type { Review, ReviewPage } from '../types'
 
 export const REVIEW_PAGE_SIZE = 20
 
@@ -32,6 +35,7 @@ export const reviewKeys = {
   lists,
   list: (params: ReviewListParams) => [...lists(), params] as const,
   facets: (params: ReviewFacetsParams) => [...all, 'facets', params] as const,
+  detail: (id: number) => [...all, 'detail', id] as const,
 }
 
 function nextOffset(last: ReviewPage) {
@@ -78,5 +82,47 @@ export function useReviewFacets(params: ReviewFacetsParams) {
     },
     // Keeps the last counts while the next filter's counts load.
     placeholderData: keepPreviousData,
+  })
+}
+
+/** The review with `id` from any list already in the cache. */
+function findListedReview(
+  queryClient: QueryClient,
+  id: number,
+): Review | undefined {
+  const lists = queryClient.getQueriesData<InfiniteData<ReviewPage>>({
+    queryKey: reviewKeys.lists(),
+  })
+  for (const [, data] of lists) {
+    for (const page of data?.pages ?? []) {
+      const review = page.data.find((r) => r.id === id)
+      if (review) return review
+    }
+  }
+  return undefined
+}
+
+/**
+ * One review. A list that already holds it shows it at once as placeholder
+ * data, but the review is still fetched, so a 404 for one deleted elsewhere
+ * wins.
+ */
+export function useReview(id: number) {
+  const queryClient = useQueryClient()
+  // Typed, or the placeholder function makes useQuery infer the data as a
+  // function.
+  return useQuery<Review>({
+    queryKey: reviewKeys.detail(id),
+    queryFn: async ({ signal }) => {
+      const body = await unwrap(
+        client.GET('/api/v3/reviews/{id}', {
+          params: { path: { id } },
+          signal,
+        }),
+      )
+      return body.data
+    },
+    enabled: Number.isInteger(id) && id > 0,
+    placeholderData: () => findListedReview(queryClient, id),
   })
 }

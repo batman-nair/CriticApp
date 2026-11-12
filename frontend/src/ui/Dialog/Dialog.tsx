@@ -1,5 +1,5 @@
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type Key, type ReactNode } from 'react'
 import { categoryVars } from '../../lib/categories'
 import { cx } from '../../lib/cx'
 import { Icon } from '../Icon/Icon'
@@ -21,6 +21,8 @@ interface DialogProps {
   /** Actions such as Edit and Delete, placed before Close. */
   headerEnd?: ReactNode
   footer?: ReactNode
+  /** A new value remounts the body, so it starts scrolled to the top. */
+  bodyKey?: Key
   children: ReactNode
 }
 
@@ -35,6 +37,7 @@ export function Dialog({
   headerStart,
   headerEnd,
   footer,
+  bodyKey,
   children,
 }: DialogProps) {
   // Radix only returns focus to its own Trigger, and these dialogs open from
@@ -107,7 +110,7 @@ export function Dialog({
             </div>
           </div>
           {/* Focusable so that a long body can be scrolled from the keyboard. */}
-          <div className={styles.body} tabIndex={0}>
+          <div key={bodyKey} className={styles.body} tabIndex={0}>
             {children}
           </div>
           {footer && <div className={styles.footer}>{footer}</div>}
