@@ -7,3 +7,17 @@ export function formatYears(start: number | null, end: number | null): string {
   if (end === null || end === start) return String(start)
   return `${start}–${end}`
 }
+
+const ACRONYM_MEDIA_TYPES = new Set(['tv', 'ova', 'ona'])
+
+/**
+ * A provider's media type as a label: "TV" and "OVA" upper-cased, otherwise
+ * "light_novel" as "Light novel". Empty when there's nothing to say.
+ */
+export function formatMediaType(value: string | null): string {
+  const type = value?.trim() ?? ''
+  if (type === '' || type.toLowerCase() === 'unknown') return ''
+  if (ACRONYM_MEDIA_TYPES.has(type.toLowerCase())) return type.toUpperCase()
+  const words = type.replaceAll('_', ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
