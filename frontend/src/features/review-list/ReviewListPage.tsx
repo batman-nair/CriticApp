@@ -175,7 +175,11 @@ export function ReviewListPage() {
             {count !== undefined ? resultsLabel(count) : ''}
           </span>
           {isFiltered && (
-            <button type="button" className={styles.clear} onClick={clearAll}>
+            <button
+              type="button"
+              className={styles.clear}
+              onClick={clearAll}
+            >
               Clear filters
             </button>
           )}
