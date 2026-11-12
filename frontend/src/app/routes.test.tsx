@@ -1,11 +1,24 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../test/axe'
 import { stubSystemTheme } from '../test/matchMedia'
 import { renderRoute } from '../test/renderRoute'
 
-const crash = vi.hoisted(() => ({ detail: false, header: false }))
+const crash = vi.hoisted(() => ({ list: false, detail: false, header: false }))
+
+vi.mock('../features/review-list/ReviewListPage', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('../features/review-list/ReviewListPage')
+    >()
+  return {
+    ReviewListPage: () => {
+      if (crash.list) throw new Error('List crashed')
+      return <original.ReviewListPage />
+    },
+  }
+})
 
 vi.mock(
   '../features/review-detail/ReviewDetailPage',
@@ -48,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  crash.list = false
   crash.detail = false
   crash.header = false
   localStorage.clear()
@@ -72,12 +86,22 @@ describe('routes', () => {
     expect(screen.getAllByRole('article')).toHaveLength(2)
   })
 
-  it.each([
-    ['/reviews/5', 'Review 5'],
-    ['/add', 'Add review'],
-  ])('shows %s over the list', (path, name) => {
-    renderRoute(path)
-    expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument()
+  it('shows /reviews/1 over the list', async () => {
+    renderRoute('/reviews/1')
+    expect(
+      await screen.findByRole('dialog', { name: 'Cowboy Bebop' }),
+    ).toBeInTheDocument()
+    // Behind the dialog, so outside the accessibility tree.
+    expect(
+      screen.getByRole('heading', { level: 1, name: HERO, hidden: true }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows /add over the list', () => {
+    renderRoute('/add')
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Add review' }),
+    ).toBeInTheDocument()
     expect(hero()).toBeInTheDocument()
   })
 
@@ -109,7 +133,7 @@ describe('routes', () => {
 describe('document title', () => {
   it.each([
     ['/', 'Critic'],
-    ['/reviews/5', 'Review · Critic'],
+    ['/reviews/1', 'Review · Critic'],
     ['/add', 'Add review · Critic'],
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
@@ -134,8 +158,8 @@ describe('when rendering throws', () => {
   })
 
   it('keeps the header around the 500 page for a page crash', () => {
-    crash.detail = true
-    renderRoute('/reviews/5')
+    crash.list = true
+    renderRoute('/')
     expect(
       screen.getByRole('heading', { level: 1, name: SERVER_ERROR }),
     ).toBeInTheDocument()
@@ -145,14 +169,35 @@ describe('when rendering throws', () => {
 
   it('recovers through "Back to my reviews"', async () => {
     const user = userEvent.setup()
-    crash.detail = true
-    renderRoute('/reviews/5')
+    crash.list = true
+    renderRoute('/')
+    crash.list = false
     await user.click(screen.getByRole('link', { name: 'Back to my reviews' }))
     expect(hero()).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: SERVER_ERROR }),
     ).not.toBeInTheDocument()
     expect(document.title).toBe('Critic')
+  })
+
+  it('keeps the list behind a dialog for a crash in the dialog', async () => {
+    const user = userEvent.setup()
+    crash.detail = true
+    const { router } = renderRoute('/reviews/1')
+    expect(
+      screen.getByRole('dialog', { name: 'Something broke' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: HERO, hidden: true }),
+    ).toBeInTheDocument()
+    expect(document.title).toBe('Something broke · Critic')
+
+    await user.click(screen.getByRole('button', { name: 'Back to the list' }))
+
+    await waitFor(() => expect(document.title).toBe('Critic'))
+    expect(router.state.location.pathname).toBe('/')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(hero()).toBeInTheDocument()
   })
 
   it('shows the 500 page in a main landmark when the header crashes', () => {
@@ -182,21 +227,30 @@ describe('scroll position', () => {
     expect(scrollTo).not.toHaveBeenCalled()
   })
 
-  it.each(['/add', '/reviews/5'])(
-    'stays put when %s links back to the list',
-    async (path) => {
-      const user = userEvent.setup()
-      const scrollTo = vi.spyOn(window, 'scrollTo')
-      renderRoute(path)
-      scrollTo.mockClear()
-      await user.click(screen.getByRole('link', { name: 'Back to the list' }))
-      // By name: the cards' titles are h2s too.
-      expect(
-        screen.queryByRole('heading', { name: /^(Add review|Review 5)$/ }),
-      ).toBeNull()
-      expect(scrollTo).not.toHaveBeenCalled()
-    },
-  )
+  it('stays put when /add links back to the list', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.spyOn(window, 'scrollTo')
+    renderRoute('/add')
+    scrollTo.mockClear()
+    await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+    // By name: the cards' titles are h2s too.
+    expect(
+      screen.queryByRole('heading', { name: 'Add review' }),
+    ).not.toBeInTheDocument()
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('stays put when /reviews/1 closes back to the list', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.spyOn(window, 'scrollTo')
+    const { router } = renderRoute('/reviews/1')
+    await screen.findByRole('dialog', { name: 'Cowboy Bebop' })
+    scrollTo.mockClear()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
 
   it('resets on an ordinary navigation', async () => {
     const user = userEvent.setup()
@@ -209,7 +263,7 @@ describe('scroll position', () => {
 })
 
 describe('accessibility', () => {
-  it.each(['/', '/does-not-exist'])(
+  it.each(['/', '/does-not-exist', '/reviews/1'])(
     'has no axe violations at %s',
     async (path) => {
       const { container } = renderRoute(path)
