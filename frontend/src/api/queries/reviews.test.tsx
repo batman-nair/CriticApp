@@ -1,16 +1,19 @@
+import type { InfiniteData } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { HttpResponse } from 'msw'
 import { expect, it } from 'vitest'
 import { OWNER_USERNAME } from '../../config'
-import { makeReview, makeReviewPage } from '../../test/fixtures'
+import { makeProblem, makeReview, makeReviewPage } from '../../test/fixtures'
 import { http } from '../../test/handlers'
-import { queryWrapper } from '../../test/render'
+import { createTestQueryClient, queryWrapper } from '../../test/render'
 import { server } from '../../test/server'
 import { ApiError } from '../client'
-import type { ReviewPage } from '../types'
+import { createQueryClient } from '../queryClient'
+import type { Review, ReviewPage } from '../types'
 import {
   REVIEW_PAGE_SIZE,
   reviewKeys,
+  useReview,
   useReviewFacets,
   useReviewList,
   type ReviewListParams,
@@ -207,6 +210,114 @@ it('exposes a facets failure as an ApiError', async () => {
 
 it('keys the facets under all, outside the lists', () => {
   const key = reviewKeys.facets({ username: 'someone' })
+
+  expect(key.slice(0, 1)).toEqual(reviewKeys.all)
+  expect(key.slice(0, 2)).not.toEqual(reviewKeys.lists())
+})
+
+/** Serves `review` at its id and records the requested paths. */
+function serveReview(review: Review, gate?: Promise<void>) {
+  const requests: string[] = []
+  server.use(
+    http.get('/api/v3/reviews/{id}', async ({ request, response }) => {
+      requests.push(new URL(request.url).pathname)
+      await gate
+      return response(200).json({ data: review, meta: {} })
+    }),
+  )
+  return requests
+}
+
+it('asks for the review by id and returns it', async () => {
+  const review = makeReview()
+  const requests = serveReview(review)
+  const { result } = renderHook(() => useReview(1), {
+    wrapper: queryWrapper(),
+  })
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  expect(requests).toEqual(['/api/v3/reviews/1'])
+  expect(result.current.data).toEqual(review)
+})
+
+it('shows the review from a cached list until the response arrives', async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  const listed = makeReview({ id: 2, rating: 7 })
+  const fresh = makeReview({ id: 2, rating: 8 })
+  serveReview(fresh, gate)
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData<InfiniteData<ReviewPage>>(
+    reviewKeys.list({ username: OWNER_USERNAME }),
+    {
+      pages: [
+        makeReviewPage([makeReview()], { count: 3 }),
+        makeReviewPage([listed, makeReview({ id: 3 })], {
+          count: 3,
+          offset: 1,
+        }),
+      ],
+      pageParams: [0, 1],
+    },
+  )
+  const { result } = renderHook(() => useReview(2), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  expect(result.current.isPlaceholderData).toBe(true)
+  expect(result.current.data).toEqual(listed)
+
+  release()
+  await waitFor(() => expect(result.current.isPlaceholderData).toBe(false))
+  expect(result.current.data).toEqual(fresh)
+})
+
+it('has no placeholder when no list holds the review', () => {
+  serveReview(makeReview({ id: 7 }), new Promise(() => {}))
+  const { result } = renderHook(() => useReview(7), {
+    wrapper: queryWrapper(),
+  })
+
+  expect(result.current.isPending).toBe(true)
+  expect(result.current.data).toBeUndefined()
+})
+
+it.each([Number.NaN, 1.5, 0, -1])('stays idle for the id %s', (id) => {
+  const requests = serveReview(makeReview())
+  const { result } = renderHook(() => useReview(id), {
+    wrapper: queryWrapper(),
+  })
+
+  expect(result.current.fetchStatus).toBe('idle')
+  expect(result.current.isPending).toBe(true)
+  expect(requests).toEqual([])
+})
+
+it('rejects a missing review with a 404 ApiError, without retrying', async () => {
+  let requests = 0
+  server.use(
+    http.get('/api/v3/reviews/{id}', ({ response }) => {
+      requests += 1
+      return response(404).json(makeProblem())
+    }),
+  )
+  // The app's client, whose retry rule is under test here.
+  const queryClient = createQueryClient()
+  queryClient.setDefaultOptions({
+    queries: { ...queryClient.getDefaultOptions().queries, retryDelay: 0 },
+  })
+  const { result } = renderHook(() => useReview(99), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(result.current.error).toBeInstanceOf(ApiError)
+  expect(result.current.error).toMatchObject({ status: 404 })
+  expect(requests).toBe(1)
+})
+
+it('keys a review under all, outside the lists', () => {
+  const key = reviewKeys.detail(1)
 
   expect(key.slice(0, 1)).toEqual(reviewKeys.all)
   expect(key.slice(0, 2)).not.toEqual(reviewKeys.lists())
