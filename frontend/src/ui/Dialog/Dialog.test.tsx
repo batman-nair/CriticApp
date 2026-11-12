@@ -152,6 +152,30 @@ it('makes the body keyboard-focusable', async () => {
   )
 })
 
+it('starts a new body, scrolled to the top, when bodyKey changes', async () => {
+  const { rerender } = await setup({ bodyKey: 1, children: <p>Body</p> })
+  const body = screen.getByText('Body').parentElement!
+  body.scrollTop = 120
+
+  rerender(
+    <Harness bodyKey={1}>
+      <p>Body</p>
+    </Harness>,
+  )
+  expect(screen.getByText('Body').parentElement).toBe(body)
+
+  rerender(
+    <Harness bodyKey={2}>
+      <p>Body</p>
+    </Harness>,
+  )
+
+  const next = screen.getByText('Body').parentElement!
+  expect(next).not.toBe(body)
+  expect(next.scrollTop).toBe(0)
+  expect(dialog()).toContainElement(next)
+})
+
 it('sets the category variables on the dialog', async () => {
   await setup({ category: 'movie' })
 
