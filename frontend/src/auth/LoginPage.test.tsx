@@ -142,6 +142,12 @@ it('says why with a valid `next`', () => {
   expect(screen.getByRole('status')).toHaveTextContent(NOTICE)
 })
 
+it('says why with `next` set to the home page', () => {
+  renderRoute('/login?next=%2F')
+
+  expect(screen.getByRole('status')).toHaveTextContent(NOTICE)
+})
+
 it('has no notice without `next`', () => {
   renderRoute('/login')
 

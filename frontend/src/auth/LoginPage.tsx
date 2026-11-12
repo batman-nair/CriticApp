@@ -52,8 +52,9 @@ export function LoginPage() {
     showError &&
     login.error instanceof ApiError &&
     login.error.code === 'INVALID_CREDENTIALS'
-  // Only for a `next` that is somewhere worth going back to.
-  const showNotice = target !== '/' && !showError
+  // Only for a `next` that safeNext accepts. It turns a rejected one into `/`.
+  const validNext = next !== null && (target !== '/' || next === '/')
+  const showNotice = validNext && !showError
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
