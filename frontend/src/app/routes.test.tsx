@@ -142,6 +142,8 @@ describe('document title', () => {
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
   ])('at %s is %s', (path, title) => {
+    // Logged out, so /login doesn't redirect.
+    if (path === '/login') server.use(sessionAs(null))
     renderRoute(path)
     expect(document.title).toBe(title)
   })
@@ -270,9 +272,10 @@ describe('scroll position', () => {
 })
 
 describe('accessibility', () => {
-  it.each(['/', '/does-not-exist', '/reviews/1'])(
+  it.each(['/', '/does-not-exist', '/reviews/1', '/login'])(
     'has no axe violations at %s',
     async (path) => {
+      if (path === '/login') server.use(sessionAs(null))
       const { container } = renderRoute(path)
       await expectNoAxeViolations(container)
     },
