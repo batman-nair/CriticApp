@@ -1,0 +1,46 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  /* The boards' 12px gap less the button's -10px margin. */
+  gap: var(--space-2);
+}
+
+.text {
+  font-size: var(--text-15);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/*
+ * Three lines, faded out at the bottom. A mask rather than the boards' overlay,
+ * so the fade needn't know the tinted dialog colour behind it.
+ */
+.clamped {
+  max-height: 4.65em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.6em), transparent);
+}
+
+/* 44px tall for touch, with the label centred in it. */
+.more {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.more svg {
+  transition: rotate var(--duration-fast) var(--ease);
+}
+
+.more[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
