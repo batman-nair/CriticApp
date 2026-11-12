@@ -1,6 +1,7 @@
 import { HttpResponse } from 'msw'
 import { afterEach, expect, it } from 'vitest'
 import { client, unwrap } from '../api/client'
+import { csrfMiddleware } from './csrf'
 import { makeProblem, makeSessionUser } from '../test/fixtures'
 import { CSRF_TOKEN, http } from '../test/handlers'
 import { server } from '../test/server'
@@ -159,6 +160,36 @@ it('refetches the token and retries once after a CSRF failure', async () => {
     { username: 'owner', password: 'secret' },
     { username: 'owner', password: 'secret' },
   ])
+})
+
+it('retries with fetch called unbound, as the browser requires', async () => {
+  setCookie('stale')
+  const sent: (string | null)[] = []
+  // Like the browser's fetch, which throws when called as a method of
+  // another object.
+  function browserFetch(this: unknown, request: Request) {
+    if (this !== undefined && this !== globalThis) {
+      throw new TypeError('Illegal invocation')
+    }
+    sent.push(request.headers.get('X-CSRFToken'))
+    return Promise.resolve(new Response(null, { status: 204 }))
+  }
+  const params = {
+    id: 'unbound',
+    options: Object.freeze({ fetch: browserFetch }),
+    request: new Request('http://localhost/api/auth/logout', {
+      method: 'POST',
+    }),
+  } as unknown as Parameters<NonNullable<typeof csrfMiddleware.onRequest>>[0]
+
+  await csrfMiddleware.onRequest?.(params)
+  const retried = await csrfMiddleware.onResponse?.({
+    ...params,
+    response: problemResponse(CSRF_FAILED),
+  } as unknown as Parameters<NonNullable<typeof csrfMiddleware.onResponse>>[0])
+
+  expect((retried as Response).status).toBe(204)
+  expect(sent).toEqual([CSRF_TOKEN])
 })
 
 it('returns a second CSRF failure without retrying again', async () => {

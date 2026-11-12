@@ -73,9 +73,11 @@ export const csrfMiddleware: Middleware = {
     } catch {
       return undefined
     }
-    // Once only: this response is returned as it is.
+    // Once only: this response is returned as it is. Called unbound: the
+    // browser's fetch throws "Illegal invocation" as a method of `options`.
+    const { fetch } = options
     try {
-      return await options.fetch(withToken(original))
+      return await fetch(withToken(original))
     } catch (error) {
       // The client maps errors only around the first fetch.
       throw toNetworkError(error) ?? error
