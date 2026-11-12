@@ -25,6 +25,7 @@ it('returns the categories and keeps them fresh', async () => {
   expect(result.current.data?.map((category) => category.label)).toEqual([
     'Movies',
     'Games',
+    'Anime',
   ])
   expect(result.current.isStale).toBe(false)
 })
