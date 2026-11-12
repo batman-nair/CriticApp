@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useMatch, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries/auth'
 
@@ -14,11 +15,26 @@ export function LogoutButton({ className }: LogoutButtonProps) {
   const logout = useLogout()
   const navigate = useNavigate()
   const onAdd = useMatch('/add') !== null
+  const leaving = useRef(false)
+  const { mutate } = logout
 
-  async function handleClick() {
-    if (logout.isPending) return
-    if (onAdd) await navigate('/', { replace: true, preventScrollReset: true })
-    logout.mutate()
+  // Logs out only once `/add` is off the screen. navigate() resolves before
+  // React commits the new route, so logging out straight after it lets the
+  // guard on `/add` see the logged-out session and go to the login page.
+  useEffect(() => {
+    if (!leaving.current || onAdd) return
+    leaving.current = false
+    mutate()
+  }, [onAdd, mutate])
+
+  function handleClick() {
+    if (logout.isPending || leaving.current) return
+    if (onAdd) {
+      leaving.current = true
+      void navigate('/', { replace: true, preventScrollReset: true })
+      return
+    }
+    mutate()
   }
 
   return (
