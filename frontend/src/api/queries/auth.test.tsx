@@ -101,3 +101,33 @@ it('sets a null user on logout and refetches everything', async () => {
     true,
   )
 })
+
+it('keeps the login’s session over a session fetch sent before it', async () => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  server.use(
+    http.get('/api/auth/session', async ({ response }) => {
+      await held
+      return response(200).json({ data: { user: null }, meta: {} })
+    }),
+  )
+  const queryClient = createTestQueryClient()
+  const session = renderHook(() => useSessionQuery(), {
+    wrapper: queryWrapper(queryClient),
+  })
+  const login = renderHook(() => useLogin(), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  await act(() =>
+    login.result.current.mutateAsync({ username: 'owner', password: 'secret' }),
+  )
+  release()
+
+  await waitFor(() => expect(session.result.current.isFetching).toBe(false))
+  expect(queryClient.getQueryData(authKeys.session())).toEqual({
+    user: makeSessionUser(),
+  })
+})

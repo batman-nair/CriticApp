@@ -41,7 +41,10 @@ export function useLogin() {
       )
       return body.data
     },
-    onSuccess: ({ user }) => {
+    onSuccess: async ({ user }) => {
+      // A session fetch sent before the login would overwrite this with its
+      // older answer.
+      await queryClient.cancelQueries({ queryKey: authKeys.session() })
       queryClient.setQueryData<Session>(authKeys.session(), { user })
       // Data that depends on who is logged in refetches. The session is
       // already right. Not awaited, so the login doesn't wait for the refetch.
@@ -56,7 +59,8 @@ export function useLogout() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => unwrap(client.POST('/api/auth/logout')),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await queryClient.cancelQueries({ queryKey: authKeys.session() })
       queryClient.setQueryData<Session>(authKeys.session(), { user: null })
       // The session too, so it's confirmed with the server.
       void queryClient.invalidateQueries()
