@@ -99,10 +99,11 @@ describe('routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows /add over the list', () => {
+  it('shows /add over the list', async () => {
     renderRoute('/add')
+    // The guard waits for the session.
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
     ).toBeInTheDocument()
     expect(hero()).toBeInTheDocument()
   })
@@ -150,7 +151,9 @@ describe('document title', () => {
     renderRoute('/')
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(document.title).toBe('Add review · Critic')
-    await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+    await user.click(
+      await screen.findByRole('link', { name: 'Back to the list' }),
+    )
     expect(document.title).toBe('Critic')
   })
 })
@@ -225,7 +228,7 @@ describe('scroll position', () => {
     scrollTo.mockClear()
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
     ).toBeInTheDocument()
     expect(scrollTo).not.toHaveBeenCalled()
   })
@@ -234,8 +237,9 @@ describe('scroll position', () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo')
     renderRoute('/add')
+    const back = await screen.findByRole('link', { name: 'Back to the list' })
     scrollTo.mockClear()
-    await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+    await user.click(back)
     // By name: the cards' titles are h2s too.
     expect(
       screen.queryByRole('heading', { name: 'Add review' }),

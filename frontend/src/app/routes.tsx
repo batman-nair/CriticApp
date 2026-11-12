@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router'
 import { LoginPage } from '../auth/LoginPage'
+import { RequireOwner } from '../auth/RequireOwner'
 import { AddReviewPage } from '../features/add-review/AddReviewPage'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
@@ -37,7 +38,11 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: 'add',
-                    element: <AddReviewPage />,
+                    element: (
+                      <RequireOwner>
+                        <AddReviewPage />
+                      </RequireOwner>
+                    ),
                     handle: { title: 'Add review' },
                   },
                 ],
