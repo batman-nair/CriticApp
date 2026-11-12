@@ -1,0 +1,32 @@
+.root {
+  display: flex;
+  gap: var(--space-6);
+}
+
+/* Two classes, so these beat IconButton's whatever the CSS order. Like Close. */
+.root .button {
+  background: var(--dialog-button-bg, var(--soft));
+}
+
+.button svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.2;
+}
+
+/* Below 640px, from board 15. */
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-4);
+  }
+
+  .root .button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .button svg {
+    width: 16px;
+    height: 16px;
+  }
+}

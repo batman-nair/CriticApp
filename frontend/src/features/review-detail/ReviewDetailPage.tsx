@@ -8,12 +8,15 @@ import { useRouteDialog } from '../../ui/Dialog/useRouteDialog'
 import { ReviewDetail } from './ReviewDetail'
 import { ReviewDetailSkeleton } from './ReviewDetailSkeleton'
 import { ReviewDetailStatus } from './ReviewDetailStatus'
+import { ReviewSteps } from './ReviewSteps'
+import { useReviewSteps } from './useReviewSteps'
 
 export function ReviewDetailPage() {
   const id = Number(useParams().id)
   const dialog = useRouteDialog()
   const review = useReview(id)
   const categories = useCategories()
+  const steps = useReviewSteps(id, dialog.open)
   const { data } = review
 
   // An id that isn't one never asks, so it's as missing as a 404.
@@ -67,6 +70,7 @@ export function ReviewDetailPage() {
       title={title}
       category={category}
       bodyKey={id}
+      headerStart={<ReviewSteps {...steps} />}
     >
       {body}
     </Dialog>
