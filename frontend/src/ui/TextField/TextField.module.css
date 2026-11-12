@@ -1,7 +1,18 @@
 .control {
-  height: 46px;
   padding: 0 var(--space-14);
+  font-size: var(--text-15);
+}
+
+.md {
+  height: 46px;
   border-radius: var(--radius-12);
   background: var(--bg);
-  font-size: var(--text-15);
+}
+
+.lg {
+  height: 52px;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-14);
+  background: var(--surface);
+  font-size: var(--text-16);
 }

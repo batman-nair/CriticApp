@@ -20,11 +20,18 @@ if (typeof document !== 'undefined') {
   // which happens before any beforeAll, and would then bypass MSW.
   server.listen({ onUnhandledRequest: rejectUnhandledRequest })
 
+  // Dynamic for the same reason: a static import is hoisted above listen and
+  // would load client.ts first. Every write in a test then has the header.
+  const { installCsrf } = await import('../auth/csrf')
+  installCsrf()
+
   const expectNoUnhandledRequests = () =>
     expect(takeUnhandledRequests(), 'requests with no MSW handler').toEqual([])
 
   afterEach(() => {
     server.resetHandlers()
+    // So one test's CSRF token doesn't reach the next.
+    document.cookie = 'csrftoken=; path=/; max-age=0'
     expectNoUnhandledRequests()
   })
 

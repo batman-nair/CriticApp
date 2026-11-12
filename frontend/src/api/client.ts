@@ -53,18 +53,24 @@ export const client = createClient<paths>({
   credentials: 'same-origin',
 })
 
-// Request middleware, such as the CSRF header, also goes in with client.use.
+/** The ApiError for a failed fetch, or undefined for a cancelled one. */
+export function toNetworkError(error: unknown): ApiError | undefined {
+  // By name, because the DOMException class differs between realms under jsdom.
+  if ((error as Error).name === 'AbortError') return undefined
+  return new ApiError({
+    kind: 'network',
+    status: 0,
+    code: 'NETWORK_ERROR',
+    detail: 'Could not reach the server.',
+    cause: error,
+  })
+}
+
+// The CSRF header is added by auth/csrf.ts, whose installCsrf() calls
+// client.use from main.tsx (and test/setup.ts).
 client.use({
   onError({ error }) {
-    // By name, because the DOMException class differs between realms under jsdom.
-    if ((error as Error).name === 'AbortError') return undefined
-    return new ApiError({
-      kind: 'network',
-      status: 0,
-      code: 'NETWORK_ERROR',
-      detail: 'Could not reach the server.',
-      cause: error,
-    })
+    return toNetworkError(error)
   },
 })
 

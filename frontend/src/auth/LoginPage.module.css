@@ -1,0 +1,275 @@
+/* S1 on desktop, S9 below 640px. */
+.page {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex: 1 1 520px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-32);
+  min-height: 420px;
+  padding: 40px var(--space-48) var(--space-48);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.logo {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-10);
+  color: inherit;
+  font-size: var(--text-20);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tighter);
+  text-decoration: none;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-10);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: var(--text-16);
+}
+
+.art {
+  position: relative;
+  height: 340px;
+}
+
+/* Two classes: Poster's own root class sets position at one. */
+.art .poster {
+  position: absolute;
+  left: 50%;
+  --poster-width: 170px;
+  --poster-radius: var(--radius-16);
+  box-shadow: 0 18px 40px var(--shadow-color);
+}
+
+.art .left {
+  top: 40px;
+  margin-left: -215px;
+  rotate: -9deg;
+}
+
+.art .right {
+  top: 70px;
+  margin-left: 45px;
+  rotate: 8deg;
+}
+
+.art .centre {
+  top: 10px;
+  margin-left: -95px;
+  --poster-width: 190px;
+  --poster-radius: var(--radius-18);
+  box-shadow: 0 24px 50px var(--shadow-color);
+}
+
+.hero {
+  font-size: var(--text-36);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tightest);
+  line-height: var(--leading-108);
+}
+
+.watched {
+  color: var(--cat-movie);
+}
+
+.played {
+  color: var(--cat-game);
+}
+
+.read {
+  color: var(--cat-book);
+}
+
+.main {
+  display: flex;
+  flex: 1 1 480px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-48) var(--space-32);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-18);
+  width: 100%;
+  max-width: 380px;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-36);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tightest);
+  line-height: var(--leading-105);
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: var(--text-16);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-12) var(--space-14);
+  border-radius: var(--radius-14);
+  background: var(--soft);
+  font-size: var(--text-14);
+}
+
+.noticeIcon {
+  flex: none;
+}
+
+.alert {
+  align-items: flex-start;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  font-weight: var(--weight-semibold);
+}
+
+.alertIcon {
+  flex: none;
+  margin-top: var(--space-2);
+}
+
+/* Wrong credentials: both fields, with no message under either. Two classes:
+   the fields set their border colour at one. */
+.form .invalid,
+.form .invalid:focus,
+.form .invalid:focus-within {
+  border-color: var(--danger-text);
+}
+
+.form .invalid:focus,
+.form .invalid:focus-within {
+  outline: 1.5px solid var(--danger-text);
+}
+
+/* Two classes: Button's .lg sets these at one. */
+.form .submit {
+  height: 54px;
+  margin-top: var(--space-6);
+  font-size: var(--text-16);
+}
+
+/* Below 640px. A media query can't read a custom property. */
+@media (max-width: 639px) {
+  .page {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .panel {
+    flex: none;
+    justify-content: flex-start;
+    height: 320px;
+    min-height: 0;
+    padding: 56px var(--space-20) 0;
+  }
+
+  .logo {
+    gap: var(--space-8);
+    font-size: var(--text-18);
+  }
+
+  .tile {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: var(--text-14);
+  }
+
+  .art {
+    position: absolute;
+    right: 0;
+    bottom: -40px;
+    left: 0;
+    height: 230px;
+  }
+
+  .art .poster {
+    --poster-width: 112px;
+    --poster-radius: var(--radius-12);
+    box-shadow: 0 14px 30px var(--shadow-color);
+  }
+
+  .art .left {
+    top: 34px;
+    margin-left: -150px;
+  }
+
+  .art .right {
+    top: 50px;
+    margin-left: 38px;
+  }
+
+  .art .centre {
+    top: 10px;
+    margin-left: -64px;
+    --poster-width: 128px;
+    --poster-radius: var(--radius-14);
+    box-shadow: 0 18px 40px var(--shadow-color);
+  }
+
+  /* S9 has no hero line. */
+  .hero {
+    display: none;
+  }
+
+  .main {
+    display: block;
+    flex: 1;
+    padding: 28px var(--space-24) 36px;
+  }
+
+  .form {
+    gap: var(--space-16);
+    max-width: none;
+  }
+
+  .intro {
+    gap: var(--space-4);
+  }
+
+  .title {
+    font-size: var(--text-30);
+    line-height: var(--leading-108);
+  }
+
+  .subtitle {
+    font-size: var(--text-15);
+  }
+
+  .notice {
+    padding: 11px var(--space-12);
+    border-radius: var(--radius-12);
+  }
+
+  .form .submit {
+    margin-top: var(--space-4);
+  }
+}

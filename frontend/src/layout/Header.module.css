@@ -44,12 +44,16 @@
   gap: var(--space-8);
 }
 
+/* The "Log in" link and the "Log out" button. */
 .login {
   display: inline-flex;
   align-items: center;
   height: 44px;
   padding: 0 var(--space-10);
+  border: 0;
+  background: none;
   color: inherit;
+  cursor: pointer;
   font-size: var(--text-14);
   font-weight: var(--weight-semibold);
   text-decoration: none;

@@ -2,8 +2,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../test/axe'
+import { sessionAs } from '../test/handlers'
 import { stubSystemTheme } from '../test/matchMedia'
 import { renderRoute } from '../test/renderRoute'
+import { server } from '../test/server'
 
 const crash = vi.hoisted(() => ({ list: false, detail: false, header: false }))
 
@@ -97,18 +99,20 @@ describe('routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows /add over the list', () => {
+  it('shows /add over the list', async () => {
     renderRoute('/add')
+    // The guard waits for the session.
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
     ).toBeInTheDocument()
     expect(hero()).toBeInTheDocument()
   })
 
   it('shows /login without the header or footer', () => {
+    server.use(sessionAs(null))
     renderRoute('/login')
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Log in' }),
+      screen.getByRole('heading', { level: 1, name: 'Welcome back' }),
     ).toBeInTheDocument()
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
@@ -138,6 +142,8 @@ describe('document title', () => {
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
   ])('at %s is %s', (path, title) => {
+    // Logged out, so /login doesn't redirect.
+    if (path === '/login') server.use(sessionAs(null))
     renderRoute(path)
     expect(document.title).toBe(title)
   })
@@ -147,7 +153,9 @@ describe('document title', () => {
     renderRoute('/')
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(document.title).toBe('Add review · Critic')
-    await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+    await user.click(
+      await screen.findByRole('link', { name: 'Back to the list' }),
+    )
     expect(document.title).toBe('Critic')
   })
 })
@@ -222,7 +230,7 @@ describe('scroll position', () => {
     scrollTo.mockClear()
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
     ).toBeInTheDocument()
     expect(scrollTo).not.toHaveBeenCalled()
   })
@@ -231,8 +239,9 @@ describe('scroll position', () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo')
     renderRoute('/add')
+    const back = await screen.findByRole('link', { name: 'Back to the list' })
     scrollTo.mockClear()
-    await user.click(screen.getByRole('link', { name: 'Back to the list' }))
+    await user.click(back)
     // By name: the cards' titles are h2s too.
     expect(
       screen.queryByRole('heading', { name: 'Add review' }),
@@ -263,9 +272,10 @@ describe('scroll position', () => {
 })
 
 describe('accessibility', () => {
-  it.each(['/', '/does-not-exist', '/reviews/1'])(
+  it.each(['/', '/does-not-exist', '/reviews/1', '/login'])(
     'has no axe violations at %s',
     async (path) => {
+      if (path === '/login') server.use(sessionAs(null))
       const { container } = renderRoute(path)
       await expectNoAxeViolations(container)
     },
