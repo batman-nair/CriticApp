@@ -8,7 +8,8 @@ export function formatYears(start: number | null, end: number | null): string {
   return `${start}–${end}`
 }
 
-const ACRONYM_MEDIA_TYPES = new Set(['tv', 'ova', 'ona'])
+// MyAnimeList's media types that are acronyms, as in "tv_special".
+const ACRONYM_MEDIA_TYPES = new Set(['tv', 'ova', 'ona', 'cm', 'pv', 'oel'])
 
 /**
  * A provider's media type as a label: "TV" and "OVA" upper-cased, otherwise
@@ -17,7 +18,11 @@ const ACRONYM_MEDIA_TYPES = new Set(['tv', 'ova', 'ona'])
 export function formatMediaType(value: string | null): string {
   const type = value?.trim() ?? ''
   if (type === '' || type.toLowerCase() === 'unknown') return ''
-  if (ACRONYM_MEDIA_TYPES.has(type.toLowerCase())) return type.toUpperCase()
-  const words = type.replaceAll('_', ' ')
+  const words = type
+    .split('_')
+    .map((word) =>
+      ACRONYM_MEDIA_TYPES.has(word.toLowerCase()) ? word.toUpperCase() : word,
+    )
+    .join(' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }

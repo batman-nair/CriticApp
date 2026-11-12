@@ -25,6 +25,9 @@ it.each([
   ['series', 'Series'],
   ['manhwa', 'Manhwa'],
   ['light_novel', 'Light novel'],
+  ['tv_special', 'TV special'],
+  ['cm', 'CM'],
+  ['oel', 'OEL'],
 ])('formats the media type %j as "%s"', (value, expected) => {
   expect(formatMediaType(value)).toBe(expected)
 })
