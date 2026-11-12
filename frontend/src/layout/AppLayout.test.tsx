@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import { stubSystemTheme } from '../test/matchMedia'
+import { queryWrapper } from '../test/render'
 import { AppLayout } from './AppLayout'
 
 afterEach(() => {
@@ -17,7 +18,8 @@ it('puts the outlet in main, between the header and footer', () => {
       children: [{ path: '/', element: <p>Page content</p> }],
     },
   ])
-  render(<RouterProvider router={router} />)
+  // The header asks for the session.
+  render(<RouterProvider router={router} />, { wrapper: queryWrapper() })
 
   const main = screen.getByRole('main')
   expect(within(main).getByText('Page content')).toBeInTheDocument()
