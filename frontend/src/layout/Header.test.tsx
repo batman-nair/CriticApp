@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeSessionUser } from '../test/fixtures'
@@ -126,7 +127,7 @@ describe('as the owner', () => {
     server.use(
       http.post('/api/auth/logout', ({ response }) => {
         calls += 1
-        return response(500).empty()
+        return response.untyped(new HttpResponse(null, { status: 500 }))
       }),
     )
     renderHeader()

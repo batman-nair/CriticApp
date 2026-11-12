@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { HttpResponse } from 'msw'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it } from 'vitest'
 import { authKeys } from '../api/queries/auth'
@@ -97,7 +98,9 @@ it('keeps the session when the logout fails', async () => {
   const user = userEvent.setup()
   const count = countLogouts()
   server.use(
-    http.post('/api/auth/logout', ({ response }) => response(500).empty()),
+    http.post('/api/auth/logout', ({ response }) =>
+      response.untyped(new HttpResponse(null, { status: 500 })),
+    ),
   )
   const { queryClient } = renderButton()
 
