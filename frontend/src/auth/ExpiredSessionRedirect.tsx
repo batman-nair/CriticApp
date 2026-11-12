@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
 import { authKeys } from '../api/queries/auth'
@@ -13,9 +13,10 @@ export function ExpiredSessionRedirect() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
-  // A ref, so the subscription isn't recreated on every navigation.
-  const here = useRef('')
-  here.current = location.pathname + location.search
+  // An effect event, so the subscription isn't recreated on every navigation.
+  const toLogin = useEffectEvent(() => {
+    void navigate(loginPath(location.pathname + location.search))
+  })
 
   useEffect(
     () =>
@@ -34,9 +35,9 @@ export function ExpiredSessionRedirect() {
         // session straight back to `next`.
         queryClient.setQueryData(authKeys.session(), { user: null })
         void queryClient.invalidateQueries({ queryKey: authKeys.session() })
-        void navigate(loginPath(here.current))
+        toLogin()
       }),
-    [queryClient, navigate],
+    [queryClient],
   )
 
   return null
