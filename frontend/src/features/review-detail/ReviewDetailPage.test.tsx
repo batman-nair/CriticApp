@@ -266,6 +266,24 @@ it('shows an error, and the review after "Try again"', async () => {
   expect(ids).toEqual([1, 1])
 })
 
+it('says a review deleted since it was loaded is not found', async () => {
+  let deleted = false
+  serveReview(() => (deleted ? 'missing' : defaultReviews[0]!))
+  const { queryClient } = renderRoute('/reviews/1')
+  expect(
+    await within(await screen.findByRole('dialog')).findByRole('heading', {
+      name: 'Cowboy Bebop',
+    }),
+  ).toBeInTheDocument()
+
+  deleted = true
+  await act(() => queryClient.refetchQueries({ queryKey: ['reviews'] }))
+
+  expect(
+    await within(dialog()).findByRole('heading', { name: 'Review not found' }),
+  ).toBeInTheDocument()
+})
+
 it('steps with ‹ › in place, and closes back to the list at once', async () => {
   serveShelf({ 0: makeReviewPage(reviews(3)) })
   const { user, router } = await openFromCard('Title 1')

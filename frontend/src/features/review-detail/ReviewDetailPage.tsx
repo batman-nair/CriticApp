@@ -24,11 +24,12 @@ export function ReviewDetailPage() {
     !(Number.isInteger(id) && id > 0) ||
     (review.error instanceof ApiError && review.error.status === 404)
 
-  // Branch on the data first: a failed background refetch keeps the review.
+  // A 404 wins over a cached copy, so a review deleted elsewhere goes. Any
+  // other failed background refetch keeps the review on screen.
   let title
   let category
   let body
-  if (data) {
+  if (data && !notFound) {
     const { item } = data
     title = item.title
     // As ReviewDetail tints itself, so the dialog matches.
