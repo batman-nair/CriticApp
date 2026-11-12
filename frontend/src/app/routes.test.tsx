@@ -2,8 +2,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../test/axe'
+import { sessionAs } from '../test/handlers'
 import { stubSystemTheme } from '../test/matchMedia'
 import { renderRoute } from '../test/renderRoute'
+import { server } from '../test/server'
 
 const crash = vi.hoisted(() => ({ list: false, detail: false, header: false }))
 
@@ -106,9 +108,10 @@ describe('routes', () => {
   })
 
   it('shows /login without the header or footer', () => {
+    server.use(sessionAs(null))
     renderRoute('/login')
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Log in' }),
+      screen.getByRole('heading', { level: 1, name: 'Welcome back' }),
     ).toBeInTheDocument()
     expect(screen.queryByRole('banner')).not.toBeInTheDocument()
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
