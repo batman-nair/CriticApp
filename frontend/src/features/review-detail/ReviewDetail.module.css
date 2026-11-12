@@ -152,6 +152,8 @@
   letter-spacing: -0.01em;
   line-height: var(--leading-145);
   text-wrap: pretty;
+  /* Keeps the paragraphs of a longer review. */
+  white-space: pre-line;
 }
 
 .noNotes {

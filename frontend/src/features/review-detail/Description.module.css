@@ -9,6 +9,8 @@
   font-size: var(--text-15);
   line-height: 1.55;
   text-wrap: pretty;
+  /* Synopses come in paragraphs. */
+  white-space: pre-line;
 }
 
 /*
