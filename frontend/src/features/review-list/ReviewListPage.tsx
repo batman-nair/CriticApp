@@ -4,6 +4,7 @@ import { useReviewFacets, useReviewList } from '../../api/queries/reviews'
 import type { ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
 import { cx } from '../../lib/cx'
+import type { ReviewListOutlet } from '../../lib/reviewListOutlet'
 import { Button } from '../../ui/Button/Button'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { EmptyShelf } from './EmptyShelf'
@@ -68,6 +69,10 @@ export function ReviewListPage() {
   })
 
   const reviews = data ? uniqueReviews(data.pages) : []
+  // For the detail's ›. The sentinel's guard, but a failed page may be asked
+  // for again.
+  const loadMore = () =>
+    hasNextPage && fetchStatus === 'idle' ? fetchNextPage() : Promise.resolve()
   const count = data?.pages[0]?.meta.pagination.count
 
   // The S5/S6 ghost panel shows until the list has loaded once. After that a
@@ -170,11 +175,7 @@ export function ReviewListPage() {
             {count !== undefined ? resultsLabel(count) : ''}
           </span>
           {isFiltered && (
-            <button
-              type="button"
-              className={styles.clear}
-              onClick={clearAll}
-            >
+            <button type="button" className={styles.clear} onClick={clearAll}>
               Clear filters
             </button>
           )}
@@ -211,7 +212,16 @@ export function ReviewListPage() {
           </>
         )}
       </div>
-      <Outlet />
+      <Outlet
+        context={
+          {
+            reviews,
+            hasNextPage,
+            loadMore,
+            isLoadingMore: isFetchingNextPage,
+          } satisfies ReviewListOutlet
+        }
+      />
     </>
   )
 }

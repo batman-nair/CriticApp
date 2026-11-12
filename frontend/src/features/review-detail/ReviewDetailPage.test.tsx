@@ -2,9 +2,20 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { Review } from '../../api/types'
+import type { Review, ReviewPage } from '../../api/types'
 import { expectNoAxeViolations } from '../../test/axe'
-import { makeProblem, makeReviewFacets } from '../../test/fixtures'
+import {
+  finishExitAnimation,
+  settle,
+  stubExitAnimation,
+} from '../../test/dialogAnimation'
+import {
+  makeItem,
+  makeProblem,
+  makeReview,
+  makeReviewFacets,
+  makeReviewPage,
+} from '../../test/fixtures'
 import { defaultReviews, http } from '../../test/handlers'
 import { stubSystemTheme } from '../../test/matchMedia'
 import { renderRoute } from '../../test/renderRoute'
@@ -57,7 +68,41 @@ function serveReview(respond: (id: number) => Served, gate?: Promise<void>) {
   return { ids }
 }
 
+function reviews(count: number, firstId = 1) {
+  return Array.from({ length: count }, (_, i) => {
+    const id = firstId + i
+    return makeReview({ id, item: makeItem({ title: `Title ${id}` }) })
+  })
+}
+
+/**
+ * Serves the list's pages by offset, each after its gate when it has one, and
+ * every listed review at /api/v3/reviews/{id}. Records the offsets asked for.
+ */
+function serveShelf(
+  pages: Record<number, ReviewPage>,
+  gates: Record<number, Promise<void>> = {},
+) {
+  const offsets: string[] = []
+  server.use(
+    http.get('/api/v3/reviews', async ({ request, response }) => {
+      const offset = Number(new URL(request.url).searchParams.get('offset'))
+      offsets.push(String(offset))
+      const page = pages[offset]
+      if (!page) throw new Error(`No page at ${offset}`)
+      await gates[offset]
+      return response(200).json(page)
+    }),
+  )
+  const listed = Object.values(pages).flatMap((page) => page.data)
+  serveReview((id) => listed.find((review) => review.id === id) ?? 'missing')
+  return { offsets }
+}
+
 const dialog = () => screen.getByRole('dialog')
+const previousButton = () =>
+  screen.getByRole('button', { name: /^Previous review/ })
+const nextButton = () => screen.getByRole('button', { name: /^Next review/ })
 const cardLink = (title: string) =>
   within(screen.getByRole('list')).getByRole('link', { name: title })
 
@@ -219,6 +264,129 @@ it('shows an error, and the review after "Try again"', async () => {
   ).toBeInTheDocument()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   expect(ids).toEqual([1, 1])
+})
+
+it('steps with ‹ › in place, and closes back to the list at once', async () => {
+  serveShelf({ 0: makeReviewPage(reviews(3)) })
+  const { user, router } = await openFromCard('Title 1')
+
+  await user.click(screen.getByRole('button', { name: 'Next review: Title 2' }))
+
+  expect(router.state.location.pathname).toBe('/reviews/2')
+  expect(router.state.location.search).toBe('?sort=title')
+  expect(router.state.location.state).toEqual({ fromParent: true })
+  expect(router.state.historyAction).toBe('REPLACE')
+  expect(screen.getByRole('dialog', { name: 'Title 2' })).toBeInTheDocument()
+  expect(
+    within(dialog()).getByRole('heading', { level: 2, name: 'Title 2' }),
+  ).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Next review: Title 3' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Previous review: Title 2' }),
+  )
+  await user.click(nextButton())
+  expect(router.state.location.pathname).toBe('/reviews/3')
+
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  expect(router.state.location.search).toBe('?sort=title')
+  expect(router.state.historyAction).toBe('POP')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('returns focus to the card it opened from, after stepping', async () => {
+  serveShelf({ 0: makeReviewPage(reviews(3)) })
+  const { user } = await openFromCard('Title 1')
+
+  await user.click(nextButton())
+  await user.click(nextButton())
+  await user.keyboard('{Escape}')
+
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+  await waitFor(() => expect(cardLink('Title 1')).toHaveFocus())
+})
+
+it('does nothing past either end of a list with no more pages', async () => {
+  serveShelf({ 0: makeReviewPage(reviews(2)) })
+  const { user, router } = await openFromCard('Title 1')
+
+  expect(previousButton()).toHaveAttribute('aria-disabled', 'true')
+  await user.click(previousButton())
+  expect(router.state.location.pathname).toBe('/reviews/1')
+
+  await user.click(nextButton())
+  expect(router.state.location.pathname).toBe('/reviews/2')
+  expect(nextButton()).toHaveAttribute('aria-disabled', 'true')
+  expect(previousButton()).not.toHaveAttribute('aria-disabled')
+
+  await user.click(nextButton())
+  expect(router.state.location.pathname).toBe('/reviews/2')
+  expect(nextButton()).toHaveFocus()
+})
+
+it('loads the next page from the last loaded review, then steps to it', async () => {
+  const gate = deferred()
+  const { offsets } = serveShelf(
+    {
+      0: makeReviewPage(reviews(2), { count: 3 }),
+      2: makeReviewPage(reviews(1, 3), { count: 3, offset: 2 }),
+    },
+    { 2: gate.promise },
+  )
+  const { user, router } = await openFromCard('Title 2')
+  expect(nextButton()).toHaveAccessibleName('Next review')
+  expect(nextButton()).not.toHaveAttribute('aria-disabled')
+
+  await user.click(nextButton())
+
+  await waitFor(() => expect(offsets).toEqual(['0', '2']))
+  expect(nextButton()).toHaveAttribute('aria-busy', 'true')
+  expect(router.state.location.pathname).toBe('/reviews/2')
+
+  gate.resolve()
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/reviews/3'))
+  expect(router.state.historyAction).toBe('REPLACE')
+  expect(
+    await within(dialog()).findByRole('heading', { level: 2, name: 'Title 3' }),
+  ).toBeInTheDocument()
+  expect(nextButton()).not.toHaveAttribute('aria-busy')
+  expect(nextButton()).toHaveAttribute('aria-disabled', 'true')
+  expect(offsets).toEqual(['0', '2'])
+})
+
+it('doesn’t step when the page arrives after Close', async () => {
+  stubExitAnimation()
+  const gate = deferred()
+  const { offsets } = serveShelf(
+    {
+      0: makeReviewPage(reviews(2), { count: 3 }),
+      2: makeReviewPage(reviews(1, 3), { count: 3, offset: 2 }),
+    },
+    { 2: gate.promise },
+  )
+  const { user, router } = await openFromCard('Title 2')
+
+  await user.click(nextButton())
+  await waitFor(() => expect(offsets).toEqual(['0', '2']))
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+  const closing = dialog()
+
+  gate.resolve()
+  await waitFor(() =>
+    expect(screen.getAllByRole('article', { hidden: true })).toHaveLength(4),
+  )
+  await settle()
+  expect(router.state.location.pathname).toBe('/reviews/2')
+
+  finishExitAnimation(closing)
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  expect(router.state.historyAction).toBe('POP')
 })
 
 it('has no axe violations', async () => {

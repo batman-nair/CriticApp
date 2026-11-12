@@ -1,10 +1,17 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
+import {
+  createMemoryRouter,
+  RouterProvider,
+  useOutletContext,
+} from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { reviewKeys } from '../../api/queries/reviews'
 import type { ReviewFacets, ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
+import type { ReviewListOutlet } from '../../lib/reviewListOutlet'
 import {
   makeItem,
   makeReview,
@@ -14,8 +21,10 @@ import {
 import { http } from '../../test/handlers'
 import { stubIntersectionObserver } from '../../test/intersectionObserver'
 import { stubSystemTheme } from '../../test/matchMedia'
+import { createTestQueryClient } from '../../test/render'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
+import { ReviewListPage } from './ReviewListPage'
 import styles from './ReviewListPage.module.css'
 
 // The header's theme toggle reads the system theme.
@@ -637,4 +646,69 @@ it('refetches a failed hero count on "Try again" while a filter is set', async (
   expect(
     await screen.findByText('45 reviews, rated out of ten'),
   ).toBeInTheDocument()
+})
+
+/** A child route showing what the list hands down, as the detail reads it. */
+function OutletProbe() {
+  const { reviews, hasNextPage, loadMore, isLoadingMore } =
+    useOutletContext<ReviewListOutlet>()
+
+  return (
+    <div>
+      <p data-testid="ids">{reviews.map((review) => review.id).join(',')}</p>
+      <p data-testid="flags">
+        {`more: ${hasNextPage}, loading: ${isLoadingMore}`}
+      </p>
+      <button type="button" onClick={() => void loadMore()}>
+        Load more
+      </button>
+    </div>
+  )
+}
+
+it('hands its reviews and loadMore to the route inside it', async () => {
+  const user = userEvent.setup()
+  const gate = deferred()
+  const { offsets } = servePages(
+    {
+      0: makeReviewPage(reviews(2), { count: 4 }),
+      // Starts with the first page's last review again.
+      2: makeReviewPage(reviews(2, 2), { count: 4, offset: 2 }),
+    },
+    { 2: gate.promise },
+  )
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/',
+        element: <ReviewListPage />,
+        children: [{ path: 'probe', element: <OutletProbe /> }],
+      },
+    ],
+    { initialEntries: ['/probe'] },
+  )
+  render(
+    <QueryClientProvider client={createTestQueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  const ids = screen.getByTestId('ids')
+  const flags = screen.getByTestId('flags')
+  await waitFor(() => expect(ids).toHaveTextContent('1,2'))
+  expect(flags).toHaveTextContent('more: true, loading: false')
+
+  await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+  await waitFor(() =>
+    expect(flags).toHaveTextContent('more: true, loading: true'),
+  )
+  // Nothing more while that page is on its way.
+  await user.click(screen.getByRole('button', { name: 'Load more' }))
+  expect(offsets()).toEqual(['0', '2'])
+
+  gate.resolve()
+  await waitFor(() => expect(ids).toHaveTextContent('1,2,3'))
+  expect(ids.textContent).toBe('1,2,3')
+  expect(flags).toHaveTextContent('more: false, loading: false')
+  expect(offsets()).toEqual(['0', '2'])
 })
