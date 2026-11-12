@@ -1,5 +1,6 @@
 import { createOpenApiHttp } from 'openapi-msw'
 import type { paths } from '../api/schema'
+import type { SessionUser } from '../api/types'
 import {
   makeCategory,
   makeItem,
@@ -7,6 +8,7 @@ import {
   makeReview,
   makeReviewFacets,
   makeReviewPage,
+  makeSessionUser,
 } from './fixtures'
 
 // jsdom's URL under Vitest. Not read from window, because setup.ts also loads
@@ -37,7 +39,31 @@ export const defaultReviews = [
   }),
 ]
 
+/** The token the CSRF handler sets. */
+export const CSRF_TOKEN = 'test-token'
+
+/**
+ * A session handler for server.use: `null` is logged out. The default
+ * handlers have the owner logged in.
+ */
+export function sessionAs(user: SessionUser | null) {
+  return http.get('/api/auth/session', ({ response }) =>
+    response(200).json({ data: { user }, meta: {} }),
+  )
+}
+
 export const handlers = [
+  sessionAs(makeSessionUser()),
+  // MSW keeps a mocked Set-Cookie in its own store, not in jsdom's
+  // document.cookie, so the handler writes the cookie itself.
+  http.get('/api/auth/csrf', ({ response }) => {
+    document.cookie = `csrftoken=${CSRF_TOKEN}; path=/`
+    return response(204).empty()
+  }),
+  http.post('/api/auth/login', ({ response }) =>
+    response(200).json({ data: { user: makeSessionUser() }, meta: {} }),
+  ),
+  http.post('/api/auth/logout', ({ response }) => response(204).empty()),
   http.get('/api/v3/categories', ({ response }) =>
     response(200).json({
       data: [

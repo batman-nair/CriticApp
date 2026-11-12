@@ -25,6 +25,8 @@ if (typeof document !== 'undefined') {
 
   afterEach(() => {
     server.resetHandlers()
+    // So one test's CSRF token doesn't reach the next.
+    document.cookie = 'csrftoken=; path=/; max-age=0'
     expectNoUnhandledRequests()
   })
 

@@ -6,6 +6,7 @@ import type {
   Review,
   ReviewFacets,
   ReviewPage,
+  SessionUser,
 } from '../api/types'
 import { OWNER_USERNAME } from '../config'
 
@@ -111,4 +112,11 @@ export function makeProblem(overrides: Partial<Problem> = {}): Problem {
     detail: 'Not found.',
     ...overrides,
   }
+}
+
+/** The owner unless overridden. */
+export function makeSessionUser(
+  overrides: Partial<SessionUser> = {},
+): SessionUser {
+  return { id: 1, username: OWNER_USERNAME, ...overrides }
 }
