@@ -267,9 +267,14 @@ it('shows an error, and the review after "Try again"', async () => {
 })
 
 it('says a listed review deleted elsewhere is not found', async () => {
-  serveReview(() => 'missing')
+  const gate = deferred()
+  serveReview(() => 'missing', gate.promise)
   await openFromCard('Cowboy Bebop')
+  expect(
+    within(dialog()).getByRole('heading', { level: 2, name: 'Cowboy Bebop' }),
+  ).toBeInTheDocument()
 
+  gate.resolve()
   expect(
     await within(dialog()).findByRole('heading', { name: 'Review not found' }),
   ).toBeInTheDocument()
