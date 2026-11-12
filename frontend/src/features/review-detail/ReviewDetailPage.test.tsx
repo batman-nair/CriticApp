@@ -266,6 +266,15 @@ it('shows an error, and the review after "Try again"', async () => {
   expect(ids).toEqual([1, 1])
 })
 
+it('says a listed review deleted elsewhere is not found', async () => {
+  serveReview(() => 'missing')
+  await openFromCard('Cowboy Bebop')
+
+  expect(
+    await within(dialog()).findByRole('heading', { name: 'Review not found' }),
+  ).toBeInTheDocument()
+})
+
 it('says a review deleted since it was loaded is not found', async () => {
   let deleted = false
   serveReview(() => (deleted ? 'missing' : defaultReviews[0]!))
