@@ -1,4 +1,5 @@
 import { Outlet, ScrollRestoration, useMatches } from 'react-router'
+import { ExpiredSessionRedirect } from '../auth/ExpiredSessionRedirect'
 
 interface RouteHandle {
   title?: string
@@ -18,6 +19,7 @@ export function Root() {
     <>
       <RouteTitle />
       <ScrollRestoration />
+      <ExpiredSessionRedirect />
       <Outlet />
     </>
   )
