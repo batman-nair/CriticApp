@@ -4,6 +4,7 @@ import { AddReviewPage } from '../features/add-review/AddReviewPage'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
 import { AppLayout } from '../layout/AppLayout'
+import { DialogErrorPage } from '../layout/DialogErrorPage'
 import { NotFoundPage } from '../layout/NotFoundPage'
 import { ServerErrorPage } from '../layout/ServerErrorPage'
 import { Root } from './Root'
@@ -30,6 +31,8 @@ export const routes: RouteObject[] = [
                   {
                     path: 'reviews/:id',
                     element: <ReviewDetailPage />,
+                    // A crash in the dialog leaves the list behind it.
+                    errorElement: <DialogErrorPage />,
                     handle: { title: 'Review' },
                   },
                   {

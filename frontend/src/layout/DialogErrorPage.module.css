@@ -1,0 +1,57 @@
+/* As the review dialog's "Review not found" body, which fills the same space. */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: 62px 0 66px;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--text-22);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-125);
+}
+
+.text {
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-10);
+  margin-top: var(--space-8);
+}
+
+/* Two classes: Button's .lg sets these at one. */
+.actions .action {
+  height: 44px;
+  padding: 0 var(--space-18);
+  border-radius: var(--radius-12);
+}
+
+/* Below 640px, from board 16. */
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-10);
+    padding: 70px var(--space-4) 48px;
+  }
+
+  .title {
+    font-size: var(--text-21);
+  }
+
+  .actions {
+    margin-top: var(--space-6);
+  }
+
+  .actions .action {
+    height: 48px;
+    padding: 0 var(--space-20);
+    border-radius: var(--radius-14);
+  }
+}
