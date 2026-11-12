@@ -21,6 +21,7 @@ import { Skeleton } from '../Skeleton/Skeleton'
 import { Stepper } from '../Stepper/Stepper'
 import { TagInput } from '../TagInput/TagInput'
 import { TextArea } from '../TextArea/TextArea'
+import { PasswordField } from '../PasswordField/PasswordField'
 import { TextField } from '../TextField/TextField'
 import styles from './Gallery.module.css'
 
@@ -54,6 +55,7 @@ const ICON_NAMES: IconName[] = [
   'lock',
   'cloud-off',
   'refresh',
+  'alert-circle',
 ]
 
 const SORT_OPTIONS = [
@@ -137,6 +139,25 @@ function TextFieldDemo({ initial = '', ...props }: TextFieldDemoProps) {
 
   return (
     <TextField
+      {...props}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+    />
+  )
+}
+
+type PasswordFieldDemoProps = Omit<
+  ComponentProps<typeof PasswordField>,
+  'value' | 'onChange'
+> & {
+  initial?: string
+}
+
+function PasswordFieldDemo({ initial = '', ...props }: PasswordFieldDemoProps) {
+  const [value, setValue] = useState(initial)
+
+  return (
+    <PasswordField
       {...props}
       value={value}
       onChange={(event) => setValue(event.target.value)}
@@ -447,6 +468,28 @@ export function Gallery() {
               error="A review for this title already exists."
             />
             <TextFieldDemo label="Disabled field" initial="Arrival" disabled />
+            <TextFieldDemo label="Large field" size="lg" initial="arjun" />
+            <TextFieldDemo
+              label="Large field with an error"
+              size="lg"
+              error="Enter your username."
+            />
+          </div>
+        </Section>
+
+        <Section title="PasswordField">
+          <div className={styles.fields}>
+            <PasswordFieldDemo label="Empty password" />
+            <PasswordFieldDemo label="Filled password" initial="hunter22" />
+            <PasswordFieldDemo
+              label="Password with an error"
+              error="Enter your password."
+            />
+            <PasswordFieldDemo
+              label="Disabled password"
+              initial="hunter22"
+              disabled
+            />
           </div>
         </Section>
 

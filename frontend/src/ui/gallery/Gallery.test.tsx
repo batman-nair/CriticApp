@@ -12,6 +12,7 @@ const SECTIONS = [
   'Chip',
   'Select',
   'TextField',
+  'PasswordField',
   'TextArea',
   'SearchField',
   'TagInput',

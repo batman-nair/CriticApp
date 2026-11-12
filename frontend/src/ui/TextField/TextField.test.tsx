@@ -4,6 +4,7 @@ import { createRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import { TextField } from './TextField'
+import styles from './TextField.module.css'
 
 it('associates the label with a generated id', () => {
   render(<TextField label="Title" />)
@@ -99,8 +100,31 @@ it('passes native props, ref and className through', async () => {
   expect(input).toHaveClass('mine')
 })
 
+it('is medium unless asked for large', () => {
+  const { rerender } = render(<TextField label="Title" />)
+  const input = screen.getByRole('textbox', { name: 'Title' })
+  const classes = () => input.className.split(' ')
+
+  expect(classes()).toContain(styles.md)
+  expect(classes()).not.toContain(styles.lg)
+  expect(input).not.toHaveAttribute('size')
+
+  rerender(<TextField label="Title" size="lg" />)
+  expect(classes()).toContain(styles.lg)
+  expect(classes()).not.toContain(styles.md)
+  expect(input).not.toHaveAttribute('size')
+})
+
 it('has no axe violations with an error', async () => {
   const { container } = render(<TextField label="Title" error="Required" />)
+
+  await expectNoAxeViolations(container)
+})
+
+it('has no axe violations when large, with an error', async () => {
+  const { container } = render(
+    <TextField label="Username" size="lg" error="Enter your username." />,
+  )
 
   await expectNoAxeViolations(container)
 })
