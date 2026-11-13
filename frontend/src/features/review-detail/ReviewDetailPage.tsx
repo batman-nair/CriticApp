@@ -58,19 +58,28 @@ export function ReviewDetailPage() {
     editButtonRef.current?.focus()
   }
 
+  // A save under way can't be cancelled: its PATCH lands either way.
+  function cancelEditing() {
+    if (!editor.isSaving) leaveEditing()
+  }
+
   async function save() {
     if (await editor.save()) leaveEditing()
   }
 
   // Asks first, with focus on "Keep it", the safe choice.
+  // While a delete is under way nothing else starts: it lands either way.
+  const deleting = deleteReview.isPending
+
   function askToDelete() {
-    if (confirmDelete) return
+    if (confirmDelete || deleting) return
     deleteReview.reset()
     flushSync(() => setConfirmDelete(true))
     keepButtonRef.current?.focus()
   }
 
   function keepReview() {
+    if (deleting) return
     flushSync(() => setConfirmDelete(false))
     deleteButtonRef.current?.focus()
   }
@@ -130,7 +139,8 @@ export function ReviewDetailPage() {
             variant="secondary"
             size="sm"
             className={cx(styles.soft, styles.action)}
-            onClick={leaveEditing}
+            aria-disabled={editor.isSaving || undefined}
+            onClick={cancelEditing}
           >
             Cancel
           </Button>
@@ -154,6 +164,7 @@ export function ReviewDetailPage() {
             size="sm"
             className={cx(styles.soft, styles.edit)}
             onClick={() => {
+              if (deleting) return
               setConfirmDelete(false)
               editor.start(data)
             }}
@@ -229,7 +240,19 @@ export function ReviewDetailPage() {
       title={title}
       category={category}
       bodyKey={`${id}-${editing ? 'edit' : 'view'}`}
-      headerStart={editing ? undefined : <ReviewSteps {...steps} />}
+      headerStart={
+        editing ? undefined : (
+          <ReviewSteps
+            {...steps}
+            {...(deleting && {
+              canGoPrevious: false,
+              canGoNext: false,
+              goPrevious: () => {},
+              goNext: () => {},
+            })}
+          />
+        )
+      }
       headerEnd={headerEnd}
       hideClose={editing}
       dismissible={!guarded}

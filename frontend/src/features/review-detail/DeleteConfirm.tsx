@@ -45,6 +45,7 @@ export function DeleteConfirm({
           ref={keepRef}
           variant="secondary"
           className={styles.keep}
+          aria-disabled={busy || undefined}
           onClick={onKeep}
         >
           Keep it

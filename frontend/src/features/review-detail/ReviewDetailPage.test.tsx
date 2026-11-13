@@ -635,6 +635,11 @@ it('saves the changes, then shows them with the list, counts and tags refetched'
   )
   expect(saveButton()).toHaveAttribute('aria-busy', 'true')
 
+  // The PATCH lands either way, so Cancel waits for it.
+  expect(cancelButton()).toHaveAttribute('aria-disabled', 'true')
+  await user.click(cancelButton())
+  expect(screen.getByRole('slider')).toBeInTheDocument()
+
   gate.resolve()
 
   expect(
@@ -944,6 +949,29 @@ it('deletes the review, then closes to the list with it gone and the counts refe
   expect(cardLink('The Matrix')).toBeInTheDocument()
   expect(served.fetched.list).toBeGreaterThan(before.list)
   expect(served.fetched.facets).toBeGreaterThan(before.facets)
+})
+
+it('holds the question, Edit and ‹ › while the delete is out', async () => {
+  const served = serveDeletable()
+  const gate = deferred()
+  served.answer.gate = gate.promise
+  const { user, router } = await openFromCard('Cowboy Bebop')
+  await user.click(deleteButton())
+  await user.click(confirmButton())
+  await waitFor(() => expect(served.deleted).toEqual([1]))
+
+  expect(keepButton()).toHaveAttribute('aria-disabled', 'true')
+  await user.click(keepButton())
+  await user.click(editButton())
+  await user.click(nextButton())
+
+  expect(queryBanner()).toBeInTheDocument()
+  expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/reviews/1')
+
+  gate.resolve()
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  expect(served.deleted).toEqual([1])
 })
 
 it('says the delete failed and stays open', async () => {
