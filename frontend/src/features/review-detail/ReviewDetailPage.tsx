@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { useBlocker, useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { useCategories } from '../../api/queries/categories'
-import { useReview } from '../../api/queries/reviews'
+import { useDeleteReview, useReview } from '../../api/queries/reviews'
 import { useSession } from '../../auth/useSession'
 import { reviewCategory } from '../../lib/categories'
 import { cx } from '../../lib/cx'
@@ -12,6 +12,7 @@ import { Dialog } from '../../ui/Dialog/Dialog'
 import { useRouteDialog } from '../../ui/Dialog/useRouteDialog'
 import { Icon } from '../../ui/Icon/Icon'
 import { IconButton } from '../../ui/IconButton/IconButton'
+import { DeleteConfirm } from './DeleteConfirm'
 import { ReviewDetail } from './ReviewDetail'
 import styles from './ReviewDetailPage.module.css'
 import { ReviewDetailSkeleton } from './ReviewDetailSkeleton'
@@ -32,6 +33,9 @@ export function ReviewDetailPage() {
   const formId = useId()
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
+  const keepButtonRef = useRef<HTMLButtonElement>(null)
+  const deleteReview = useDeleteReview(id)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const { data } = review
 
   // The mode belongs to one review: showing another goes back to viewing.
@@ -40,6 +44,7 @@ export function ReviewDetailPage() {
   if (!Object.is(id, modeId)) {
     setModeId(id)
     editor.reset()
+    setConfirmDelete(false)
   }
 
   // An id that isn't one never asks, so it's as missing as a 404.
@@ -57,6 +62,26 @@ export function ReviewDetailPage() {
     if (await editor.save()) leaveEditing()
   }
 
+  // Asks first, with focus on "Keep it", the safe choice.
+  function askToDelete() {
+    if (confirmDelete) return
+    deleteReview.reset()
+    flushSync(() => setConfirmDelete(true))
+    keepButtonRef.current?.focus()
+  }
+
+  function keepReview() {
+    flushSync(() => setConfirmDelete(false))
+    deleteButtonRef.current?.focus()
+  }
+
+  // Closing returns to the list, which the delete has already refetched.
+  function deleteIt() {
+    deleteReview.mutate(undefined, {
+      onSuccess: () => dialog.onOpenChange(false),
+    })
+  }
+
   // A 404 wins over a cached copy, so a review deleted elsewhere goes. Any
   // other failed background refetch keeps the review on screen.
   let title
@@ -64,6 +89,7 @@ export function ReviewDetailPage() {
   let body
   let editing = false
   let headerEnd
+  let footer
   if (data && !notFound) {
     const { item } = data
     title = item.title
@@ -127,7 +153,10 @@ export function ReviewDetailPage() {
             variant="secondary"
             size="sm"
             className={cx(styles.soft, styles.edit)}
-            onClick={() => editor.start(data)}
+            onClick={() => {
+              setConfirmDelete(false)
+              editor.start(data)
+            }}
           >
             <Icon name="pencil" size={16} />
             <span className={styles.editLabel}>Edit</span>
@@ -138,11 +167,24 @@ export function ReviewDetailPage() {
             variant="soft"
             size="sm"
             className={cx(styles.soft, styles.icon)}
+            onClick={askToDelete}
           >
             <Icon name="trash" />
           </IconButton>
         </>
       )
+      if (confirmDelete) {
+        footer = (
+          <DeleteConfirm
+            title={item.title}
+            busy={deleteReview.isPending}
+            failed={deleteReview.isError}
+            onKeep={keepReview}
+            onDelete={deleteIt}
+            keepRef={keepButtonRef}
+          />
+        )
+      }
     }
   } else if (notFound) {
     title = 'Review not found'
@@ -191,6 +233,7 @@ export function ReviewDetailPage() {
       headerEnd={headerEnd}
       hideClose={editing}
       dismissible={!guarded}
+      footer={footer}
     >
       {body}
     </Dialog>

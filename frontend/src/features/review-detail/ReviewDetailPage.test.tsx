@@ -829,3 +829,181 @@ it('goes Back without asking when nothing changed', async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(confirm).not.toHaveBeenCalled()
 })
+
+// Deleting.
+
+// The header's, which comes before the question's own "Delete review".
+const deleteButton = () =>
+  within(dialog()).getAllByRole('button', { name: 'Delete review' })[0]!
+const queryBanner = () =>
+  within(dialog()).queryByRole('group', { name: /^Delete your review of/ })
+const keepButton = () =>
+  within(dialog()).getByRole('button', { name: 'Keep it' })
+const confirmButton = () =>
+  within(queryBanner()!).getByRole('button', { name: 'Delete review' })
+
+/**
+ * Serves the default reviews until DELETE removes one, which waits for `gate`
+ * when there is one and answers with `status`. Records the ids sent and how
+ * often the list and the counts were fetched.
+ */
+function serveDeletable() {
+  let current = [...defaultReviews]
+  const deleted: number[] = []
+  const fetched = { list: 0, facets: 0 }
+  const answer = {
+    gate: undefined as Promise<void> | undefined,
+    status: 204,
+  }
+  server.use(
+    http.get('/api/v3/reviews', ({ response }) => {
+      fetched.list += 1
+      return response(200).json(makeReviewPage(current))
+    }),
+    http.get('/api/v3/reviews/{id}', ({ params, response }) => {
+      if (params.id === 'facets') {
+        fetched.facets += 1
+        return response.untyped(HttpResponse.json(makeReviewFacets()))
+      }
+      const review = current.find((r) => r.id === Number(params.id))
+      if (!review) return response(404).json(makeProblem())
+      return response(200).json({ data: review, meta: {} })
+    }),
+    http.delete('/api/v3/reviews/{id}', async ({ params, response }) => {
+      const id = Number(params.id)
+      deleted.push(id)
+      await answer.gate
+      if (answer.status !== 204) {
+        return response.untyped(
+          new HttpResponse(null, { status: answer.status }),
+        )
+      }
+      current = current.filter((r) => r.id !== id)
+      return response(204).empty()
+    }),
+  )
+  return { deleted, fetched, answer }
+}
+
+it('asks before deleting, and keeps the review on "Keep it"', async () => {
+  const served = serveDeletable()
+  const user = userEvent.setup()
+  renderRoute('/reviews/1')
+  await user.click(
+    await within(await screen.findByRole('dialog')).findByRole('button', {
+      name: 'Delete review',
+    }),
+  )
+
+  expect(queryBanner()).toHaveAccessibleName(
+    'Delete your review of Cowboy Bebop?',
+  )
+  expect(
+    within(queryBanner()!).getByText('Your rating and notes will be removed.'),
+  ).toBeInTheDocument()
+  expect(keepButton()).toHaveFocus()
+
+  // Again does nothing new.
+  await user.click(deleteButton())
+  expect(
+    within(dialog()).getAllByRole('group', { name: /^Delete your review/ }),
+  ).toHaveLength(1)
+
+  await user.click(keepButton())
+
+  expect(queryBanner()).not.toBeInTheDocument()
+  expect(deleteButton()).toHaveFocus()
+  expect(served.deleted).toEqual([])
+})
+
+it('deletes the review, then closes to the list with it gone and the counts refetched', async () => {
+  const served = serveDeletable()
+  const gate = deferred()
+  served.answer.gate = gate.promise
+  const { user, router } = await openFromCard('Cowboy Bebop')
+  const before = { ...served.fetched }
+
+  await user.click(deleteButton())
+  await user.click(confirmButton())
+
+  await waitFor(() => expect(served.deleted).toEqual([1]))
+  expect(confirmButton()).toHaveAttribute('aria-busy', 'true')
+
+  gate.resolve()
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  expect(router.state.location.search).toBe('?sort=title')
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('link', { name: 'Cowboy Bebop' }),
+    ).not.toBeInTheDocument(),
+  )
+  expect(cardLink('The Matrix')).toBeInTheDocument()
+  expect(served.fetched.list).toBeGreaterThan(before.list)
+  expect(served.fetched.facets).toBeGreaterThan(before.facets)
+})
+
+it('says the delete failed and stays open', async () => {
+  const served = serveDeletable()
+  served.answer.status = 500
+  const user = userEvent.setup()
+  const { router } = renderRoute('/reviews/1')
+  await user.click(
+    await within(await screen.findByRole('dialog')).findByRole('button', {
+      name: 'Delete review',
+    }),
+  )
+
+  await user.click(confirmButton())
+
+  expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+    'Couldn’t delete. Try again.',
+  )
+  expect(served.deleted).toEqual([1])
+  expect(confirmButton()).not.toHaveAttribute('aria-busy')
+  expect(keepButton()).toBeInTheDocument()
+  expect(dialog()).toHaveAttribute('data-state', 'open')
+  expect(router.state.location.pathname).toBe('/reviews/1')
+
+  // Asking again starts afresh.
+  await user.click(keepButton())
+  await user.click(deleteButton())
+  expect(within(dialog()).queryByRole('alert')).not.toBeInTheDocument()
+})
+
+it('closes the question and edits on Edit', async () => {
+  const served = serveDeletable()
+  const user = userEvent.setup()
+  renderRoute('/reviews/1')
+  await user.click(
+    await within(await screen.findByRole('dialog')).findByRole('button', {
+      name: 'Delete review',
+    }),
+  )
+
+  await user.click(editButton())
+
+  expect(queryBanner()).not.toBeInTheDocument()
+  expect(ratingSlider()).toHaveFocus()
+
+  await user.click(cancelButton())
+  expect(queryBanner()).not.toBeInTheDocument()
+  expect(served.deleted).toEqual([])
+})
+
+it('closes the question when another review is shown', async () => {
+  serveShelf({ 0: makeReviewPage(reviews(2)) })
+  const { user } = await openFromCard('Title 1')
+  await user.click(deleteButton())
+  expect(queryBanner()).toBeInTheDocument()
+
+  await user.click(nextButton())
+
+  expect(
+    await within(dialog()).findByRole('heading', { level: 2, name: 'Title 2' }),
+  ).toBeInTheDocument()
+  expect(queryBanner()).not.toBeInTheDocument()
+})
