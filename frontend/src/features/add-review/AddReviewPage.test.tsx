@@ -602,6 +602,12 @@ describe('saving', () => {
         text: 'Long.',
       })
       servePatch()
+      const fetched: string[] = []
+      server.events.on('request:start', ({ request }) => {
+        const { pathname } = new URL(request.url)
+        if (request.method === 'GET' && pathname === '/api/v3/reviews/1')
+          fetched.push(pathname)
+      })
       const { dialog, user } = await pick(reviewed)
 
       expect(screen.getByRole('dialog', { name: 'Update your rating' })).toBe(
@@ -632,6 +638,8 @@ describe('saving', () => {
           body: { rating: 6.5, text: '', tags: ['cozy'] },
         },
       ])
+      // Once for the pre-fill: the save's refresh doesn't fetch it again.
+      expect(fetched).toHaveLength(1)
     })
 
     it('fills in from the server, not from a stale cached copy', async () => {
@@ -648,7 +656,6 @@ describe('saving', () => {
       queryClient.setQueryData(
         reviewKeys.detail(1),
         makeReview({ id: 1, rating: 2, tags: ['old'] }),
-        { updatedAt: 1 },
       )
       await user.type(searchbox('Search games'), 'witcher')
       await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
@@ -656,6 +663,66 @@ describe('saving', () => {
       await waitFor(() => expect(tagsField()).not.toBeDisabled())
       expect(slider()).toHaveAttribute('aria-valuenow', '6.5')
       expect(tagsField()).toHaveValue('cozy')
+    })
+
+    /** Opens the sheet with review 1 cached as `cached`, then picks it. */
+    async function pickCached(fresh: boolean) {
+      const user = userEvent.setup()
+      localStorage.setItem('critic-add-category', 'game')
+      serveSearch({ 'game/witcher': [reviewed] })
+      const { queryClient, dialog } = await openSheet()
+      if (fresh) {
+        queryClient.setQueryDefaults(reviewKeys.detail(1), {
+          staleTime: Infinity,
+        })
+      }
+      queryClient.setQueryData(
+        reviewKeys.detail(1),
+        makeReview({ id: 1, rating: 2, tags: ['old'] }),
+      )
+      await user.type(searchbox('Search games'), 'witcher')
+      await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+      return { dialog, user }
+    }
+
+    it('fills in from a fresh cached copy without asking again', async () => {
+      const fetched: string[] = []
+      server.events.on('request:start', ({ request }) => {
+        if (new URL(request.url).pathname === '/api/v3/reviews/1')
+          fetched.push(request.method)
+      })
+      await pickCached(true)
+
+      await waitFor(() => expect(tagsField()).toHaveValue('old'))
+      expect(slider()).toHaveAttribute('aria-valuenow', '2')
+      expect(fetched).toEqual([])
+    })
+
+    it('doesn’t fill in from a stale copy when asking again fails', async () => {
+      server.use(
+        http.get('/api/v3/reviews/{id}', ({ params }) =>
+          params.id === 'facets'
+            ? Response.json(makeReviewFacets())
+            : problem(500, 'SERVER_ERROR'),
+        ),
+      )
+      const { dialog } = await pickCached(false)
+
+      expect(
+        await within(dialog).findByText('Couldn’t load your review.'),
+      ).toBeVisible()
+      expect(tagsField()).toHaveValue('')
+    })
+
+    it('adds it as new when a stale copy’s review is gone', async () => {
+      serveReview(null)
+      const { dialog } = await pickCached(false)
+
+      expect(await screen.findByRole('dialog', { name: 'Rate it' })).toBe(
+        dialog,
+      )
+      expect(slider()).toHaveAttribute('aria-valuenow', '9.5')
+      expect(tagsField()).toHaveValue('')
     })
 
     it('adds it as new when the review is deleted while updating', async () => {

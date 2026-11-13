@@ -41,8 +41,10 @@ export function AddReviewPage() {
     flow.prefill === 'loading' ? (flow.reviewId ?? 0) : 0,
   )
   const { data: existingReview, error } = existing
+  // A failed refetch counts as fetched and keeps the old data: not current.
   const current =
     !existing.isPlaceholderData &&
+    !existing.isError &&
     (!existing.isStale || existing.isFetchedAfterMount)
   useEffect(() => {
     if (existingReview && current) {
