@@ -13,11 +13,14 @@ import type { Review, ReviewPage } from '../types'
 import {
   REVIEW_PAGE_SIZE,
   reviewKeys,
+  useDeleteReview,
   useReview,
   useReviewFacets,
   useReviewList,
+  useUpdateReview,
   type ReviewListParams,
 } from './reviews'
+import { tagKeys } from './tags'
 
 function reviews(count: number, firstId = 1) {
   return Array.from({ length: count }, (_, i) =>
@@ -321,4 +324,146 @@ it('keys a review under all, outside the lists', () => {
 
   expect(key.slice(0, 1)).toEqual(reviewKeys.all)
   expect(key.slice(0, 2)).not.toEqual(reviewKeys.lists())
+})
+
+const listKey = reviewKeys.list({ username: OWNER_USERNAME })
+const facetsKey = reviewKeys.facets({ username: OWNER_USERNAME })
+
+/** A client holding a list, the counts and the tags, none of them stale. */
+function seededQueryClient() {
+  const queryClient = createTestQueryClient()
+  queryClient.setQueryData(listKey, 'old list')
+  queryClient.setQueryData(facetsKey, 'old facets')
+  queryClient.setQueryData(tagKeys.list(), 'old tags')
+  return queryClient
+}
+
+function isInvalidated(
+  queryClient: ReturnType<typeof createTestQueryClient>,
+  queryKey: readonly unknown[],
+) {
+  return queryClient.getQueryState(queryKey)?.isInvalidated
+}
+
+it('sends the update, shows the saved review and refetches the rest', async () => {
+  const sent: unknown[] = []
+  const saved = makeReview({ rating: 7, text: 'Fine.', tags: ['cozy'] })
+  server.use(
+    http.patch('/api/v3/reviews/{id}', async ({ request, response }) => {
+      sent.push([new URL(request.url).pathname, await request.json()])
+      return response(200).json({ data: saved, meta: {} })
+    }),
+  )
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useUpdateReview(1), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  const returned = await act(() =>
+    result.current.mutateAsync({ rating: 7, text: 'Fine.', tags: ['cozy'] }),
+  )
+
+  expect(sent).toEqual([
+    ['/api/v3/reviews/1', { rating: 7, text: 'Fine.', tags: ['cozy'] }],
+  ])
+  expect(returned).toEqual(saved)
+  expect(queryClient.getQueryData(reviewKeys.detail(1))).toEqual(saved)
+  expect(isInvalidated(queryClient, listKey)).toBe(true)
+  expect(isInvalidated(queryClient, facetsKey)).toBe(true)
+  expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
+})
+
+it('rejects a refused update with an ApiError carrying the field errors', async () => {
+  const errors = [
+    { field: 'text', code: 'max_length', message: 'Too long.' },
+    { field: 'tags.0', code: 'invalid', message: 'Letters only.' },
+  ]
+  server.use(
+    http.patch('/api/v3/reviews/{id}', ({ response }) =>
+      response(400).json(
+        makeProblem({
+          title: 'Bad Request',
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          detail: 'Invalid input.',
+          errors,
+        }),
+      ),
+    ),
+  )
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useUpdateReview(1), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  act(() => result.current.mutate({ text: 'x' }))
+
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(result.current.error).toBeInstanceOf(ApiError)
+  expect(result.current.error).toMatchObject({ status: 400, errors })
+  expect(queryClient.getQueryData(reviewKeys.detail(1))).toBeUndefined()
+  expect(isInvalidated(queryClient, listKey)).toBe(false)
+})
+
+/** Serves DELETE with `status` and records the deleted paths. */
+function serveDelete(status: 204 | 404 | 500) {
+  const requests: string[] = []
+  server.use(
+    http.delete('/api/v3/reviews/{id}', ({ request, response }) => {
+      requests.push(new URL(request.url).pathname)
+      if (status === 204) return response(204).empty()
+      if (status === 404) return response(404).json(makeProblem())
+      return response.untyped(new HttpResponse(null, { status }))
+    }),
+  )
+  return requests
+}
+
+it('deletes the review and refetches the lists, counts and tags, but not the review', async () => {
+  const deleted = serveDelete(204)
+  const fetched = serveReview(makeReview())
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(
+    () => ({ review: useReview(1), remove: useDeleteReview(1) }),
+    { wrapper: queryWrapper(queryClient) },
+  )
+  await waitFor(() => expect(result.current.review.isSuccess).toBe(true))
+
+  await act(() => result.current.remove.mutateAsync())
+
+  expect(deleted).toEqual(['/api/v3/reviews/1'])
+  expect(isInvalidated(queryClient, listKey)).toBe(true)
+  expect(isInvalidated(queryClient, facetsKey)).toBe(true)
+  expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
+  expect(isInvalidated(queryClient, reviewKeys.detail(1))).toBe(true)
+  expect(result.current.review.fetchStatus).toBe('idle')
+  expect(fetched).toEqual(['/api/v3/reviews/1'])
+})
+
+it('counts a review already deleted elsewhere (404) as deleted', async () => {
+  serveDelete(404)
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useDeleteReview(1), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  await act(() => result.current.mutateAsync())
+
+  expect(result.current.isSuccess).toBe(true)
+  expect(isInvalidated(queryClient, listKey)).toBe(true)
+})
+
+it('exposes a failed delete as an ApiError and refetches nothing', async () => {
+  serveDelete(500)
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useDeleteReview(1), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  act(() => result.current.mutate())
+
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(result.current.error).toBeInstanceOf(ApiError)
+  expect(result.current.error).toMatchObject({ status: 500 })
+  expect(isInvalidated(queryClient, listKey)).toBe(false)
 })
