@@ -6,6 +6,7 @@ import { Icon } from '../Icon/Icon'
 import { IconButton } from '../IconButton/IconButton'
 import { VisuallyHidden } from '../VisuallyHidden/VisuallyHidden'
 import styles from './Dialog.module.css'
+import { useSheetDrag } from './useSheetDrag'
 
 interface DialogProps {
   open: boolean
@@ -58,6 +59,9 @@ export function Dialog({
     }
   }, [])
 
+  const contentRef = useRef<HTMLDivElement>(null)
+  const drag = useSheetDrag(contentRef, () => onOpenChange(false))
+
   // FocusScope sends this once the content has unmounted, which Presence holds
   // back until the exit animation ends. A route unmounted by the browser's Back
   // sends it too, with `open` still true or the Dialog already gone.
@@ -72,6 +76,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={styles.overlay} />
         <RadixDialog.Content
+          ref={contentRef}
           className={cx(
             styles.content,
             styles[size],
@@ -80,8 +85,9 @@ export function Dialog({
           style={category ? categoryVars(category) : undefined}
           onCloseAutoFocus={handleCloseAutoFocus}
         >
-          <div className={styles.handle} aria-hidden="true" />
-          <div className={styles.header}>
+          <div className={styles.handle} aria-hidden="true" {...drag} />
+          {/* The body doesn't drag, so it keeps its own scrolling. */}
+          <div className={styles.header} {...drag}>
             <div className={styles.start}>
               {headerStart}
               {hideTitle ? (
