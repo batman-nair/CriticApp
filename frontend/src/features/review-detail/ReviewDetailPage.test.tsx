@@ -20,6 +20,7 @@ import {
   makeSessionUser,
 } from '../../test/fixtures'
 import { defaultReviews, http, sessionAs } from '../../test/handlers'
+import { fromParentState } from '../../ui/Dialog/useRouteDialog'
 import { stubSystemTheme } from '../../test/matchMedia'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
@@ -775,5 +776,56 @@ it('closes on Esc in edit mode with nothing changed', async () => {
   await waitFor(() =>
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
   )
+  expect(confirm).not.toHaveBeenCalled()
+})
+
+/** Opens review 1 over the list, so Back has somewhere to go, and edits it. */
+async function editFromList() {
+  const user = userEvent.setup()
+  const view = renderRoute('/')
+  await screen.findByRole('link', { name: 'Cowboy Bebop' })
+  await act(() =>
+    view.router.navigate('/reviews/1', { state: fromParentState }),
+  )
+  await user.click(
+    await within(await screen.findByRole('dialog')).findByRole('button', {
+      name: 'Edit',
+    }),
+  )
+  return { user, ...view }
+}
+
+it('asks before Back drops unsaved changes', async () => {
+  const confirm = vi.fn(() => false)
+  vi.stubGlobal('confirm', confirm)
+  const { user, router } = await editFromList()
+  await user.type(notesField(), ' More.')
+
+  await act(() => router.navigate(-1))
+
+  expect(confirm).toHaveBeenCalledExactlyOnceWith('Discard your changes?')
+  expect(router.state.location.pathname).toBe('/reviews/1')
+  expect(notesField()).toHaveValue(
+    'Still the coolest thing ever animated. More.',
+  )
+
+  confirm.mockReturnValue(true)
+  await act(() => router.navigate(-1))
+
+  expect(confirm).toHaveBeenCalledTimes(2)
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+})
+
+it('goes Back without asking when nothing changed', async () => {
+  const confirm = vi.fn(() => false)
+  vi.stubGlobal('confirm', confirm)
+  const { router } = await editFromList()
+
+  await act(() => router.navigate(-1))
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(confirm).not.toHaveBeenCalled()
 })

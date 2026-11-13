@@ -1,6 +1,6 @@
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { useParams } from 'react-router'
+import { useBlocker, useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { useCategories } from '../../api/queries/categories'
 import { useReview } from '../../api/queries/reviews'
@@ -164,6 +164,18 @@ export function ReviewDetailPage() {
 
   // Unsaved edits aren't dropped by Esc, a click outside or a drag down.
   const guarded = editing && editor.dirty
+
+  // Nor by the browser's Back or Forward, which can't be told apart from an
+  // edge swipe on a phone. Only POP: the redirect to /login on a 401 pushes.
+  // The dialog's own close goes Back too, but never while guarded.
+  const blocker = useBlocker(
+    ({ historyAction }) => guarded && historyAction === 'POP',
+  )
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    if (window.confirm('Discard your changes?')) blocker.proceed()
+    else blocker.reset()
+  }, [blocker])
 
   // One Dialog for every state and every review, so it keeps the element to
   // return focus to.
