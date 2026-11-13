@@ -61,6 +61,7 @@ const ICON_NAMES: IconName[] = [
   'cloud-off',
   'refresh',
   'alert-circle',
+  'check',
 ]
 
 const SORT_OPTIONS = [

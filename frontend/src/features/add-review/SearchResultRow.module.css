@@ -1,0 +1,130 @@
+/* From boards 03 and 20; below 640px, 07 and 24. */
+
+/*
+ * A grid, so the provider badge can sit at the end on desktop and under the
+ * text on a phone. The 1fr rows take the poster's extra height, centring the
+ * text beside it.
+ */
+.row {
+  display: grid;
+  grid-template-areas:
+    'poster . provider chevron'
+    'poster title provider chevron'
+    'poster genres provider chevron'
+    'poster mine provider chevron'
+    'poster . provider chevron';
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  grid-template-rows: 1fr auto auto auto 1fr;
+  column-gap: var(--space-14);
+  width: 100%;
+  padding: var(--space-8) var(--space-10) var(--space-8) var(--space-6);
+  border: 0;
+  border-radius: var(--radius-12);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.row:hover {
+  background: var(--soft);
+}
+
+.poster {
+  --poster-width: 44px;
+  --poster-radius: 7px;
+
+  grid-area: poster;
+}
+
+.title {
+  grid-area: title;
+  font-size: var(--text-16);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-125);
+}
+
+.year {
+  color: var(--muted);
+  font-weight: var(--weight-medium);
+}
+
+.genres {
+  grid-area: genres;
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+.mine {
+  display: inline-flex;
+  grid-area: mine;
+  justify-self: start;
+  align-items: center;
+  gap: 5px;
+  margin-top: var(--space-6);
+  padding: var(--space-2) 9px;
+  border-radius: 7px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: var(--text-12);
+  font-weight: var(--weight-bold);
+}
+
+.provider {
+  display: flex;
+  grid-area: provider;
+  align-self: center;
+}
+
+.chevron {
+  grid-area: chevron;
+  align-self: center;
+  color: var(--muted);
+}
+
+@media (max-width: 639px) {
+  .row {
+    grid-template-areas:
+      'poster . chevron'
+      'poster title chevron'
+      'poster genres chevron'
+      'poster mine chevron'
+      'poster provider chevron'
+      'poster . chevron';
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-rows: 1fr auto auto auto auto 1fr;
+    column-gap: var(--space-12);
+    padding: var(--space-8);
+  }
+
+  .mine {
+    gap: var(--space-4);
+    margin-top: 5px;
+    padding: var(--space-2) var(--space-8);
+  }
+
+  .mine svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .provider {
+    justify-self: start;
+    margin-top: 5px;
+  }
+
+  /* A class and an element, so these beat RatingBadge's single classes. */
+  .provider > span {
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-8);
+    border-radius: 7px;
+    font-size: var(--text-12);
+  }
+
+  .provider svg {
+    width: 11px;
+    height: 11px;
+  }
+}
