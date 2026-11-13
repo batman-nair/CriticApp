@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "gen:api": "openapi-typescript ../openapi/v3.yaml -o src/api/schema.d.ts",
     "check:api": "npm run gen:api -- --check",
     "check": "npm run check:api && npm run lint && npm run typecheck && npm run test && npm run build"
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
     "@tanstack/react-query-devtools": "5.107.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",

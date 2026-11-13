@@ -1,6 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => {
   // Vitest runs in 'test' mode and gets an owner from test.env below.
@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       env: { VITE_OWNER_USERNAME: 'owner' },
+      // Playwright's smoke test, run against the image.
+      exclude: [...configDefaults.exclude, 'e2e/**'],
     },
   }
 })
