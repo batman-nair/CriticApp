@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import userEvent, { PointerEventsCheckLevel } from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -166,9 +166,13 @@ describe('as the owner', () => {
   })
 
   it('goes home, not to the login page, when logging out at /add', async () => {
-    const user = userEvent.setup()
+    // The modal add sheet leaves the header inert, so this is clicked past it.
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+    })
     const { router } = renderRoute('/add')
-    const button = await screen.findByRole('button', { name: 'Log out' })
+    await screen.findByRole('dialog', { name: 'What are you adding?' })
+    const button = screen.getByRole('button', { name: 'Log out', hidden: true })
     server.use(sessionAs(null))
 
     await user.click(button)
