@@ -5,8 +5,19 @@
   font-size: var(--text-13);
 }
 
+/* Rate, Write and done: back on the left, forward on the right. */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
 @media (max-width: 639px) {
   .footerText {
     text-align: center;
+  }
+
+  .actions > * {
+    flex: 1;
   }
 }

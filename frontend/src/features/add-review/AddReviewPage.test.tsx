@@ -67,6 +67,7 @@ const currentStep = () =>
     (_, element) => element?.getAttribute('aria-current') === 'step',
   )
 const status = () => screen.getByRole('status')
+const slider = () => screen.getByRole('slider', { name: 'Your rating' })
 
 it('opens on Find with the category chips and the footer', async () => {
   const { dialog } = await openSheet()
@@ -279,9 +280,8 @@ it('moves to Rate with the picked result, and Back returns to the results', asyn
 
   expect(screen.getByRole('dialog', { name: 'Rate it' })).toBe(dialog)
   expect(currentStep()).toHaveTextContent('Rate')
-  expect(dialog).toHaveTextContent(
-    'Rating comes next for The Witcher 3: Wild Hunt.',
-  )
+  expect(dialog).toHaveTextContent('The Witcher 3: Wild Hunt')
+  expect(slider()).toBeInTheDocument()
   expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Back' }))
