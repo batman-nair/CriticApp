@@ -9,6 +9,7 @@ import { http } from '../../test/handlers'
 import { renderWithClient } from '../../test/render'
 import { server } from '../../test/server'
 import { FindStep } from './FindStep'
+import styles from './FindStep.module.css'
 import { useAddFlow } from './useAddFlow'
 
 afterEach(() => {
@@ -55,9 +56,10 @@ it('shows skeleton chips while /categories loads, then the chips', async () => {
       return Response.json({ data: [], meta: {} })
     }),
   )
-  renderStep()
+  const { container } = renderStep()
 
   expect(screen.queryByRole('group')).not.toBeInTheDocument()
+  expect(container.querySelector(`.${styles.chips}`)?.children).toHaveLength(6)
   expect(
     await screen.findByRole('group', { name: 'Category' }),
   ).toBeEmptyDOMElement()
@@ -135,6 +137,54 @@ it('says the connection failed for anything unexpected, and tries again', async 
     await screen.findByRole('button', { name: /The Witcher 3/ }),
   ).toBeInTheDocument()
   expect(screen.getByRole('status')).toBeEmptyDOMElement()
+})
+
+it('drops an error as soon as the text changes, before searching again', async () => {
+  const user = userEvent.setup()
+  serveSearch((q) =>
+    q === 'witcher'
+      ? Response.error()
+      : new Promise<Response>(() => {
+          // Never answers, so only the change of text can clear the error.
+        }),
+  )
+  renderStep()
+
+  await user.type(searchbox(), 'witcher')
+  await waitFor(() =>
+    expect(screen.getByRole('status')).toHaveTextContent('Couldn’t search.'),
+  )
+
+  await user.type(searchbox(), ' 3')
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  expect(
+    screen.queryByRole('button', { name: 'Try again' }),
+  ).not.toBeInTheDocument()
+})
+
+it('names no provider on a 502 when /categories failed', async () => {
+  const user = userEvent.setup()
+  server.use(
+    http.get('/api/v3/categories', ({ response }) =>
+      response(500).json(makeProblem({ status: 500, code: 'SERVER_ERROR' })),
+    ),
+  )
+  serveSearch(() =>
+    Response.json(
+      makeProblem({ status: 502, code: 'UPSTREAM_ERROR' }),
+      { status: 502 },
+    ),
+  )
+  renderStep()
+
+  await screen.findByText('Couldn’t load the categories.')
+  await user.type(searchbox(), 'witcher')
+
+  await waitFor(() =>
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'The search isn’t answering right now.',
+    ),
+  )
 })
 
 it('dims the old results while a longer query loads', async () => {

@@ -81,7 +81,8 @@ export function FindStep({
   let message = ''
   let retry = false
   let results = null
-  if (long && search.isError) {
+  // Until the debounce catches up, the error is about the previous text.
+  if (long && search.isError && q === draft) {
     if (invalid || unauthenticated) {
       // Said under the field, or about to leave for the login page.
     } else if (error?.code === 'UPSTREAM_ERROR') {
