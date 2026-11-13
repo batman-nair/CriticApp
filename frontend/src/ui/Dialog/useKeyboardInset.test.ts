@@ -9,11 +9,18 @@ afterEach(() => {
 
 /** jsdom has no visualViewport. Undo with vi.unstubAllGlobals(). */
 function stubVisualViewport(height = window.innerHeight) {
-  const viewport = Object.assign(new EventTarget(), { height, offsetTop: 0 })
+  const viewport = Object.assign(new EventTarget(), {
+    height,
+    offsetTop: 0,
+    scale: 1,
+  })
   vi.stubGlobal('visualViewport', viewport)
   return {
     viewport,
-    set(change: { height?: number; offsetTop?: number }, type = 'resize') {
+    set(
+      change: { height?: number; offsetTop?: number; scale?: number },
+      type = 'resize',
+    ) {
       Object.assign(viewport, change)
       act(() => {
         viewport.dispatchEvent(new Event(type))
@@ -93,4 +100,12 @@ it('removes its listeners when disabled and on unmount', () => {
     'resize',
     'scroll',
   ])
+})
+
+it('is 0 while pinch-zoomed, which shrinks the visual viewport too', () => {
+  const { set } = stubVisualViewport()
+  const { result } = renderHook(() => useKeyboardInset(true))
+
+  set({ height: window.innerHeight / 2, offsetTop: 100, scale: 2 })
+  expect(result.current).toBe(0)
 })

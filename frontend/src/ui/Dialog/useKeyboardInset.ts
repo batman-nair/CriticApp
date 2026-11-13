@@ -6,7 +6,8 @@ import { useSyncExternalStore } from 'react'
  */
 function currentInset() {
   const viewport = window.visualViewport
-  if (!viewport) return 0
+  // Pinch-zoom shrinks the visual viewport too, and isn't a keyboard.
+  if (!viewport || viewport.scale > 1) return 0
   return Math.max(
     0,
     Math.round(window.innerHeight - viewport.height - viewport.offsetTop),
