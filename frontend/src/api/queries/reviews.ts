@@ -9,7 +9,8 @@ import {
 } from '@tanstack/react-query'
 import { ApiError, client, unwrap } from '../client'
 import type { paths } from '../schema'
-import type { Review, ReviewPage, ReviewUpdate } from '../types'
+import type { Review, ReviewCreate, ReviewPage, ReviewUpdate } from '../types'
+import { searchKeys } from './search'
 import { tagKeys } from './tags'
 
 export const REVIEW_PAGE_SIZE = 20
@@ -131,8 +132,48 @@ export function useReview(id: number) {
 }
 
 /**
+ * Reviews an item. The new review is cached at once; the lists, counts, tags
+ * and search results (whose `my_review` changes) refetch behind it. A review
+ * the owner already has rejects with a 409: see `duplicateReviewId`.
+ */
+export function useCreateReview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (review: ReviewCreate) => {
+      const body = await unwrap(
+        client.POST('/api/v3/reviews', { body: review }),
+      )
+      return body.data
+    },
+    onSuccess: (review) => {
+      queryClient.setQueryData<Review>(reviewKeys.detail(review.id), review)
+      // Not awaited, so the save doesn't wait for the refetch.
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+      void queryClient.invalidateQueries({ queryKey: tagKeys.all })
+      void queryClient.invalidateQueries({ queryKey: searchKeys.all })
+    },
+  })
+}
+
+/**
+ * The id of the review the owner already has, from a create's 409
+ * DUPLICATE_REVIEW. Null for any other error.
+ */
+export function duplicateReviewId(error: unknown): number | null {
+  if (
+    !(error instanceof ApiError) ||
+    error.status !== 409 ||
+    error.code !== 'DUPLICATE_REVIEW'
+  ) {
+    return null
+  }
+  const id = error.problem?.existing_review_id
+  return Number.isInteger(id) ? (id as number) : null
+}
+
+/**
  * Saves the fields sent. The saved review shows at once; the lists, counts,
- * the review itself and the tags refetch behind it.
+ * the review itself, the tags and search results refetch behind it.
  */
 export function useUpdateReview(id: number) {
   const queryClient = useQueryClient()
@@ -151,6 +192,7 @@ export function useUpdateReview(id: number) {
       // Not awaited, so the save doesn't wait for the refetch.
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
       void queryClient.invalidateQueries({ queryKey: tagKeys.all })
+      void queryClient.invalidateQueries({ queryKey: searchKeys.all })
     },
   })
 }
@@ -175,6 +217,7 @@ export function useDeleteReview(id: number) {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.lists() })
       void queryClient.invalidateQueries({ queryKey: reviewKeys.allFacets() })
       void queryClient.invalidateQueries({ queryKey: tagKeys.all })
+      void queryClient.invalidateQueries({ queryKey: searchKeys.all })
       // Marked stale without a refetch: the closing dialog would otherwise
       // flip to "Review not found". A later visit refetches and gets the 404.
       void queryClient.invalidateQueries({

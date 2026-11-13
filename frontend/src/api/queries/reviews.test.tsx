@@ -12,7 +12,9 @@ import { createQueryClient } from '../queryClient'
 import type { Review, ReviewPage } from '../types'
 import {
   REVIEW_PAGE_SIZE,
+  duplicateReviewId,
   reviewKeys,
+  useCreateReview,
   useDeleteReview,
   useReview,
   useReviewFacets,
@@ -20,6 +22,7 @@ import {
   useUpdateReview,
   type ReviewListParams,
 } from './reviews'
+import { searchKeys } from './search'
 import { tagKeys } from './tags'
 
 function reviews(count: number, firstId = 1) {
@@ -328,13 +331,18 @@ it('keys a review under all, outside the lists', () => {
 
 const listKey = reviewKeys.list({ username: OWNER_USERNAME })
 const facetsKey = reviewKeys.facets({ username: OWNER_USERNAME })
+const searchKey = searchKeys.list({ category: 'game', q: 'witcher' })
 
-/** A client holding a list, the counts and the tags, none of them stale. */
+/**
+ * A client holding a list, the counts, the tags and a search, none of them
+ * stale.
+ */
 function seededQueryClient() {
   const queryClient = createTestQueryClient()
   queryClient.setQueryData(listKey, 'old list')
   queryClient.setQueryData(facetsKey, 'old facets')
   queryClient.setQueryData(tagKeys.list(), 'old tags')
+  queryClient.setQueryData(searchKey, 'old search')
   return queryClient
 }
 
@@ -345,7 +353,7 @@ function isInvalidated(
   return queryClient.getQueryState(queryKey)?.isInvalidated
 }
 
-it('sends the update, shows the saved review and refetches the rest', async () => {
+it('sends the update, shows the saved review and refetches the rest, search included', async () => {
   const sent: unknown[] = []
   const saved = makeReview({ rating: 7, text: 'Fine.', tags: ['cozy'] })
   server.use(
@@ -371,6 +379,7 @@ it('sends the update, shows the saved review and refetches the rest', async () =
   expect(isInvalidated(queryClient, listKey)).toBe(true)
   expect(isInvalidated(queryClient, facetsKey)).toBe(true)
   expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
+  expect(isInvalidated(queryClient, searchKey)).toBe(true)
 })
 
 it('rejects a refused update with an ApiError carrying the field errors', async () => {
@@ -405,6 +414,127 @@ it('rejects a refused update with an ApiError carrying the field errors', async 
   expect(isInvalidated(queryClient, listKey)).toBe(false)
 })
 
+it('sends the new review, caches it and refetches the rest', async () => {
+  const sent: unknown[] = []
+  const created = makeReview({
+    id: 12,
+    rating: 7,
+    text: 'Fine.',
+    tags: ['cozy'],
+  })
+  server.use(
+    http.post('/api/v3/reviews', async ({ request, response }) => {
+      sent.push(await request.json())
+      return response(201).json({ data: created, meta: {} })
+    }),
+  )
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useCreateReview(), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  const returned = await act(() =>
+    result.current.mutateAsync({
+      item_id: 'mal:1',
+      rating: 7,
+      text: 'Fine.',
+      tags: ['cozy'],
+    }),
+  )
+
+  expect(sent).toEqual([
+    { item_id: 'mal:1', rating: 7, text: 'Fine.', tags: ['cozy'] },
+  ])
+  expect(returned).toEqual(created)
+  expect(queryClient.getQueryData(reviewKeys.detail(12))).toEqual(created)
+  expect(isInvalidated(queryClient, listKey)).toBe(true)
+  expect(isInvalidated(queryClient, facetsKey)).toBe(true)
+  expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
+  expect(isInvalidated(queryClient, searchKey)).toBe(true)
+})
+
+function duplicateProblem(existing_review_id: unknown) {
+  return {
+    ...makeProblem({
+      title: 'Conflict',
+      status: 409,
+      code: 'DUPLICATE_REVIEW',
+      detail: 'You already reviewed this.',
+    }),
+    existing_review_id,
+  }
+}
+
+it('rejects a duplicate with the existing review’s id and refetches nothing', async () => {
+  server.use(
+    http.post('/api/v3/reviews', ({ response }) =>
+      response.untyped(
+        HttpResponse.json(duplicateProblem(7), {
+          status: 409,
+          headers: { 'Content-Type': 'application/problem+json' },
+        }),
+      ),
+    ),
+  )
+  const queryClient = seededQueryClient()
+  const { result } = renderHook(() => useCreateReview(), {
+    wrapper: queryWrapper(queryClient),
+  })
+
+  act(() => result.current.mutate({ item_id: 'mal:1', rating: 7 }))
+
+  await waitFor(() => expect(result.current.isError).toBe(true))
+  expect(duplicateReviewId(result.current.error)).toBe(7)
+  expect(isInvalidated(queryClient, listKey)).toBe(false)
+  expect(isInvalidated(queryClient, searchKey)).toBe(false)
+})
+
+it.each([
+  [
+    'a 409 with another code',
+    new ApiError({
+      kind: 'problem',
+      status: 409,
+      code: 'CONFLICT',
+      detail: 'x',
+      problem: { existing_review_id: 7 },
+    }),
+  ],
+  [
+    'a duplicate without an integer id',
+    new ApiError({
+      kind: 'problem',
+      status: 409,
+      code: 'DUPLICATE_REVIEW',
+      detail: 'x',
+      problem: duplicateProblem('7'),
+    }),
+  ],
+  [
+    'a 400',
+    new ApiError({
+      kind: 'problem',
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      detail: 'x',
+      problem: { existing_review_id: 7 },
+    }),
+  ],
+  [
+    'a network error',
+    new ApiError({
+      kind: 'network',
+      status: 0,
+      code: 'NETWORK_ERROR',
+      detail: 'x',
+    }),
+  ],
+  ['an Error', new Error('x')],
+  ['nothing', null],
+])('has no duplicate id for %s', (_, error) => {
+  expect(duplicateReviewId(error)).toBeNull()
+})
+
 /** Serves DELETE with `status` and records the deleted paths. */
 function serveDelete(status: 204 | 404 | 500) {
   const requests: string[] = []
@@ -419,7 +549,7 @@ function serveDelete(status: 204 | 404 | 500) {
   return requests
 }
 
-it('deletes the review and refetches the lists, counts and tags, but not the review', async () => {
+it('deletes the review and refetches the lists, counts, tags and search, but not the review', async () => {
   const deleted = serveDelete(204)
   const fetched = serveReview(makeReview())
   const queryClient = seededQueryClient()
@@ -435,6 +565,7 @@ it('deletes the review and refetches the lists, counts and tags, but not the rev
   expect(isInvalidated(queryClient, listKey)).toBe(true)
   expect(isInvalidated(queryClient, facetsKey)).toBe(true)
   expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
+  expect(isInvalidated(queryClient, searchKey)).toBe(true)
   expect(isInvalidated(queryClient, reviewKeys.detail(1))).toBe(true)
   expect(result.current.review.fetchStatus).toBe('idle')
   expect(fetched).toEqual(['/api/v3/reviews/1'])
