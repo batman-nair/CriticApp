@@ -69,12 +69,25 @@ export const handlers = [
     response(200).json({
       data: [
         makeCategory(),
+        makeCategory({ id: 'series', label: 'Series' }),
         makeCategory({ id: 'game', label: 'Games', source: 'IGDB' }),
         makeCategory({
           id: 'anime',
           label: 'Anime',
           source: 'MyAnimeList',
           rating_label: 'MyAnimeList',
+        }),
+        makeCategory({
+          id: 'manga',
+          label: 'Manga',
+          source: 'MyAnimeList',
+          rating_label: 'MyAnimeList',
+        }),
+        makeCategory({
+          id: 'book',
+          label: 'Books',
+          source: 'Open Library',
+          rating_label: 'Open Library',
         }),
       ],
       meta: {},
@@ -106,6 +119,10 @@ export const handlers = [
     return response(200).json({ data: { ...review, ...update }, meta: {} })
   }),
   http.delete('/api/v3/reviews/{id}', ({ response }) => response(204).empty()),
+  // Nothing found. Tests that search override it with server.use.
+  http.get('/api/v3/search', ({ response }) =>
+    response(200).json({ data: [], meta: {} }),
+  ),
   // The owner's most-used tags.
   http.get('/api/v3/tags', ({ response }) =>
     response(200).json({
