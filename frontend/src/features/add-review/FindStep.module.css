@@ -1,0 +1,108 @@
+/* From boards 03 and 07. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.categoriesError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-10);
+  min-height: 40px;
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
+/* Under the field. */
+.hint,
+.invalid {
+  margin: -6px 0 0;
+  font-size: var(--text-13);
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.invalid {
+  color: var(--danger-text);
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 -6px;
+  padding: 0;
+  list-style: none;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+/* Newer results are on the way. */
+.results[data-stale] {
+  opacity: 0.55;
+}
+
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  padding: var(--space-8) 0;
+}
+
+.skeletonText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Nothing found, or the search failed. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding: var(--space-18);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-14);
+  color: var(--muted);
+}
+
+.notice p {
+  margin: 0;
+}
+
+@media (max-width: 639px) {
+  /* One scrolling row, out to the sheet's edges. */
+  .chips {
+    flex-wrap: nowrap;
+    margin: 0 calc(-1 * var(--space-20));
+    padding: 0 var(--space-20) var(--space-2);
+    overflow-x: auto;
+  }
+
+  .results {
+    gap: 0;
+    margin: 0 -8px;
+  }
+
+  .skeletonRow {
+    gap: var(--space-12);
+  }
+}

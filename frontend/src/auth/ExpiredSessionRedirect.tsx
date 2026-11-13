@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useEffectEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
-import { authKeys } from '../api/queries/auth'
+import { markSessionExpired } from './markSessionExpired'
 import { loginPath } from './next'
 
 /**
@@ -33,8 +33,7 @@ export function ExpiredSessionRedirect() {
         }
         // Logged out before navigating: the login page sends anyone with a
         // session straight back to `next`.
-        queryClient.setQueryData(authKeys.session(), { user: null })
-        void queryClient.invalidateQueries({ queryKey: authKeys.session() })
+        markSessionExpired(queryClient)
         toLogin()
       }),
     [queryClient],

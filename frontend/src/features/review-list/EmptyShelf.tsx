@@ -33,7 +33,7 @@ export function EmptyShelf() {
       </p>
       {addLink !== null && (
         <Link
-          to={addLink}
+          {...addLink}
           preventScrollReset
           className={buttonClass({
             variant: 'primary',

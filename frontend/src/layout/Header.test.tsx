@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import userEvent, { PointerEventsCheckLevel } from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { stubSystemTheme } from '../test/matchMedia'
 import { queryWrapper } from '../test/render'
 import { renderRoute } from '../test/renderRoute'
 import { server } from '../test/server'
+import { fromParentState } from '../ui/Dialog/useRouteDialog'
 import { Header } from './Header'
 
 beforeEach(() => {
@@ -93,6 +94,29 @@ describe('as the owner', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('opens /add over the list, keeping its filters', async () => {
+    const user = userEvent.setup()
+    const { router } = renderRoute('/?q=dune')
+    await screen.findByRole('button', { name: 'Log out' })
+    const link = screen.getByRole('link', { name: 'Add review' })
+    expect(link).toHaveAttribute('href', '/add?q=dune')
+
+    await user.click(link)
+
+    expect(router.state.location.pathname).toBe('/add')
+    expect(router.state.location.search).toBe('?q=dune')
+    expect(router.state.location.state).toEqual(fromParentState)
+  })
+
+  it('links "Add review" to plain /add from the 404 page', async () => {
+    renderRoute('/does-not-exist?q=dune')
+    await screen.findByRole('button', { name: 'Log out' })
+    expect(screen.getByRole('link', { name: 'Add review' })).toHaveAttribute(
+      'href',
+      '/add',
+    )
+  })
+
   it('logs out with the CSRF header and switches to "Log in"', async () => {
     const user = userEvent.setup()
     const logouts: (string | null)[] = []
@@ -142,9 +166,13 @@ describe('as the owner', () => {
   })
 
   it('goes home, not to the login page, when logging out at /add', async () => {
-    const user = userEvent.setup()
+    // The modal add sheet leaves the header inert, so this is clicked past it.
+    const user = userEvent.setup({
+      pointerEventsCheck: PointerEventsCheckLevel.Never,
+    })
     const { router } = renderRoute('/add')
-    const button = await screen.findByRole('button', { name: 'Log out' })
+    await screen.findByRole('dialog', { name: 'What are you adding?' })
+    const button = screen.getByRole('button', { name: 'Log out', hidden: true })
     server.use(sessionAs(null))
 
     await user.click(button)

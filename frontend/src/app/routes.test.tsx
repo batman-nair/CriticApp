@@ -103,9 +103,12 @@ describe('routes', () => {
     renderRoute('/add')
     // The guard waits for the session.
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('dialog', { name: 'What are you adding?' }),
     ).toBeInTheDocument()
-    expect(hero()).toBeInTheDocument()
+    // Behind the dialog, so outside the accessibility tree.
+    expect(
+      screen.getByRole('heading', { level: 1, name: HERO, hidden: true }),
+    ).toBeInTheDocument()
   })
 
   it('shows /login without the header or footer', () => {
@@ -153,10 +156,9 @@ describe('document title', () => {
     renderRoute('/')
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(document.title).toBe('Add review · Critic')
-    await user.click(
-      await screen.findByRole('link', { name: 'Back to the list' }),
-    )
-    expect(document.title).toBe('Critic')
+    await screen.findByRole('dialog', { name: 'What are you adding?' })
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(document.title).toBe('Critic'))
   })
 })
 
@@ -230,22 +232,20 @@ describe('scroll position', () => {
     scrollTo.mockClear()
     await user.click(screen.getByRole('link', { name: 'Add review' }))
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Add review' }),
+      await screen.findByRole('dialog', { name: 'What are you adding?' }),
     ).toBeInTheDocument()
     expect(scrollTo).not.toHaveBeenCalled()
   })
 
-  it('stays put when /add links back to the list', async () => {
+  it('stays put when /add closes back to the list', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo')
-    renderRoute('/add')
-    const back = await screen.findByRole('link', { name: 'Back to the list' })
+    const { router } = renderRoute('/add')
+    await screen.findByRole('dialog', { name: 'What are you adding?' })
     scrollTo.mockClear()
-    await user.click(back)
-    // By name: the cards' titles are h2s too.
-    expect(
-      screen.queryByRole('heading', { name: 'Add review' }),
-    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(scrollTo).not.toHaveBeenCalled()
   })
 
@@ -264,7 +264,8 @@ describe('scroll position', () => {
   it('resets on an ordinary navigation', async () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo')
-    renderRoute('/add')
+    // Not /add: the modal sheet would block the header.
+    renderRoute('/does-not-exist')
     scrollTo.mockClear()
     await user.click(screen.getByRole('link', { name: 'Critic' }))
     expect(scrollTo).toHaveBeenCalledWith(0, 0)
@@ -272,12 +273,17 @@ describe('scroll position', () => {
 })
 
 describe('accessibility', () => {
-  it.each(['/', '/does-not-exist', '/reviews/1', '/login'])(
+  it.each(['/', '/does-not-exist', '/reviews/1', '/add', '/login'])(
     'has no axe violations at %s',
     async (path) => {
       if (path === '/login') server.use(sessionAs(null))
       const { container } = renderRoute(path)
-      await expectNoAxeViolations(container)
+      // The sheet is in a portal, outside the container.
+      const checked =
+        path === '/add'
+          ? await screen.findByRole('dialog', { name: 'What are you adding?' })
+          : container
+      await expectNoAxeViolations(checked)
     },
     30_000,
   )

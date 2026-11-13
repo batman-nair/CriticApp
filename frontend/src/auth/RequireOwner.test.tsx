@@ -19,7 +19,7 @@ it('shows /add to the owner', async () => {
   const { router } = renderRoute('/add')
 
   expect(
-    await screen.findByRole('heading', { level: 2, name: 'Add review' }),
+    await screen.findByRole('dialog', { name: 'What are you adding?' }),
   ).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/add')
 })
@@ -28,7 +28,7 @@ it('shows nothing while the session loads', () => {
   renderRoute('/add')
 
   expect(
-    screen.queryByRole('heading', { level: 2, name: 'Add review' }),
+    screen.queryByRole('dialog', { name: 'What are you adding?' }),
   ).not.toBeInTheDocument()
 })
 
@@ -53,6 +53,6 @@ it('sends someone else logged in home', async () => {
 
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(
-    screen.queryByRole('heading', { level: 2, name: 'Add review' }),
+    screen.queryByRole('dialog', { name: 'What are you adding?' }),
   ).not.toBeInTheDocument()
 })

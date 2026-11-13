@@ -229,6 +229,21 @@ it('sets the category variables on the dialog', async () => {
   expect(Array.from(dialog().classList)).toContain(styles.tinted)
 })
 
+it('sets the keyboard inset on the add sheet, with the category variables', async () => {
+  await setup({ size: 'add', category: 'movie' })
+
+  expect(dialog().style.getPropertyValue('--keyboard-inset')).toBe('0px')
+  expect(dialog().style.getPropertyValue('--cat-base')).toBe(
+    'var(--cat-movie-base)',
+  )
+})
+
+it('has no keyboard inset on the detail dialog', async () => {
+  await setup()
+
+  expect(dialog().style.getPropertyValue('--keyboard-inset')).toBe('')
+})
+
 it('has no tint without a category', async () => {
   await setup()
 
