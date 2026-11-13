@@ -1,0 +1,41 @@
+/* The header's Edit, Delete, Cancel and Save, matched to Close. */
+
+/* Two classes, so these beat Button's and IconButton's whatever the order. */
+.soft.soft {
+  background: var(--dialog-button-bg, var(--soft));
+}
+
+.icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.2;
+}
+
+/* Below 640px, from boards 16 and 19: Close's size, Edit its pencil alone. */
+@media (max-width: 639px) {
+  .action.action {
+    height: 44px;
+  }
+
+  .icon.icon,
+  .edit.edit {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+
+  .icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* As VisuallyHidden, so the button keeps its name. */
+  .editLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

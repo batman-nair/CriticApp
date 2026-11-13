@@ -1,0 +1,75 @@
+/* Boards 13 and 16: the banner at the foot of the dialog. */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12) var(--space-20);
+  margin: 0 var(--space-20) var(--space-20);
+  padding: var(--space-16) var(--space-18);
+  border-radius: var(--radius-18);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  font-size: var(--text-15);
+  font-weight: var(--weight-bold);
+}
+
+.note,
+.error {
+  font-size: var(--text-13);
+}
+
+.note {
+  opacity: 0.85;
+}
+
+.error {
+  margin-top: var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-8);
+}
+
+/* Two classes, so these beat Button's whatever the order. */
+.actions .keep {
+  background: var(--surface);
+}
+
+/* Below 640px, from board 16: full width, the buttons sharing it. */
+@media (max-width: 639px) {
+  .root {
+    flex-direction: column;
+    align-items: stretch;
+    margin: 0;
+    padding: var(--space-16) var(--space-20) 30px;
+    border-radius: 0;
+  }
+
+  .title {
+    font-size: var(--text-16);
+  }
+
+  .actions {
+    gap: var(--space-10);
+  }
+
+  .actions .keep,
+  .actions .action {
+    flex: 1;
+    height: 50px;
+    border-radius: var(--radius-14);
+    font-size: var(--text-15);
+  }
+}

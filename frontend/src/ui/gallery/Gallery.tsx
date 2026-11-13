@@ -35,7 +35,12 @@ const CATEGORIES = [
   { id: 'book', label: 'Book' },
 ]
 
-const BUTTON_VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'ghost']
+const BUTTON_VARIANTS: ButtonVariant[] = [
+  'primary',
+  'secondary',
+  'ghost',
+  'danger',
+]
 const BUTTON_SIZES: ButtonSize[] = ['sm', 'md', 'lg']
 const ICON_BUTTON_VARIANTS = ['ghost', 'soft', 'outline'] as const
 const ICON_BUTTON_SIZES = ['sm', 'md'] as const

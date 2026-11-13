@@ -9,6 +9,7 @@ import {
   makeReviewFacets,
   makeReviewPage,
   makeSessionUser,
+  makeTag,
 } from './fixtures'
 
 // jsdom's URL under Vitest. Not read from window, because setup.ts also loads
@@ -96,4 +97,24 @@ export const handlers = [
       ? response(200).json({ data: review, meta: {} })
       : response(404).json(makeProblem())
   }),
+  // The ordering note above is about GET only. Returns the review with the
+  // body merged in, without changing defaultReviews, which other tests share.
+  http.patch('/api/v3/reviews/{id}', async ({ params, request, response }) => {
+    const review = defaultReviews.find((r) => r.id === Number(params.id))
+    if (!review) return response(404).json(makeProblem())
+    const update = await request.json()
+    return response(200).json({ data: { ...review, ...update }, meta: {} })
+  }),
+  http.delete('/api/v3/reviews/{id}', ({ response }) => response(204).empty()),
+  // The owner's most-used tags.
+  http.get('/api/v3/tags', ({ response }) =>
+    response(200).json({
+      data: [
+        makeTag({ count: 3 }),
+        makeTag({ name: 'comfort', count: 2 }),
+        makeTag({ name: 'soundtrack' }),
+      ],
+      meta: {},
+    }),
+  ),
 ]

@@ -77,6 +77,29 @@ it.each(closers)('closes with %s and returns focus', async (_, close) => {
   await waitFor(() => expect(opener()).toHaveFocus())
 })
 
+it.each(closers.slice(0, 2))(
+  'stays open on %s when not dismissible',
+  async (_, close) => {
+    const onOpenChange = vi.fn()
+    const { user } = await setup({ dismissible: false, onOpenChange })
+
+    await close(user)
+
+    expect(dialog()).toHaveAttribute('data-state', 'open')
+    expect(onOpenChange).not.toHaveBeenCalled()
+  },
+)
+
+it('still closes with Close when not dismissible', async () => {
+  const { user } = await setup({ dismissible: false })
+
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+})
+
 it('moves focus inside on open and keeps it there', async () => {
   const { user } = await setup()
   expect(dialog()).toContainElement(document.activeElement as HTMLElement)
@@ -142,6 +165,19 @@ it('renders each slot, with Close after the header actions', async () => {
   expect(scope.getAllByRole('button')).toEqual([
     scope.getByRole('button', { name: 'Edit' }),
     scope.getByRole('button', { name: 'Close' }),
+  ])
+})
+
+it('leaves out Close with hideClose, keeping the header actions', async () => {
+  await setup({
+    headerEnd: <button type="button">Cancel</button>,
+    hideClose: true,
+    children: <p>Body</p>,
+  })
+
+  const scope = within(dialog())
+  expect(scope.getAllByRole('button')).toEqual([
+    scope.getByRole('button', { name: 'Cancel' }),
   ])
 })
 
@@ -397,6 +433,16 @@ describe('drag to close', () => {
     drag(handle(), { moves: [[40, 30]], upAt: 35 })
 
     await expectClosed()
+  })
+
+  it('springs back after a long drag when not dismissible', async () => {
+    const onOpenChange = vi.fn()
+    await setupSheet({ dismissible: false, onOpenChange })
+
+    drag(handle(), slowLong)
+
+    expectSprungBack()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('springs back when a fast move is followed by a pause', async () => {

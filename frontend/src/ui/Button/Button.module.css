@@ -46,6 +46,15 @@
   background: var(--soft);
 }
 
+.danger {
+  background: var(--danger-btn);
+  color: var(--danger-btn-fg);
+}
+
+.danger:hover:not(:disabled, [aria-busy='true']) {
+  opacity: 0.9;
+}
+
 .sm {
   height: 40px;
   padding: 0 var(--space-16);

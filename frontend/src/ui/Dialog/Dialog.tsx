@@ -21,6 +21,13 @@ interface DialogProps {
   headerStart?: ReactNode
   /** Actions such as Edit and Delete, placed before Close. */
   headerEnd?: ReactNode
+  /** Leaves out Close, for a header whose actions include their own Cancel. */
+  hideClose?: boolean
+  /**
+   * False ignores Esc, clicks outside and dragging the sheet down, which
+   * springs back, such as while there are unsaved changes. Close still works.
+   */
+  dismissible?: boolean
   footer?: ReactNode
   /** A new value remounts the body, so it starts scrolled to the top. */
   bodyKey?: Key
@@ -37,6 +44,8 @@ export function Dialog({
   category,
   headerStart,
   headerEnd,
+  hideClose = false,
+  dismissible = true,
   footer,
   bodyKey,
   children,
@@ -60,7 +69,13 @@ export function Dialog({
   }, [])
 
   const contentRef = useRef<HTMLDivElement>(null)
-  const drag = useSheetDrag(contentRef, () => onOpenChange(false))
+  const drag = useSheetDrag(
+    contentRef,
+    dismissible ? () => onOpenChange(false) : undefined,
+  )
+  const keepOpen = (event: Event) => {
+    if (!dismissible) event.preventDefault()
+  }
 
   // FocusScope sends this once the content has unmounted, which Presence holds
   // back until the exit animation ends. A route unmounted by the browser's Back
@@ -84,6 +99,8 @@ export function Dialog({
           )}
           style={category ? categoryVars(category) : undefined}
           onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={keepOpen}
+          onInteractOutside={keepOpen}
         >
           <div className={styles.handle} aria-hidden="true" {...drag} />
           {/* The body doesn't drag, so it keeps its own scrolling. */}
@@ -104,15 +121,17 @@ export function Dialog({
             </div>
             <div className={styles.end}>
               {headerEnd}
-              <RadixDialog.Close asChild>
-                <IconButton
-                  label="Close"
-                  variant="soft"
-                  className={styles.close}
-                >
-                  <Icon name="x" />
-                </IconButton>
-              </RadixDialog.Close>
+              {!hideClose && (
+                <RadixDialog.Close asChild>
+                  <IconButton
+                    label="Close"
+                    variant="soft"
+                    className={styles.close}
+                  >
+                    <Icon name="x" />
+                  </IconButton>
+                </RadixDialog.Close>
+              )}
             </div>
           </div>
           {/* Focusable so that a long body can be scrolled from the keyboard. */}

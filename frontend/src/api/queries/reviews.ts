@@ -1,14 +1,16 @@
 import {
   keepPreviousData,
   useInfiniteQuery,
+  useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query'
-import { client, unwrap } from '../client'
+import { ApiError, client, unwrap } from '../client'
 import type { paths } from '../schema'
-import type { Review, ReviewPage } from '../types'
+import type { Review, ReviewPage, ReviewUpdate } from '../types'
+import { tagKeys } from './tags'
 
 export const REVIEW_PAGE_SIZE = 20
 
@@ -34,6 +36,7 @@ export const reviewKeys = {
   all,
   lists,
   list: (params: ReviewListParams) => [...lists(), params] as const,
+  allFacets: () => [...all, 'facets'] as const,
   facets: (params: ReviewFacetsParams) => [...all, 'facets', params] as const,
   detail: (id: number) => [...all, 'detail', id] as const,
 }
@@ -124,5 +127,60 @@ export function useReview(id: number) {
     },
     enabled: Number.isInteger(id) && id > 0,
     placeholderData: () => findListedReview(queryClient, id),
+  })
+}
+
+/**
+ * Saves the fields sent. The saved review shows at once; the lists, counts,
+ * the review itself and the tags refetch behind it.
+ */
+export function useUpdateReview(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (update: ReviewUpdate) => {
+      const body = await unwrap(
+        client.PATCH('/api/v3/reviews/{id}', {
+          params: { path: { id } },
+          body: update,
+        }),
+      )
+      return body.data
+    },
+    onSuccess: (review) => {
+      queryClient.setQueryData<Review>(reviewKeys.detail(id), review)
+      // Not awaited, so the save doesn't wait for the refetch.
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+      void queryClient.invalidateQueries({ queryKey: tagKeys.all })
+    },
+  })
+}
+
+/**
+ * Deletes the review. One already deleted elsewhere (404) counts as deleted.
+ */
+export function useDeleteReview(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        await unwrap(
+          client.DELETE('/api/v3/reviews/{id}', { params: { path: { id } } }),
+        )
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return
+        throw error
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.lists() })
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.allFacets() })
+      void queryClient.invalidateQueries({ queryKey: tagKeys.all })
+      // Marked stale without a refetch: the closing dialog would otherwise
+      // flip to "Review not found". A later visit refetches and gets the 404.
+      void queryClient.invalidateQueries({
+        queryKey: reviewKeys.detail(id),
+        refetchType: 'none',
+      })
+    },
   })
 }

@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { createRef, type FormEvent } from 'react'
 import { expect, it, vi } from 'vitest'
 import { Button } from './Button'
+import styles from './Button.module.css'
 import { buttonClass, type ButtonSize, type ButtonVariant } from './buttonClass'
 
-const variants: ButtonVariant[] = ['primary', 'secondary', 'ghost']
+const variants: ButtonVariant[] = ['primary', 'secondary', 'ghost', 'danger']
 const sizes: ButtonSize[] = ['sm', 'md', 'lg']
 const combinations = variants.flatMap((variant) =>
   sizes.map((size) => ({ variant, size })),
@@ -155,4 +156,12 @@ it('uses the same defaults in buttonClass as in Button', () => {
   expect(screen.getByRole('button').className).toBe(buttonClass())
   expect(buttonClass()).not.toBe(buttonClass({ variant: 'ghost' }))
   expect(buttonClass()).not.toBe(buttonClass({ size: 'lg' }))
+})
+
+it('gives the danger variant its own class', () => {
+  render(<Button variant="danger">Delete review</Button>)
+
+  const button = screen.getByRole('button', { name: 'Delete review' })
+  expect(button).toHaveClass(styles.danger!)
+  expect(button).not.toHaveClass(styles.primary!)
 })
