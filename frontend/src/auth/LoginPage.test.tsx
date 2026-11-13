@@ -101,7 +101,7 @@ it('signs in and goes to `next`', async () => {
   await signIn('  devuser ', 'devpass123')
 
   expect(
-    await screen.findByRole('heading', { level: 2, name: 'Add review' }),
+    await screen.findByRole('dialog', { name: 'What are you adding?' }),
   ).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/add')
   // Trimmed username, password as typed.
