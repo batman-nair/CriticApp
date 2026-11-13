@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import type { Review } from '../../api/types'
 import {
   categoryLabel,
@@ -19,9 +19,15 @@ interface ReviewDetailProps {
    * it isn't known, which labels it "Rating".
    */
   ratingLabel: string | null | undefined
+  /** Replaces the ratings, the notes and About, such as with the edit form. */
+  children?: ReactNode
 }
 
-export function ReviewDetail({ review, ratingLabel }: ReviewDetailProps) {
+export function ReviewDetail({
+  review,
+  ratingLabel,
+  children,
+}: ReviewDetailProps) {
   const { item } = review
   const category =
     item.category === 'anime'
@@ -62,46 +68,52 @@ export function ReviewDetail({ review, ratingLabel }: ReviewDetailProps) {
         <h2 className={styles.title}>{item.title}</h2>
       </div>
       <div className={styles.main}>
-        <dl className={styles.ratings}>
-          <div className={styles.mine}>
-            <dt className={styles.ratingLabel}>My rating</dt>
-            <dd className={styles.score}>
-              {review.rating.toFixed(1)}
-              <span className={styles.scale}>/10</span>
-            </dd>
-          </div>
-          {providerRating !== null && (
-            <div className={styles.provider}>
-              <dt className={styles.ratingLabel}>{ratingLabel ?? 'Rating'}</dt>
-              <dd className={styles.providerScore}>
-                <Icon name="star" size={15} className={styles.star} />
-                {providerRating.toFixed(1)}
-              </dd>
-            </div>
-          )}
-        </dl>
-        {text ? (
-          <p className={styles.quote}>“{text}”</p>
-        ) : (
-          <p className={styles.noNotes}>No notes yet</p>
-        )}
-        {(about.length > 0 || description) && (
+        {children ?? (
           <>
-            <hr className={styles.divider} />
-            <div className={styles.about}>
-              <h3 className={styles.aboutTitle}>About</h3>
-              {about.length > 0 && (
-                <dl className={styles.facts}>
-                  {about.map(([key, value]) => (
-                    <Fragment key={key}>
-                      <dt className={styles.factKey}>{key}</dt>
-                      <dd>{value}</dd>
-                    </Fragment>
-                  ))}
-                </dl>
+            <dl className={styles.ratings}>
+              <div className={styles.mine}>
+                <dt className={styles.ratingLabel}>My rating</dt>
+                <dd className={styles.score}>
+                  {review.rating.toFixed(1)}
+                  <span className={styles.scale}>/10</span>
+                </dd>
+              </div>
+              {providerRating !== null && (
+                <div className={styles.provider}>
+                  <dt className={styles.ratingLabel}>
+                    {ratingLabel ?? 'Rating'}
+                  </dt>
+                  <dd className={styles.providerScore}>
+                    <Icon name="star" size={15} className={styles.star} />
+                    {providerRating.toFixed(1)}
+                  </dd>
+                </div>
               )}
-              {description && <Description text={description} />}
-            </div>
+            </dl>
+            {text ? (
+              <p className={styles.quote}>“{text}”</p>
+            ) : (
+              <p className={styles.noNotes}>No notes yet</p>
+            )}
+            {(about.length > 0 || description) && (
+              <>
+                <hr className={styles.divider} />
+                <div className={styles.about}>
+                  <h3 className={styles.aboutTitle}>About</h3>
+                  {about.length > 0 && (
+                    <dl className={styles.facts}>
+                      {about.map(([key, value]) => (
+                        <Fragment key={key}>
+                          <dt className={styles.factKey}>{key}</dt>
+                          <dd>{value}</dd>
+                        </Fragment>
+                      ))}
+                    </dl>
+                  )}
+                  {description && <Description text={description} />}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

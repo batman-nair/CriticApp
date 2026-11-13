@@ -1,0 +1,28 @@
+/* Boards 18 and 19: the main column of ReviewDetail, as a form. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-14) var(--space-14) var(--space-10);
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line));
+  border-radius: var(--radius-16);
+}
+
+/* Below 640px, from board 19: the ruler runs the sheet's full width. */
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-24);
+  }
+
+  .rating {
+    padding: 0;
+    border: 0;
+  }
+}

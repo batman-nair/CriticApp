@@ -189,3 +189,23 @@ it('has no axe violations', async () => {
 
   await expectNoAxeViolations(container)
 })
+
+it('puts children in place of the ratings, notes and About', () => {
+  render(
+    <ReviewDetail review={makeReview()} ratingLabel="MyAnimeList">
+      <p>The form</p>
+    </ReviewDetail>,
+  )
+
+  expect(screen.getByText('The form')).toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { level: 2, name: 'Cowboy Bebop' }),
+  ).toBeInTheDocument()
+  expect(screen.queryByText('My rating')).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('“Still the coolest thing ever animated.”'),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'About' }),
+  ).not.toBeInTheDocument()
+})
