@@ -2,9 +2,18 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authKeys } from '../../api/queries/auth'
+import { reviewKeys } from '../../api/queries/reviews'
+import { searchKeys } from '../../api/queries/search'
+import { tagKeys } from '../../api/queries/tags'
 import type { SearchResult } from '../../api/types'
-import { makeProblem, makeSearchResult } from '../../test/fixtures'
-import { http, sessionAs } from '../../test/handlers'
+import {
+  makeItem,
+  makeProblem,
+  makeReview,
+  makeReviewFacets,
+  makeSearchResult,
+} from '../../test/fixtures'
+import { CREATED_REVIEW_ID, http, sessionAs } from '../../test/handlers'
 import { stubSystemTheme } from '../../test/matchMedia'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
@@ -68,6 +77,9 @@ const currentStep = () =>
   )
 const status = () => screen.getByRole('status')
 const slider = () => screen.getByRole('slider', { name: 'Your rating' })
+const tagsField = () => screen.getByRole('textbox', { name: /^Tags/ })
+const notes = () => screen.getByRole('textbox', { name: 'In a line or two' })
+const button = (name: string) => screen.getByRole('button', { name })
 
 it('opens on Find with the category chips and the footer', async () => {
   const { dialog } = await openSheet()
@@ -305,4 +317,406 @@ it('closes back to the list', async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(router.state.location.search).toBe('?category=movie')
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+describe('saving', () => {
+  interface Sent {
+    method: string
+    path: string
+    body: unknown
+  }
+
+  afterEach(() => server.events.removeAllListeners())
+
+  /** Records each write's method, path and body; await the result to read them. */
+  function recordWrites() {
+    const sent: Promise<Sent>[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'GET') return
+      sent.push(
+        request
+          .clone()
+          .json()
+          .then((body) => ({
+            method: request.method,
+            path: new URL(request.url).pathname,
+            body,
+          })),
+      )
+    })
+    return () => Promise.all(sent)
+  }
+
+  /** Answers PATCH with the body merged into a review with that id. */
+  function servePatch() {
+    server.use(
+      http.patch('/api/v3/reviews/{id}', async ({ params, request }) => {
+        const update = await request.json()
+        return Response.json({
+          data: makeReview({
+            id: Number(params.id),
+            item: makeItem({ id: witcher.id }),
+            ...update,
+          }),
+          meta: {},
+        })
+      }),
+    )
+  }
+
+  /** Answers POST with `respond` instead of creating the review. */
+  function failPost(respond: () => Response) {
+    server.use(http.post('/api/v3/reviews', () => respond()))
+  }
+
+  /** Opens the sheet on Games and picks `result` from a search for "witcher". */
+  async function pick(result: SearchResult = witcher, path?: string) {
+    const user = userEvent.setup()
+    localStorage.setItem('critic-add-category', 'game')
+    serveSearch({ 'game/witcher': [result] })
+    const view = await openSheet(path)
+    await user.type(searchbox('Search games'), 'witcher')
+    await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+    return { ...view, user }
+  }
+
+  /** Rated 5.1 with the "comfort" tag, on Write with `text` typed. */
+  async function fillIn(
+    user: ReturnType<typeof userEvent.setup>,
+    text = 'Huge.',
+  ) {
+    await user.keyboard('{ArrowRight}')
+    await user.click(await screen.findByRole('button', { name: '+ comfort' }))
+    await user.click(button('Next'))
+    if (text) await user.type(notes(), text)
+  }
+
+  it('adds a new review end to end', async () => {
+    const sent = recordWrites()
+    const { dialog, user } = await pick()
+
+    expect(slider()).toHaveAttribute('aria-valuenow', '5')
+    await user.keyboard('{ArrowRight}')
+    await user.click(await screen.findByRole('button', { name: '+ comfort' }))
+    expect(tagsField()).toHaveValue('comfort')
+    await user.click(button('Next'))
+
+    expect(screen.getByRole('dialog', { name: 'Say a few words' })).toBe(dialog)
+    expect(currentStep()).toHaveTextContent('Write')
+    expect(dialog).toHaveTextContent('Your rating 5.1')
+    await user.type(notes(), 'Huge.')
+    await user.click(button('Add review'))
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Added to your reviews' }),
+    ).toBe(dialog)
+    expect(await sent()).toEqual([
+      {
+        method: 'POST',
+        path: '/api/v3/reviews',
+        body: {
+          item_id: witcher.id,
+          rating: 5.1,
+          text: 'Huge.',
+          tags: ['comfort'],
+        },
+      },
+    ])
+    const card = within(dialog).getByRole('article')
+    expect(within(card).getByRole('link')).toHaveAttribute(
+      'href',
+      `/reviews/${CREATED_REVIEW_ID}`,
+    )
+    expect(card).toHaveTextContent('5.1')
+    expect(card).toHaveTextContent('Huge.')
+    expect(button('Add another')).toBeVisible()
+    expect(button('Done')).toBeVisible()
+  })
+
+  it('keeps the rating, tags and text through Back and Change', async () => {
+    const { user } = await pick()
+    await fillIn(user)
+
+    await user.click(button('Back'))
+    expect(screen.getByRole('dialog', { name: 'Rate it' })).toBeInTheDocument()
+    expect(slider()).toHaveAttribute('aria-valuenow', '5.1')
+    expect(tagsField()).toHaveValue('comfort')
+
+    await user.click(button('Change'))
+    expect(searchbox('Search games')).toHaveValue('witcher')
+    await user.click(screen.getByRole('button', { name: /Wild Hunt/ }))
+    expect(slider()).toHaveAttribute('aria-valuenow', '5.1')
+    expect(tagsField()).toHaveValue('comfort')
+
+    await user.click(button('Next'))
+    expect(notes()).toHaveValue('Huge.')
+  })
+
+  it('starts again on an empty Find in the same category from Add another', async () => {
+    const { user } = await pick()
+    await fillIn(user)
+    await user.click(button('Add review'))
+    await screen.findByRole('dialog', { name: 'Added to your reviews' })
+
+    await user.click(button('Add another'))
+
+    expect(
+      screen.getByRole('dialog', { name: 'What are you adding?' }),
+    ).toBeInTheDocument()
+    expect(currentStep()).toHaveTextContent('Find')
+    expect(searchbox('Search games')).toHaveValue('')
+    expect(chip('Games')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('closes to the list, with its query string, from Done', async () => {
+    const { router, user } = await pick(witcher, '/add?category=movie')
+    await fillIn(user)
+    await user.click(button('Add review'))
+    await screen.findByRole('dialog', { name: 'Added to your reviews' })
+
+    await user.click(button('Done'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(router.state.location.search).toBe('?category=movie')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('switches to an update on a 409, and updates on confirm', async () => {
+    const sent = recordWrites()
+    failPost(() => problem(409, 'DUPLICATE_REVIEW', { existing_review_id: 7 }))
+    servePatch()
+    const { dialog, user } = await pick()
+    await fillIn(user)
+
+    await user.click(button('Add review'))
+
+    expect(
+      await screen.findByRole('button', { name: 'Update review' }),
+    ).toBeVisible()
+    expect(screen.getByRole('dialog', { name: 'Update your words' })).toBe(
+      dialog,
+    )
+    expect(notes()).toHaveValue('Huge.')
+    await user.click(button('Back'))
+    expect(dialog).toHaveTextContent(
+      'Already in your reviews — your changes will update it.',
+    )
+    expect(slider()).toHaveAttribute('aria-valuenow', '5.1')
+    expect(tagsField()).toHaveValue('comfort')
+    await user.click(button('Next'))
+
+    await user.click(button('Update review'))
+
+    expect(await screen.findByRole('dialog', { name: 'Review updated' })).toBe(
+      dialog,
+    )
+    expect((await sent()).slice(1)).toEqual([
+      {
+        method: 'PATCH',
+        path: '/api/v3/reviews/7',
+        body: { rating: 5.1, text: 'Huge.', tags: ['comfort'] },
+      },
+    ])
+  })
+
+  it('after a 409 with no text or tags, updates only the rating', async () => {
+    const sent = recordWrites()
+    failPost(() => problem(409, 'DUPLICATE_REVIEW', { existing_review_id: 7 }))
+    servePatch()
+    const { user } = await pick()
+    await user.click(button('Next'))
+    await user.click(button('Add review'))
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Update review' }),
+    )
+
+    await screen.findByRole('dialog', { name: 'Review updated' })
+    expect((await sent()).map(({ method, body }) => [method, body])).toEqual([
+      ['POST', { item_id: witcher.id, rating: 5, text: '', tags: [] }],
+      ['PATCH', { rating: 5 }],
+    ])
+  })
+
+  describe('an item already reviewed', () => {
+    const reviewed = makeSearchResult({ my_review: { id: 1, rating: 9.5 } })
+
+    /** Serves review 1 with `review`'s fields, or a 404 when null. */
+    function serveReview(review: Parameters<typeof makeReview>[0] | null) {
+      server.use(
+        // Overriding GET {id} catches /facets too.
+        http.get('/api/v3/reviews/{id}', ({ params }) => {
+          if (params.id === 'facets') return Response.json(makeReviewFacets())
+          if (!review) return problem(404, 'NOT_FOUND')
+          return Response.json({ data: makeReview(review), meta: {} })
+        }),
+      )
+    }
+
+    it('fills in the review, and updates it', async () => {
+      const sent = recordWrites()
+      serveReview({
+        id: 1,
+        item: makeItem({ id: reviewed.id }),
+        rating: 6.5,
+        tags: ['cozy'],
+        text: 'Long.',
+      })
+      servePatch()
+      const { dialog, user } = await pick(reviewed)
+
+      expect(screen.getByRole('dialog', { name: 'Update your rating' })).toBe(
+        dialog,
+      )
+      expect(dialog).toHaveTextContent(
+        'Already in your reviews — your changes will update it.',
+      )
+      await waitFor(() =>
+        expect(slider()).toHaveAttribute('aria-valuenow', '6.5'),
+      )
+      expect(tagsField()).toHaveValue('cozy')
+      await user.click(button('Next'))
+      expect(screen.getByRole('dialog', { name: 'Update your words' })).toBe(
+        dialog,
+      )
+      expect(notes()).toHaveValue('Long.')
+      await user.clear(notes())
+      await user.click(button('Update review'))
+
+      expect(
+        await screen.findByRole('dialog', { name: 'Review updated' }),
+      ).toBe(dialog)
+      expect(await sent()).toEqual([
+        {
+          method: 'PATCH',
+          path: '/api/v3/reviews/1',
+          body: { rating: 6.5, text: '', tags: ['cozy'] },
+        },
+      ])
+    })
+
+    it('adds it as new when the review was deleted since', async () => {
+      const sent = recordWrites()
+      serveReview(null)
+      const { dialog, user } = await pick(reviewed)
+
+      expect(await screen.findByRole('dialog', { name: 'Rate it' })).toBe(
+        dialog,
+      )
+      expect(dialog).not.toHaveTextContent('Already in your reviews')
+      await user.click(button('Next'))
+      await user.click(button('Add review'))
+
+      await screen.findByRole('dialog', { name: 'Added to your reviews' })
+      expect((await sent()).map(({ method, path }) => [method, path])).toEqual([
+        ['POST', '/api/v3/reviews'],
+      ])
+    })
+  })
+
+  it('puts a tags.0 error under Tags on Rate, and keeps a text error on Write', async () => {
+    let field = 'tags.0'
+    failPost(() =>
+      problem(400, 'VALIDATION_ERROR', {
+        errors: [{ field, code: 'invalid', message: 'Not that.' }],
+      }),
+    )
+    const { user } = await pick()
+    await fillIn(user)
+
+    await user.click(button('Add review'))
+
+    await waitFor(() =>
+      expect(tagsField()).toHaveAccessibleDescription('Not that.'),
+    )
+    expect(screen.getByRole('dialog', { name: 'Rate it' })).toBeInTheDocument()
+
+    field = 'text'
+    await user.click(button('Next'))
+    await user.click(button('Add review'))
+
+    await waitFor(() =>
+      expect(notes()).toHaveAccessibleDescription(
+        expect.stringContaining('Not that.'),
+      ),
+    )
+    expect(
+      screen.getByRole('dialog', { name: 'Say a few words' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a 502 on Write with Try again, which sends again', async () => {
+    let fail = true
+    let posts = 0
+    server.use(
+      http.post('/api/v3/reviews', async ({ request }) => {
+        posts += 1
+        const { item_id } = await request.json()
+        if (fail) return problem(502, 'UPSTREAM_ERROR')
+        return Response.json(
+          {
+            data: makeReview({ id: 4, item: makeItem({ id: item_id }) }),
+            meta: {},
+          },
+          { status: 201 },
+        )
+      }),
+    )
+    const { user } = await pick()
+    await fillIn(user)
+
+    await user.click(button('Add review'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed.')
+    fail = false
+    await user.click(button('Try again'))
+    await screen.findByRole('dialog', { name: 'Added to your reviews' })
+    expect(posts).toBe(2)
+  })
+
+  it('doesn’t carry a 502 message over to the next review', async () => {
+    let fail = true
+    server.use(
+      http.post('/api/v3/reviews', () => {
+        if (fail) return problem(502, 'UPSTREAM_ERROR')
+        return Response.json(
+          {
+            data: makeReview({ id: 4, item: makeItem({ id: witcher.id }) }),
+            meta: {},
+          },
+          { status: 201 },
+        )
+      }),
+    )
+    const { user } = await pick()
+    await fillIn(user)
+    await user.click(button('Add review'))
+    await screen.findByRole('alert')
+    fail = false
+    await user.click(button('Try again'))
+    await screen.findByRole('dialog', { name: 'Added to your reviews' })
+
+    await user.click(button('Add another'))
+    await user.type(searchbox('Search games'), 'witcher')
+    await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+    await user.click(button('Next'))
+
+    expect(notes()).toHaveValue('')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('refreshes the list, counts, tags and search after a save', async () => {
+    const { queryClient, user } = await pick()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    await fillIn(user)
+
+    await user.click(button('Add review'))
+    await screen.findByRole('dialog', { name: 'Added to your reviews' })
+
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey)
+    // reviewKeys.all covers the lists and the facets.
+    expect(keys).toEqual(
+      expect.arrayContaining([reviewKeys.all, tagKeys.all, searchKeys.all]),
+    )
+  })
 })
