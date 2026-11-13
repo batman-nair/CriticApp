@@ -7,6 +7,7 @@ import type {
   ReviewFacets,
   ReviewPage,
   SessionUser,
+  Tag,
 } from '../api/types'
 import { OWNER_USERNAME } from '../config'
 
@@ -119,4 +120,8 @@ export function makeSessionUser(
   overrides: Partial<SessionUser> = {},
 ): SessionUser {
   return { id: 1, username: OWNER_USERNAME, ...overrides }
+}
+
+export function makeTag(overrides: Partial<Tag> = {}): Tag {
+  return { name: 'rewatch', count: 1, ...overrides }
 }
