@@ -29,7 +29,7 @@ export interface ReviewEditor {
   start: (review: Review) => void
   /** Changes fields of the draft, clearing their server messages. */
   change: (update: Partial<Draft>) => void
-  /** Sends the draft. Resolves true once saved, false when it wasn't. */
+  /** Sends the changed fields. Resolves true once saved, false when it wasn't. */
   save: () => Promise<boolean>
   /** Leaves edit mode, dropping the draft and the messages. */
   reset: () => void
@@ -56,6 +56,17 @@ function isDirty(draft: Draft, baseline: Draft) {
     draft.text !== baseline.text ||
     tagsKey(draft.tags) !== tagsKey(baseline.tags)
   )
+}
+
+// Only what changed is sent, so a draft started from an older copy of the
+// review doesn't put back fields that changed since on the server.
+function changedFields(draft: Draft, baseline: Draft): Partial<Draft> {
+  const changes: Partial<Draft> = {}
+  if (tenths(draft.rating) !== tenths(baseline.rating))
+    changes.rating = draft.rating
+  if (draft.text !== baseline.text) changes.text = draft.text
+  if (tagsKey(draft.tags) !== tagsKey(baseline.tags)) changes.tags = draft.tags
+  return changes
 }
 
 // The backend names a list's children with dotted paths, such as "tags.0".
@@ -122,10 +133,13 @@ export function useReviewEditor(id: number): ReviewEditor {
   // Sends even when the form already shows a rule broken: the server stays the
   // source of truth, and its message lands on the same field.
   async function save() {
-    if (!draft || update.isPending) return false
+    if (!draft || !baseline || update.isPending) return false
+    const changes = changedFields(draft, baseline)
+    // Nothing to send: saving just leaves edit mode.
+    if (Object.keys(changes).length === 0) return true
     setFormError(null)
     try {
-      await update.mutateAsync(draft)
+      await update.mutateAsync(changes)
       return true
     } catch (error) {
       const messages = saveErrors(error)

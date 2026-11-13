@@ -16,6 +16,13 @@ function setup(review: Review = makeReview()) {
   return view
 }
 
+/** Started on a review, with the notes changed, so a save sends something. */
+function edited(review?: Review) {
+  const view = setup(review)
+  act(() => view.result.current.change({ text: 'Edited.' }))
+  return view
+}
+
 /** Answers PATCH with a 400 carrying `errors`, and records the bodies sent. */
 function refuse(errors: FieldError[]) {
   const sent: unknown[] = []
@@ -87,7 +94,7 @@ it('compares the tags after normalising them', () => {
   expect(result.current.dirty).toBe(true)
 })
 
-it('saves the whole draft', async () => {
+it('saves only the fields that changed', async () => {
   const sent: unknown[] = []
   server.use(
     http.patch('/api/v3/reviews/{id}', async ({ request, response }) => {
@@ -102,7 +109,24 @@ it('saves the whole draft', async () => {
   const saved = await act(() => result.current.save())
 
   expect(saved).toBe(true)
-  expect(sent).toEqual([{ rating: 9.5, text: 'New.', tags: [] }])
+  expect(sent).toEqual([{ text: 'New.' }])
+
+  act(() => result.current.start(makeReview({ rating: 9.5, tags: ['cozy'] })))
+  act(() => result.current.change({ rating: 8, tags: ['cozy', 'rewatch'] }))
+  await act(() => result.current.save())
+
+  expect(sent[1]).toEqual({ rating: 8, tags: ['cozy', 'rewatch'] })
+})
+
+it('saves without a request when nothing changed', async () => {
+  const sent = refuse([])
+  const { result } = setup()
+  act(() => result.current.change({ rating: result.current.draft!.rating }))
+
+  const saved = await act(() => result.current.save())
+
+  expect(saved).toBe(true)
+  expect(sent).toEqual([])
 })
 
 it('puts the server’s messages under their fields, tags.0 under tags', async () => {
@@ -111,7 +135,7 @@ it('puts the server’s messages under their fields, tags.0 under tags', async (
     { field: 'text', code: 'max_length', message: 'Too long.' },
     { field: 'tags.0', code: 'invalid', message: 'Letters only.' },
   ])
-  const { result } = setup()
+  const { result } = edited()
 
   const saved = await act(() => result.current.save())
 
@@ -130,7 +154,7 @@ it('shows a message about no field, or an unknown one, for the whole form', asyn
     { field: null, code: 'invalid', message: 'Nothing to save.' },
     { field: 'item_id', code: 'read_only', message: 'Can’t change.' },
   ])
-  const { result } = setup()
+  const { result } = edited()
 
   await act(() => result.current.save())
 
@@ -146,7 +170,7 @@ it('shows the problem’s detail, or a generic message, when the save fails', as
       ),
     ),
   )
-  const { result } = setup()
+  const { result } = edited()
 
   await act(() => result.current.save())
   expect(result.current.formError).toBe('Not yours.')
@@ -165,7 +189,7 @@ it('clears a field’s message once that field changes', async () => {
     { field: 'text', code: 'max_length', message: 'Too long.' },
     { field: 'tags', code: 'max_length', message: 'Too many.' },
   ])
-  const { result } = setup()
+  const { result } = edited()
   await act(() => result.current.save())
 
   act(() => result.current.change({ text: 'Shorter.' }))
@@ -195,7 +219,7 @@ it('is saving while the request is out', async () => {
       return response(200).json({ data: makeReview(), meta: {} })
     }),
   )
-  const { result } = setup()
+  const { result } = edited()
 
   let saving!: Promise<boolean>
   act(() => {
