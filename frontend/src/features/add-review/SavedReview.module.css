@@ -1,0 +1,134 @@
+/* From boards 06 and 23; below 640px, 10 and 27. As ReviewCard, smaller. */
+.card {
+  /* For the link's ::after, which covers the card. */
+  position: relative;
+  display: flex;
+  gap: var(--space-18);
+  padding: var(--space-16);
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-card-line), var(--line));
+  border-radius: var(--radius-20);
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-card),
+    var(--surface)
+  );
+  transition: box-shadow var(--duration-medium) var(--ease);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* The ring goes round the card, not the title the link wraps. */
+.card:has(.link:focus-visible) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.poster {
+  --poster-width: 104px;
+
+  flex: none;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  padding-top: var(--space-4);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-20);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-120);
+}
+
+.link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
+.text,
+.noNotes {
+  margin: 0;
+  font-size: var(--text-15);
+  line-height: var(--leading-145);
+}
+
+.text {
+  display: -webkit-box;
+  overflow: hidden;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.noNotes {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+  margin-top: auto;
+  padding-top: var(--space-8);
+}
+
+.provider {
+  color: var(--muted);
+  font-size: var(--text-13);
+}
+
+@media (max-width: 639px) {
+  .card {
+    gap: var(--space-14);
+    padding: var(--space-12);
+    border-radius: var(--radius-18);
+  }
+
+  .poster {
+    --poster-width: 84px;
+  }
+
+  .title {
+    font-size: var(--text-18);
+  }
+}
