@@ -26,3 +26,15 @@ export function stubSystemTheme(initial: Theme = 'light') {
     listeners.forEach((listener) => listener())
   }
 }
+
+/**
+ * Matches only the queries in the list, such as a phone width or reduced
+ * motion. Undo with vi.unstubAllGlobals().
+ */
+export function stubMediaQueries(matching: string[]) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: matching.includes(query),
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }))
+}
