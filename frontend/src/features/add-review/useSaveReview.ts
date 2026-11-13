@@ -86,6 +86,14 @@ export function useSaveReview(
             })
       dispatch({ type: 'saved', review })
     } catch (error) {
+      if (
+        flow.mode === 'update' &&
+        error instanceof ApiError &&
+        error.status === 404
+      ) {
+        dispatch({ type: 'reviewGone' })
+        return
+      }
       const id = flow.mode === 'create' ? duplicateReviewId(error) : null
       if (id !== null) {
         dispatch({ type: 'duplicateFound', id })

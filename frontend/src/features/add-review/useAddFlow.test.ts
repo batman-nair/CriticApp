@@ -4,6 +4,7 @@ import { makeReview, makeSearchResult } from '../../test/fixtures'
 import {
   addFlowReducer,
   DEFAULT_RATING,
+  REVIEW_GONE,
   initialAddFlow,
   useAddFlow,
   type AddFlow,
@@ -252,6 +253,24 @@ it('switches to create mode, keeping the rating, when the review is gone', () =>
   })
   const fresh = picked()
   expect(addFlowReducer(fresh, { type: 'reviewMissing' })).toBe(fresh)
+})
+
+it('switches an update whose review was deleted to create, with a message', () => {
+  const updating = addFlowReducer(entered(), { type: 'duplicateFound', id: 7 })
+  const state = addFlowReducer(updating, { type: 'reviewGone' })
+
+  expect(state).toMatchObject({
+    step: 'write',
+    rating: updating.rating,
+    tags: updating.tags,
+    text: updating.text,
+    mode: 'create',
+    reviewId: null,
+    duplicate: false,
+    formError: REVIEW_GONE,
+  })
+  const creating = entered()
+  expect(addFlowReducer(creating, { type: 'reviewGone' })).toBe(creating)
 })
 
 it('switches to update mode on a duplicate, keeping entries and the step', () => {

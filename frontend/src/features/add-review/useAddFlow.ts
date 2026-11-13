@@ -6,6 +6,9 @@ export type AddStep = 'find' | 'rate' | 'write' | 'done'
 /** Where a new review's rating starts. */
 export const DEFAULT_RATING = 5
 
+export const REVIEW_GONE =
+  'Your review was deleted. Try again to add it as a new one.'
+
 /** The fields the server can reject. */
 export type AddFlowField = 'rating' | 'tags' | 'text'
 
@@ -44,6 +47,7 @@ export type AddFlowAction =
   | { type: 'itemSelected'; item: SearchResult }
   | { type: 'reviewLoaded'; review: Review }
   | { type: 'reviewMissing' }
+  | { type: 'reviewGone' }
   | { type: 'ratingChanged'; rating: number }
   | { type: 'tagsChanged'; tags: string[] }
   | { type: 'textChanged'; text: string }
@@ -146,6 +150,18 @@ export function addFlowReducer(state: AddFlow, action: AddFlowAction): AddFlow {
     case 'reviewMissing':
       if (state.prefill !== 'loading') return state
       return { ...state, mode: 'create', reviewId: null, prefill: 'none' }
+    // Deleted while being updated: saving again adds it as a new review.
+    case 'reviewGone':
+      if (state.mode !== 'update') return state
+      return {
+        ...state,
+        mode: 'create',
+        reviewId: null,
+        prefill: 'none',
+        duplicate: false,
+        errors: {},
+        formError: REVIEW_GONE,
+      }
     case 'ratingChanged':
       return {
         ...state,

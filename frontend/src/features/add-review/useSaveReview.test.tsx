@@ -240,6 +240,22 @@ it('a 409 on an update is a form error, not another switch', async () => {
   })
 })
 
+it('a 404 on an update reports the review gone', async () => {
+  server.use(
+    http.patch('/api/v3/reviews/{id}', ({ response }) =>
+      response.untyped(problem(404, 'NOT_FOUND')),
+    ),
+  )
+  const { result, dispatch } = setup(1)
+
+  await act(() =>
+    result.current.save(flowWith({ mode: 'update', reviewId: 1 })),
+  )
+
+  expect(dispatch).toHaveBeenCalledWith({ type: 'reviewGone' })
+  expect(dispatch).toHaveBeenCalledTimes(1)
+})
+
 it('is saving while the request is out, and ignores a second save', async () => {
   let release!: () => void
   const gate = new Promise<void>((done) => (release = done))
