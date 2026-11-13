@@ -206,6 +206,13 @@
     justify-content: center;
   }
 
+  /* So the browser doesn't take a drag here for scrolling or selecting. */
+  .handle,
+  .header {
+    touch-action: none;
+    user-select: none;
+  }
+
   .handle::before {
     width: 38px;
     height: 5px;
