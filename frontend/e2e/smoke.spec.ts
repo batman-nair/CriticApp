@@ -94,7 +94,8 @@ async function answerApi(route: Route) {
 }
 
 async function expectThemeSet(page: Page) {
-  // Set by the inline script, so it ran under the CSP.
+  // The app sets it too, so a blocked inline script shows up as the
+  // "Refused to execute" console error that afterEach checks.
   await expect(page.locator('html')).toHaveAttribute(
     'data-theme',
     /^(light|dark)$/,
@@ -174,6 +175,7 @@ test('the HTML revalidates and hashed assets are cached for a year', async ({
   // Not index.html: that would be cached for a year under an asset's name.
   const missing = await request.get('/assets/does-not-exist.js')
   expect(missing.status()).toBe(404)
+  expect(missing.headers()['cache-control']).toBeUndefined()
 })
 
 test('security headers, gzip and the health check', async ({ request }) => {

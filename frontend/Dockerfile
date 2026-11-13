@@ -21,6 +21,11 @@ FROM nginxinc/nginx-unprivileged:1.30.6-alpine
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 # Outside conf.d, so nginx only loads it where default.conf includes it.
 COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
+# Without the base image's stock pages (index.html, 50x.html). They belong to
+# root; the base image runs as uid 101, so switch back after.
+USER root
+RUN rm -rf /usr/share/nginx/html/*
+USER 101
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
