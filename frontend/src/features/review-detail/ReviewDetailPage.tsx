@@ -1,14 +1,24 @@
+import { useId, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { useCategories } from '../../api/queries/categories'
 import { useReview } from '../../api/queries/reviews'
+import { useSession } from '../../auth/useSession'
 import { reviewCategory } from '../../lib/categories'
+import { cx } from '../../lib/cx'
+import { Button } from '../../ui/Button/Button'
 import { Dialog } from '../../ui/Dialog/Dialog'
 import { useRouteDialog } from '../../ui/Dialog/useRouteDialog'
+import { Icon } from '../../ui/Icon/Icon'
+import { IconButton } from '../../ui/IconButton/IconButton'
 import { ReviewDetail } from './ReviewDetail'
+import styles from './ReviewDetailPage.module.css'
 import { ReviewDetailSkeleton } from './ReviewDetailSkeleton'
 import { ReviewDetailStatus } from './ReviewDetailStatus'
+import { ReviewEditForm } from './ReviewEditForm'
 import { ReviewSteps } from './ReviewSteps'
+import { useReviewEditor } from './useReviewEditor'
 import { useReviewSteps } from './useReviewSteps'
 
 export function ReviewDetailPage() {
@@ -17,18 +27,43 @@ export function ReviewDetailPage() {
   const review = useReview(id)
   const categories = useCategories()
   const steps = useReviewSteps(id, dialog.open)
+  const session = useSession()
+  const editor = useReviewEditor(id)
+  const formId = useId()
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const { data } = review
+
+  // The mode belongs to one review: showing another goes back to viewing.
+  // Object.is, as an id that isn't one is NaN.
+  const [modeId, setModeId] = useState(id)
+  if (!Object.is(id, modeId)) {
+    setModeId(id)
+    editor.reset()
+  }
 
   // An id that isn't one never asks, so it's as missing as a 404.
   const notFound =
     !(Number.isInteger(id) && id > 0) ||
     (review.error instanceof ApiError && review.error.status === 404)
 
+  // Leaves edit mode with focus on Edit, which only exists once rendered.
+  function leaveEditing() {
+    flushSync(() => editor.reset())
+    editButtonRef.current?.focus()
+  }
+
+  async function save() {
+    if (await editor.save()) leaveEditing()
+  }
+
   // A 404 wins over a cached copy, so a review deleted elsewhere goes. Any
   // other failed background refetch keeps the review on screen.
   let title
   let category
   let body
+  let editing = false
+  let headerEnd
   if (data && !notFound) {
     const { item } = data
     title = item.title
@@ -42,7 +77,73 @@ export function ReviewDetailPage() {
       ? undefined
       : (categories.data?.find((c) => c.id === item.category)?.rating_label ??
         null)
-    body = <ReviewDetail key={id} review={data} ratingLabel={ratingLabel} />
+    const isOwn =
+      session.isOwner && session.user?.username === data.user.username
+    const draft = isOwn ? editor.draft : null
+    editing = draft !== null
+    body = (
+      <ReviewDetail key={id} review={data} ratingLabel={ratingLabel}>
+        {draft ? (
+          <ReviewEditForm
+            id={formId}
+            review={data}
+            ratingLabel={ratingLabel}
+            draft={draft}
+            errors={editor.errors}
+            formError={editor.formError}
+            onChange={editor.change}
+            onSubmit={() => void save()}
+          />
+        ) : undefined}
+      </ReviewDetail>
+    )
+    if (editing) {
+      headerEnd = (
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            className={cx(styles.soft, styles.action)}
+            onClick={leaveEditing}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            size="sm"
+            className={styles.action}
+            busy={editor.isSaving}
+          >
+            Save
+          </Button>
+        </>
+      )
+    } else if (isOwn) {
+      headerEnd = (
+        <>
+          <Button
+            ref={editButtonRef}
+            variant="secondary"
+            size="sm"
+            className={cx(styles.soft, styles.edit)}
+            onClick={() => editor.start(data)}
+          >
+            <Icon name="pencil" size={16} />
+            <span className={styles.editLabel}>Edit</span>
+          </Button>
+          <IconButton
+            ref={deleteButtonRef}
+            label="Delete review"
+            variant="soft"
+            size="sm"
+            className={cx(styles.soft, styles.icon)}
+          >
+            <Icon name="trash" />
+          </IconButton>
+        </>
+      )
+    }
   } else if (notFound) {
     title = 'Review not found'
     body = (
@@ -61,6 +162,9 @@ export function ReviewDetailPage() {
     body = <ReviewDetailSkeleton />
   }
 
+  // Unsaved edits aren't dropped by Esc, a click outside or a drag down.
+  const guarded = editing && editor.dirty
+
   // One Dialog for every state and every review, so it keeps the element to
   // return focus to.
   return (
@@ -70,8 +174,11 @@ export function ReviewDetailPage() {
       hideTitle
       title={title}
       category={category}
-      bodyKey={id}
-      headerStart={<ReviewSteps {...steps} />}
+      bodyKey={`${id}-${editing ? 'edit' : 'view'}`}
+      headerStart={editing ? undefined : <ReviewSteps {...steps} />}
+      headerEnd={headerEnd}
+      hideClose={editing}
+      dismissible={!guarded}
     >
       {body}
     </Dialog>

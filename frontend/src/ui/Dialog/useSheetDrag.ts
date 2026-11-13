@@ -42,10 +42,11 @@ function currentOffset(sheet: HTMLElement) {
 /**
  * Drags the sheet down by the zones the handlers are spread on, and closes it
  * past a third of its height or on a downward flick. Phone layout only.
+ * Without `onClose` it still drags, and always springs back.
  */
 export function useSheetDrag(
   sheetRef: RefObject<HTMLElement | null>,
-  onClose: () => void,
+  onClose: (() => void) | undefined,
 ) {
   const dragRef = useRef<Drag | null>(null)
 
@@ -129,7 +130,7 @@ export function useSheetDrag(
       speed >= FLICK_PX_PER_MS &&
       performance.now() - last.time <= FLICK_MAX_AGE_MS
 
-    if (far || flick) {
+    if (onClose && (far || flick)) {
       // The transform stays: sheet-out has only a `to`, so the exit starts here.
       onClose()
     } else {
