@@ -6,14 +6,20 @@ import type { SearchCategory } from '../types'
  * The categories search takes, at runtime, to check a stored or
  * `/categories` id against.
  */
-export const SEARCH_CATEGORIES = [
-  'movie',
-  'series',
-  'game',
-  'anime',
-  'manga',
-  'book',
-] as const satisfies readonly SearchCategory[]
+// A Record, so a category added to the schema fails the typecheck until it's
+// listed here.
+const SEARCH_CATEGORY_SET: Record<SearchCategory, true> = {
+  movie: true,
+  series: true,
+  game: true,
+  anime: true,
+  manga: true,
+  book: true,
+}
+
+export const SEARCH_CATEGORIES = Object.keys(
+  SEARCH_CATEGORY_SET,
+) as readonly SearchCategory[]
 
 export function isSearchCategory(value: string): value is SearchCategory {
   return (SEARCH_CATEGORIES as readonly string[]).includes(value)
