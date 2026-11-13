@@ -145,6 +145,19 @@ it('renders each slot, with Close after the header actions', async () => {
   ])
 })
 
+it('leaves out Close with hideClose, keeping the header actions', async () => {
+  await setup({
+    headerEnd: <button type="button">Cancel</button>,
+    hideClose: true,
+    children: <p>Body</p>,
+  })
+
+  const scope = within(dialog())
+  expect(scope.getAllByRole('button')).toEqual([
+    scope.getByRole('button', { name: 'Cancel' }),
+  ])
+})
+
 it('has no footer wrapper without a footer', async () => {
   await setup({ children: <p>Body</p> })
 

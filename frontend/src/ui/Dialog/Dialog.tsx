@@ -21,6 +21,8 @@ interface DialogProps {
   headerStart?: ReactNode
   /** Actions such as Edit and Delete, placed before Close. */
   headerEnd?: ReactNode
+  /** Leaves out Close, for a header whose actions include their own Cancel. */
+  hideClose?: boolean
   footer?: ReactNode
   /** A new value remounts the body, so it starts scrolled to the top. */
   bodyKey?: Key
@@ -37,6 +39,7 @@ export function Dialog({
   category,
   headerStart,
   headerEnd,
+  hideClose = false,
   footer,
   bodyKey,
   children,
@@ -104,15 +107,17 @@ export function Dialog({
             </div>
             <div className={styles.end}>
               {headerEnd}
-              <RadixDialog.Close asChild>
-                <IconButton
-                  label="Close"
-                  variant="soft"
-                  className={styles.close}
-                >
-                  <Icon name="x" />
-                </IconButton>
-              </RadixDialog.Close>
+              {!hideClose && (
+                <RadixDialog.Close asChild>
+                  <IconButton
+                    label="Close"
+                    variant="soft"
+                    className={styles.close}
+                  >
+                    <Icon name="x" />
+                  </IconButton>
+                </RadixDialog.Close>
+              )}
             </div>
           </div>
           {/* Focusable so that a long body can be scrolled from the keyboard. */}
