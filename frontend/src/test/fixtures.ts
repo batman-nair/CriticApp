@@ -6,6 +6,7 @@ import type {
   Review,
   ReviewFacets,
   ReviewPage,
+  SearchResult,
   SessionUser,
   Tag,
 } from '../api/types'
@@ -111,6 +112,24 @@ export function makeProblem(overrides: Partial<Problem> = {}): Problem {
     status: 404,
     code: 'NOT_FOUND',
     detail: 'Not found.',
+    ...overrides,
+  }
+}
+
+/** A game with genres and a provider rating, not yet reviewed. */
+export function makeSearchResult(
+  overrides: Partial<SearchResult> = {},
+): SearchResult {
+  return {
+    id: 'igdb:1942',
+    category: 'game',
+    title: 'The Witcher 3: Wild Hunt',
+    image_url: 'https://cdn.example.com/witcher-3.jpg',
+    start_year: 2015,
+    end_year: null,
+    genres: ['Role-playing (RPG)', 'Adventure'],
+    provider_rating: 9.3,
+    my_review: null,
     ...overrides,
   }
 }
