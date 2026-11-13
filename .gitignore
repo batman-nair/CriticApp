@@ -139,5 +139,7 @@ GitHub.sublime-settings
 # Frontend #
 node_modules/
 *.local
+frontend/test-results/
+frontend/playwright-report/
 # The Python and Django rules above (lib/, parts/, media, db.*) would otherwise drop frontend source
 !frontend/src/**

@@ -26,6 +26,8 @@
     "vite.config.test.ts",
     "api-schema.test.ts",
     "theme-files.test.ts",
-    "nginx-config.test.ts"
+    "nginx-config.test.ts",
+    "playwright.config.ts",
+    "e2e/**/*.ts"
   ]
 }
