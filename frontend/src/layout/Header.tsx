@@ -23,7 +23,7 @@ export function Header() {
         <ThemeToggle />
         {addLink !== null && (
           <Link
-            to={addLink}
+            {...addLink}
             preventScrollReset
             className={buttonClass({
               variant: 'primary',

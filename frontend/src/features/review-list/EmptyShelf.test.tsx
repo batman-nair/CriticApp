@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { expect, it } from 'vitest'
 import { authKeys } from '../../api/queries/auth'
@@ -7,14 +8,23 @@ import { makeSessionUser } from '../../test/fixtures'
 import { sessionAs } from '../../test/handlers'
 import { createTestQueryClient, queryWrapper } from '../../test/render'
 import { server } from '../../test/server'
+import { fromParentState } from '../../ui/Dialog/useRouteDialog'
 import { EmptyShelf } from './EmptyShelf'
 
 const ADD = 'Add your first review'
 
-/** Renders the shelf and waits for the session to load. */
-async function renderShelf() {
+/**
+ * Renders the shelf on the list at `path` and waits for the session to load.
+ */
+async function renderShelf(path = '/') {
   const queryClient = createTestQueryClient()
-  const router = createMemoryRouter([{ path: '/', element: <EmptyShelf /> }])
+  const router = createMemoryRouter(
+    [
+      { path: '/', element: <EmptyShelf /> },
+      { path: '/add', element: <h2>Add review</h2> },
+    ],
+    { initialEntries: [path] },
+  )
   const result = render(<RouterProvider router={router} />, {
     wrapper: queryWrapper(queryClient),
   })
@@ -23,7 +33,7 @@ async function renderShelf() {
       'success',
     ),
   )
-  return result
+  return { router, ...result }
 }
 
 it('says the shelf is empty and links the owner to adding a review', async () => {
@@ -38,9 +48,22 @@ it('says the shelf is empty and links the owner to adding a review', async () =>
   )
 })
 
+it('opens /add over the list, keeping its filters', async () => {
+  const user = userEvent.setup()
+  const { router } = await renderShelf('/?q=dune')
+  const link = screen.getByRole('link', { name: ADD })
+  expect(link).toHaveAttribute('href', '/add?q=dune')
+
+  await user.click(link)
+
+  expect(router.state.location.pathname).toBe('/add')
+  expect(router.state.location.search).toBe('?q=dune')
+  expect(router.state.location.state).toEqual(fromParentState)
+})
+
 it('sends someone logged out through the login page', async () => {
   server.use(sessionAs(null))
-  await renderShelf()
+  await renderShelf('/?q=dune')
 
   expect(screen.getByRole('link', { name: ADD })).toHaveAttribute(
     'href',

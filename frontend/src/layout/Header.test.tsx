@@ -9,6 +9,7 @@ import { stubSystemTheme } from '../test/matchMedia'
 import { queryWrapper } from '../test/render'
 import { renderRoute } from '../test/renderRoute'
 import { server } from '../test/server'
+import { fromParentState } from '../ui/Dialog/useRouteDialog'
 import { Header } from './Header'
 
 beforeEach(() => {
@@ -91,6 +92,29 @@ describe('as the owner', () => {
     expect(
       screen.queryByRole('link', { name: 'Log in' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('opens /add over the list, keeping its filters', async () => {
+    const user = userEvent.setup()
+    const { router } = renderRoute('/?q=dune')
+    await screen.findByRole('button', { name: 'Log out' })
+    const link = screen.getByRole('link', { name: 'Add review' })
+    expect(link).toHaveAttribute('href', '/add?q=dune')
+
+    await user.click(link)
+
+    expect(router.state.location.pathname).toBe('/add')
+    expect(router.state.location.search).toBe('?q=dune')
+    expect(router.state.location.state).toEqual(fromParentState)
+  })
+
+  it('links "Add review" to plain /add from the 404 page', async () => {
+    renderRoute('/does-not-exist?q=dune')
+    await screen.findByRole('button', { name: 'Log out' })
+    expect(screen.getByRole('link', { name: 'Add review' })).toHaveAttribute(
+      'href',
+      '/add',
+    )
   })
 
   it('logs out with the CSRF header and switches to "Log in"', async () => {
