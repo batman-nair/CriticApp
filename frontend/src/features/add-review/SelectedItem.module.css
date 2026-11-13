@@ -75,19 +75,33 @@
   margin: var(--space-2) 0 0;
 }
 
-/* The desktop Write step shows the rating beside its field instead. */
+/*
+ * In RatingBadge's colours. The desktop Write step shows the rating beside its
+ * field instead.
+ */
 .mine {
   display: none;
   padding: var(--space-2) var(--space-8);
   border-radius: 7px;
-  background: var(--fg);
-  color: var(--bg);
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-badge),
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--cat-base),
+    var(--badge-ink) var(--badge-ink-mix)
+  );
   font-size: var(--text-12);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-extrabold);
 }
 
+/* A link-like button, as on the boards. */
 .change {
   flex: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 @media (max-width: 639px) {

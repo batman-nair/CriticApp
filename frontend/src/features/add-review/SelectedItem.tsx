@@ -70,7 +70,7 @@ export function SelectedItem({
       </div>
       <Button
         className={styles.change}
-        variant="secondary"
+        variant="ghost"
         size="sm"
         onClick={onChange}
       >
