@@ -36,6 +36,7 @@ export const reviewKeys = {
   all,
   lists,
   list: (params: ReviewListParams) => [...lists(), params] as const,
+  allFacets: () => [...all, 'facets'] as const,
   facets: (params: ReviewFacetsParams) => [...all, 'facets', params] as const,
   detail: (id: number) => [...all, 'detail', id] as const,
 }
@@ -172,9 +173,7 @@ export function useDeleteReview(id: number) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.lists() })
-      void queryClient.invalidateQueries({
-        queryKey: [...reviewKeys.all, 'facets'],
-      })
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.allFacets() })
       void queryClient.invalidateQueries({ queryKey: tagKeys.all })
       // Marked stale without a refetch: the closing dialog would otherwise
       // flip to "Review not found". A later visit refetches and gets the 404.
