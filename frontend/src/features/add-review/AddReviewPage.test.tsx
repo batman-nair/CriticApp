@@ -485,6 +485,12 @@ describe('saving', () => {
     const sent = recordWrites()
     failPost(() => problem(409, 'DUPLICATE_REVIEW', { existing_review_id: 7 }))
     servePatch()
+    const fetched: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      const { pathname } = new URL(request.url)
+      if (request.method === 'GET' && pathname === '/api/v3/reviews/7')
+        fetched.push(pathname)
+    })
     const { dialog, user } = await pick()
     await fillIn(user)
 
@@ -520,6 +526,36 @@ describe('saving', () => {
         body: { rating: 5.1, text: 'Huge.', tags: ['comfort'] },
       },
     ])
+    // Its stored fields aren't shown after a 409, so it isn't fetched.
+    expect(fetched).toEqual([])
+  })
+
+  it('stays on Write while saving: Change and Back wait', async () => {
+    let release = () => {}
+    failPost(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () =>
+            resolve(
+              Response.json(
+                { data: makeReview({ id: CREATED_REVIEW_ID }), meta: {} },
+                { status: 201 },
+              ),
+            )
+        }) as unknown as Response,
+    )
+    const { dialog, user } = await pick()
+    await fillIn(user)
+
+    await user.click(button('Add review'))
+    await user.click(button('Change'))
+    await user.click(button('Back'))
+    expect(screen.getByRole('dialog', { name: 'Say a few words' })).toBe(dialog)
+
+    release()
+    expect(
+      await screen.findByRole('dialog', { name: 'Added to your reviews' }),
+    ).toBe(dialog)
   })
 
   it('after a 409 with no text or tags, updates only the rating', async () => {
@@ -595,6 +631,60 @@ describe('saving', () => {
           path: '/api/v3/reviews/1',
           body: { rating: 6.5, text: '', tags: ['cozy'] },
         },
+      ])
+    })
+
+    it('fills in from the server, not from a stale cached copy', async () => {
+      serveReview({
+        id: 1,
+        item: makeItem({ id: reviewed.id }),
+        rating: 6.5,
+        tags: ['cozy'],
+      })
+      const user = userEvent.setup()
+      localStorage.setItem('critic-add-category', 'game')
+      serveSearch({ 'game/witcher': [reviewed] })
+      const { queryClient } = await openSheet()
+      queryClient.setQueryData(
+        reviewKeys.detail(1),
+        makeReview({ id: 1, rating: 2, tags: ['old'] }),
+        { updatedAt: 1 },
+      )
+      await user.type(searchbox('Search games'), 'witcher')
+      await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+
+      await waitFor(() => expect(tagsField()).not.toBeDisabled())
+      expect(slider()).toHaveAttribute('aria-valuenow', '6.5')
+      expect(tagsField()).toHaveValue('cozy')
+    })
+
+    it('adds it as new when the review is deleted while updating', async () => {
+      serveReview({ id: 1, item: makeItem({ id: reviewed.id }), rating: 6.5 })
+      server.use(
+        http.patch('/api/v3/reviews/{id}', () => problem(404, 'NOT_FOUND')),
+      )
+      const sent = recordWrites()
+      const { dialog, user } = await pick(reviewed)
+      await waitFor(() =>
+        expect(slider()).toHaveAttribute('aria-valuenow', '6.5'),
+      )
+      await user.click(button('Next'))
+      await user.click(button('Update review'))
+
+      expect(
+        await within(dialog).findByText(
+          'Your review was deleted. Try again to add it as a new one.',
+        ),
+      ).toBeVisible()
+      expect(screen.getByRole('dialog', { name: 'Say a few words' })).toBe(
+        dialog,
+      )
+      await user.click(button('Try again'))
+
+      await screen.findByRole('dialog', { name: 'Added to your reviews' })
+      expect((await sent()).map(({ method, path }) => [method, path])).toEqual([
+        ['PATCH', '/api/v3/reviews/1'],
+        ['POST', '/api/v3/reviews'],
       ])
     })
 

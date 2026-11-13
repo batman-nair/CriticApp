@@ -11,7 +11,7 @@ import { FindStep } from './FindStep'
 import { readLastCategory } from './lastCategory'
 import { RateStep, UPDATE_NOTICE } from './RateStep'
 import { SavedReview } from './SavedReview'
-import { useAddFlow, type AddStep } from './useAddFlow'
+import { useAddFlow, type AddFlowAction, type AddStep } from './useAddFlow'
 import { useSaveReview } from './useSaveReview'
 import { WriteStep } from './WriteStep'
 
@@ -33,16 +33,22 @@ export function AddReviewPage() {
   const rateId = useId()
   const writeId = useId()
 
-  // An already-reviewed pick fills the fields from its review. Id 0 (create
-  // mode) never asks. The list's copy shown as placeholder may be older, so
-  // only the fetched review counts; the reducer takes the first one only.
-  const existing = useReview(flow.reviewId ?? 0)
-  const { data: existingReview, isPlaceholderData, error } = existing
+  // An already-reviewed pick fills the fields from its review. Id 0 never
+  // asks, so nothing is fetched once the fields are in. The list's copy shown
+  // as placeholder, or a stale cached one, may be older: only a fresh review
+  // or one fetched for this pick counts, and the reducer takes the first one.
+  const existing = useReview(
+    flow.prefill === 'loading' ? (flow.reviewId ?? 0) : 0,
+  )
+  const { data: existingReview, error } = existing
+  const current =
+    !existing.isPlaceholderData &&
+    (!existing.isStale || existing.isFetchedAfterMount)
   useEffect(() => {
-    if (existingReview && !isPlaceholderData) {
+    if (existingReview && current) {
       dispatch({ type: 'reviewLoaded', review: existingReview })
     }
-  }, [existingReview, isPlaceholderData, dispatch])
+  }, [existingReview, current, dispatch])
   // Deleted since the search: it's a new review after all.
   const missing = error instanceof ApiError && error.status === 404
   useEffect(() => {
@@ -51,6 +57,10 @@ export function AddReviewPage() {
 
   const { item } = flow
   const update = flow.mode === 'update'
+  // Not while saving: the outcome would land on a flow that moved on.
+  const go = (action: AddFlowAction) => {
+    if (!isSaving) dispatch(action)
+  }
   const ratingLabel = item
     ? (categories.data?.find((c) => c.id === item.category)?.rating_label ??
       null)
@@ -87,7 +97,7 @@ export function AddReviewPage() {
         error={flow.errors.text}
         formError={flow.formError}
         retrying={isSaving}
-        onChangeItem={() => dispatch({ type: 'change' })}
+        onChangeItem={() => go({ type: 'change' })}
         onTextChange={(text) => dispatch({ type: 'textChanged', text })}
         onRetry={() => void save(flow)}
         onSubmit={() => void save(flow)}
@@ -95,7 +105,7 @@ export function AddReviewPage() {
     )
     footer = (
       <div className={styles.actions}>
-        <Button variant="secondary" onClick={() => dispatch({ type: 'back' })}>
+        <Button variant="secondary" onClick={() => go({ type: 'back' })}>
           Back
         </Button>
         <Button type="submit" form={writeId} busy={isSaving}>
@@ -120,20 +130,20 @@ export function AddReviewPage() {
         errors={flow.errors}
         formError={flow.formError}
         retrying={isSaving}
-        onChangeItem={() => dispatch({ type: 'change' })}
+        onChangeItem={() => go({ type: 'change' })}
         onRatingChange={(rating) => dispatch({ type: 'ratingChanged', rating })}
         onTagsChange={(tags) => dispatch({ type: 'tagsChanged', tags })}
         onReload={() => void existing.refetch()}
         onRetry={() => void save(flow)}
         // Not before the review's fields are in, or they'd land on Write.
         onSubmit={() => {
-          if (!loading) dispatch({ type: 'next' })
+          if (!loading) go({ type: 'next' })
         }}
       />
     )
     footer = (
       <div className={styles.actions}>
-        <Button variant="secondary" onClick={() => dispatch({ type: 'back' })}>
+        <Button variant="secondary" onClick={() => go({ type: 'back' })}>
           Back
         </Button>
         <Button
