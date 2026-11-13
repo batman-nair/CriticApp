@@ -66,6 +66,24 @@ it('maps a problem+json 404 with no field errors', async () => {
   })
 })
 
+it('keeps a problem’s extra members on the error', async () => {
+  const problem = {
+    ...makeProblem({
+      title: 'Conflict',
+      status: 409,
+      code: 'DUPLICATE_REVIEW',
+      detail: 'You already reviewed this.',
+    }),
+    existing_review_id: 7,
+  }
+  categoriesRespondWith(problemResponse(problem))
+
+  const error = await getCategories().catch((e) => e)
+
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error.problem).toEqual(problem)
+})
+
 it('maps a non-JSON 502 to a generic error', async () => {
   categoriesRespondWith(
     new HttpResponse('<html>Bad Gateway</html>', {
@@ -82,6 +100,7 @@ it('maps a non-JSON 502 to a generic error', async () => {
     status: 502,
     code: 'HTTP_ERROR',
     errors: [],
+    problem: null,
   })
 })
 
@@ -131,6 +150,7 @@ it('maps a network failure', async () => {
     kind: 'network',
     status: 0,
     code: 'NETWORK_ERROR',
+    problem: null,
   })
 })
 
