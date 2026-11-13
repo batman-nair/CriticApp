@@ -25,6 +25,7 @@
     "vite.config.ts",
     "vite.config.test.ts",
     "api-schema.test.ts",
-    "theme-files.test.ts"
+    "theme-files.test.ts",
+    "nginx-config.test.ts"
   ]
 }
