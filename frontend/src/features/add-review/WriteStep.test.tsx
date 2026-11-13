@@ -10,9 +10,15 @@ interface SetupOptions {
   text?: string
   error?: string
   formError?: string | null
+  notice?: string
 }
 
-function setup({ text = '', error, formError = null }: SetupOptions = {}) {
+function setup({
+  text = '',
+  error,
+  formError = null,
+  notice,
+}: SetupOptions = {}) {
   const props = {
     onChangeItem: vi.fn(),
     onTextChange: vi.fn(),
@@ -28,6 +34,7 @@ function setup({ text = '', error, formError = null }: SetupOptions = {}) {
         item={makeSearchResult()}
         ratingLabel="IGDB"
         rating={7.5}
+        notice={notice}
         text={value}
         error={error}
         formError={formError}
@@ -59,6 +66,18 @@ it('shows the picked title and the rating given', () => {
     'placeholder',
     'e.g. “Way more fun than it had any right to be.”',
   )
+})
+
+it('shows no notice by default', () => {
+  setup()
+  expect(screen.queryByText(/Already in your reviews/)).not.toBeInTheDocument()
+})
+
+it('shows the notice it is given', () => {
+  setup({ notice: 'Already in your reviews — your changes will update it.' })
+  expect(
+    screen.getByText('Already in your reviews — your changes will update it.'),
+  ).toBeVisible()
 })
 
 it('starts in the text', () => {

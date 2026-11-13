@@ -16,6 +16,8 @@ interface WriteStepProps {
   /** The category's rating name, such as "IMDb". Null while unknown. */
   ratingLabel: string | null
   rating: number
+  /** Shown above the field, such as why the button now updates. */
+  notice?: string
   text: string
   /** The server's message about the text. */
   error?: string
@@ -34,6 +36,7 @@ export function WriteStep({
   item,
   ratingLabel,
   rating,
+  notice,
   text,
   error,
   formError,
@@ -65,6 +68,7 @@ export function WriteStep({
         rating={rating}
         onChange={onChangeItem}
       />
+      {notice && <p className={styles.notice}>{notice}</p>}
       <div className={styles.field}>
         <TextArea
           ref={textRef}

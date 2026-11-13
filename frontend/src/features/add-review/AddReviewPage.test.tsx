@@ -497,6 +497,9 @@ describe('saving', () => {
       dialog,
     )
     expect(notes()).toHaveValue('Huge.')
+    expect(dialog).toHaveTextContent(
+      'Already in your reviews — your changes will update it.',
+    )
     await user.click(button('Back'))
     expect(dialog).toHaveTextContent(
       'Already in your reviews — your changes will update it.',

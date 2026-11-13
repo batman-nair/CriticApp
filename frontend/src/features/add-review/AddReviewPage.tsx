@@ -9,7 +9,7 @@ import { Stepper } from '../../ui/Stepper/Stepper'
 import styles from './AddReviewPage.module.css'
 import { FindStep } from './FindStep'
 import { readLastCategory } from './lastCategory'
-import { RateStep } from './RateStep'
+import { RateStep, UPDATE_NOTICE } from './RateStep'
 import { SavedReview } from './SavedReview'
 import { useAddFlow, type AddStep } from './useAddFlow'
 import { useSaveReview } from './useSaveReview'
@@ -81,6 +81,8 @@ export function AddReviewPage() {
         item={item}
         ratingLabel={ratingLabel}
         rating={flow.rating}
+        // A 409 switched to an update here, on Write: say why.
+        notice={flow.duplicate ? UPDATE_NOTICE : undefined}
         text={flow.text}
         error={flow.errors.text}
         formError={flow.formError}

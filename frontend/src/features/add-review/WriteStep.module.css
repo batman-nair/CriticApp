@@ -5,6 +5,16 @@
   gap: var(--space-20);
 }
 
+/* As RateStep's. */
+.notice {
+  margin: 0;
+  padding: var(--space-10) var(--space-14);
+  border-radius: var(--radius-12);
+  background: var(--soft);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+}
+
 /* For the rating, which sits on the label's line. */
 .field {
   position: relative;
