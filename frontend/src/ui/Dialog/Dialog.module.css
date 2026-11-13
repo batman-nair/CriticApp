@@ -194,10 +194,12 @@
     max-height: none;
   }
 
+  /* --keyboard-inset keeps the footer above the on-screen keyboard. */
   .add {
     top: auto;
+    bottom: var(--keyboard-inset, 0px);
     width: auto;
-    max-height: calc(100dvh - 64px);
+    max-height: calc(100dvh - var(--keyboard-inset, 0px) - 64px);
   }
 
   .handle {

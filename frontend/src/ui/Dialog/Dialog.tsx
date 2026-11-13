@@ -1,12 +1,22 @@
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { useEffect, useRef, useState, type Key, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Key,
+  type ReactNode,
+} from 'react'
 import { categoryVars } from '../../lib/categories'
 import { cx } from '../../lib/cx'
 import { Icon } from '../Icon/Icon'
 import { IconButton } from '../IconButton/IconButton'
 import { VisuallyHidden } from '../VisuallyHidden/VisuallyHidden'
 import styles from './Dialog.module.css'
+import { useKeyboardInset } from './useKeyboardInset'
 import { useSheetDrag } from './useSheetDrag'
+
+type KeyboardInsetVars = CSSProperties & Record<'--keyboard-inset', string>
 
 interface DialogProps {
   open: boolean
@@ -73,6 +83,14 @@ export function Dialog({
     contentRef,
     dismissible ? () => onOpenChange(false) : undefined,
   )
+  // The add sheet's footer has to stay above the phone keyboard.
+  const keyboardInset = useKeyboardInset(open && size === 'add')
+  const catVars = category ? categoryVars(category) : undefined
+  const style: KeyboardInsetVars | CSSProperties | undefined =
+    size === 'add'
+      ? { ...catVars, '--keyboard-inset': `${keyboardInset}px` }
+      : catVars
+
   const keepOpen = (event: Event) => {
     if (!dismissible) event.preventDefault()
   }
@@ -97,7 +115,7 @@ export function Dialog({
             styles[size],
             category && styles.tinted,
           )}
-          style={category ? categoryVars(category) : undefined}
+          style={style}
           onCloseAutoFocus={handleCloseAutoFocus}
           onEscapeKeyDown={keepOpen}
           onInteractOutside={keepOpen}
