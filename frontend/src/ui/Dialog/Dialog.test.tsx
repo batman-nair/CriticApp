@@ -1,15 +1,23 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { useState, type ComponentProps } from 'react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import {
   finishExitAnimation,
   settle,
   stubExitAnimation,
 } from '../../test/dialogAnimation'
+import { stubMediaQueries } from '../../test/matchMedia'
 import { Dialog } from './Dialog'
 import styles from './Dialog.module.css'
+import { REDUCED_MOTION_QUERY, SHEET_QUERY } from './useSheetDrag'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -256,4 +264,270 @@ it('has no axe violations', async () => {
 
   // Not document.body: axe's region rule misfires on portaled content.
   await expectNoAxeViolations(dialog())
+})
+
+describe('drag to close', () => {
+  const START_Y = 100
+  const HEIGHT = 600
+
+  beforeEach(() => {
+    stubMediaQueries([SHEET_QUERY])
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const handle = () => dialog().getElementsByClassName(styles.handle!)[0]!
+  const title = () => screen.getByRole('heading', { name: 'Details' })
+
+  async function setupSheet(props?: HarnessProps) {
+    const view = await setup(props)
+    vi.spyOn(dialog(), 'getBoundingClientRect').mockReturnValue({
+      height: HEIGHT,
+    } as DOMRect)
+    return view
+  }
+
+  interface Gesture {
+    /** [distance down from the start, time in ms] for each move. */
+    moves: [number, number][]
+    /** Defaults to the last move's time. */
+    upAt?: number
+    end?: 'up' | 'cancel' | 'none'
+    pointerType?: string
+  }
+
+  // performance.now is stubbed only around these synchronous events, never
+  // across userEvent calls, which React's scheduler would also read it during.
+  function drag(
+    target: Element,
+    { moves, upAt, end = 'up', pointerType = 'touch' }: Gesture,
+  ) {
+    const now = vi.spyOn(performance, 'now')
+    const pointer = { pointerId: 1, pointerType }
+    now.mockReturnValueOnce(0)
+    fireEvent.pointerDown(target, { ...pointer, button: 0, clientY: START_Y })
+    for (const [dy, time] of moves) {
+      now.mockReturnValueOnce(time)
+      fireEvent.pointerMove(target, {
+        ...pointer,
+        buttons: 1,
+        clientY: START_Y + dy,
+      })
+    }
+    const lastTime = moves.at(-1)?.[1] ?? 0
+    if (end === 'up') {
+      now.mockReturnValueOnce(upAt ?? lastTime)
+      fireEvent.pointerUp(target, { ...pointer, clientY: START_Y })
+    } else if (end === 'cancel') {
+      fireEvent.pointerCancel(target, pointer)
+    }
+    now.mockRestore()
+  }
+
+  const slowLong: Gesture = {
+    moves: [
+      [100, 500],
+      [200, 1000],
+      [300, 1500],
+    ],
+  }
+
+  async function expectClosed() {
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+    await waitFor(() => expect(opener()).toHaveFocus())
+  }
+
+  function expectSprungBack() {
+    expect(dialog()).toHaveAttribute('data-state', 'open')
+    expect(dialog().style.transform).toBe('')
+    expect(dialog().style.transition).not.toBe('')
+  }
+
+  it('closes after a long, slow drag of the handle and returns focus', async () => {
+    await setupSheet()
+
+    drag(handle(), slowLong)
+
+    await expectClosed()
+  })
+
+  it('closes after a long drag of the header', async () => {
+    await setupSheet()
+
+    drag(title(), slowLong)
+
+    await expectClosed()
+  })
+
+  it('follows the pointer down, and not above the open position', async () => {
+    await setupSheet()
+
+    drag(handle(), { moves: [[50, 100]], end: 'none' })
+    expect(dialog().style.transform).toBe('translateY(50px)')
+
+    fireEvent.pointerMove(handle(), {
+      pointerId: 1,
+      buttons: 1,
+      clientY: START_Y - 100,
+    })
+    expect(dialog().style.transform).toBe('translateY(0px)')
+  })
+
+  it('springs back after a short, slow drag', async () => {
+    await setupSheet()
+
+    drag(handle(), {
+      moves: [
+        [40, 500],
+        [80, 1000],
+      ],
+      upAt: 1100,
+    })
+
+    expectSprungBack()
+  })
+
+  it('closes after a fast flick', async () => {
+    await setupSheet()
+
+    drag(handle(), { moves: [[40, 30]], upAt: 35 })
+
+    await expectClosed()
+  })
+
+  it('springs back when a fast move is followed by a pause', async () => {
+    await setupSheet()
+
+    drag(handle(), { moves: [[40, 30]], upAt: 330 })
+
+    expectSprungBack()
+  })
+
+  it('springs back and stops when a mouse release went missing', async () => {
+    await setupSheet()
+    drag(handle(), { moves: [[300, 100]], end: 'none', pointerType: 'mouse' })
+    expect(dialog().style.transform).toBe('translateY(300px)')
+
+    fireEvent.pointerMove(handle(), {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 0,
+      clientY: START_Y + 400,
+    })
+
+    expectSprungBack()
+    fireEvent.pointerMove(handle(), {
+      pointerId: 1,
+      pointerType: 'mouse',
+      buttons: 1,
+      clientY: START_Y + 400,
+    })
+    fireEvent.pointerUp(handle(), { pointerId: 1, pointerType: 'mouse' })
+    expectSprungBack()
+  })
+
+  it('springs back on pointercancel', async () => {
+    await setupSheet()
+
+    drag(handle(), { ...slowLong, end: 'cancel' })
+
+    expectSprungBack()
+  })
+
+  it('does not drag from the body', async () => {
+    await setupSheet({ children: <p>Body</p> })
+
+    drag(screen.getByText('Body'), slowLong)
+
+    expect(dialog()).toHaveAttribute('data-state', 'open')
+    expect(dialog().style.transform).toBe('')
+  })
+
+  it('keeps the header buttons clickable, and does not drag from them', async () => {
+    const onBack = vi.fn()
+    const onEdit = vi.fn()
+    const { user } = await setupSheet({
+      headerStart: (
+        <button type="button" onClick={onBack}>
+          Back
+        </button>
+      ),
+      headerEnd: (
+        <button type="button" onClick={onEdit}>
+          Edit
+        </button>
+      ),
+    })
+
+    for (const name of ['Back', 'Edit', 'Close']) {
+      drag(screen.getByRole('button', { name }), slowLong)
+      expect(dialog().style.transform).toBe('')
+      expect(dialog()).toHaveAttribute('data-state', 'open')
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(onBack).toHaveBeenCalledOnce()
+    expect(onEdit).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await expectClosed()
+  })
+
+  it('does nothing on the desktop layout', async () => {
+    stubMediaQueries([])
+    await setupSheet()
+
+    drag(title(), slowLong)
+    drag(handle(), { moves: [[40, 30]], upAt: 35 })
+
+    expect(dialog()).toHaveAttribute('data-state', 'open')
+    expect(dialog().style.transform).toBe('')
+  })
+
+  describe('with reduced motion', () => {
+    beforeEach(() => {
+      stubMediaQueries([SHEET_QUERY, REDUCED_MOTION_QUERY])
+    })
+
+    it('does not move the sheet, and closes past the distance', async () => {
+      await setupSheet()
+
+      drag(handle(), { ...slowLong, end: 'none' })
+      expect(dialog().style.transform).toBe('')
+      fireEvent.pointerUp(handle(), { pointerId: 1 })
+
+      await expectClosed()
+    })
+
+    it('stays open after a short drag', async () => {
+      await setupSheet()
+
+      drag(handle(), {
+        moves: [
+          [40, 500],
+          [80, 1000],
+        ],
+      })
+
+      expect(dialog()).toHaveAttribute('data-state', 'open')
+      expect(dialog().style.transform).toBe('')
+    })
+  })
+
+  it('starts the exit animation from where the drag let go', async () => {
+    stubExitAnimation()
+    await setupSheet()
+
+    drag(handle(), slowLong)
+
+    const closing = dialog()
+    expect(closing).toHaveAttribute('data-state', 'closed')
+    expect(closing.style.transform).toBe('translateY(300px)')
+    finishExitAnimation(closing)
+    await expectClosed()
+  })
 })

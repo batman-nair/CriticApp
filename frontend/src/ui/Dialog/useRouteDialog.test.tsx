@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   createMemoryRouter,
@@ -12,8 +12,11 @@ import {
   settle,
   stubExitAnimation,
 } from '../../test/dialogAnimation'
+import { stubMediaQueries } from '../../test/matchMedia'
 import { Dialog } from './Dialog'
+import styles from './Dialog.module.css'
 import { fromParentState, useRouteDialog } from './useRouteDialog'
+import { SHEET_QUERY } from './useSheetDrag'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -73,6 +76,28 @@ it('goes back when opened from the parent', async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(router.state.location.search).toBe('?category=movie')
   expect(router.state.historyAction).toBe('POP')
+})
+
+it('goes back when dragged closed on a phone', async () => {
+  stubMediaQueries([SHEET_QUERY])
+  const router = renderDialogRoute({
+    initialEntries: ['/?category=movie', markedEntry],
+    initialIndex: 1,
+  })
+  const dialog = await screen.findByRole('dialog')
+  vi.spyOn(dialog, 'getBoundingClientRect').mockReturnValue({
+    height: 600,
+  } as DOMRect)
+  const handle = dialog.getElementsByClassName(styles.handle!)[0]!
+
+  fireEvent.pointerDown(handle, { pointerId: 1, button: 0, clientY: 100 })
+  fireEvent.pointerMove(handle, { pointerId: 1, buttons: 1, clientY: 400 })
+  fireEvent.pointerUp(handle, { pointerId: 1, clientY: 400 })
+
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  expect(router.state.location.search).toBe('?category=movie')
+  expect(router.state.historyAction).toBe('POP')
+  vi.unstubAllGlobals()
 })
 
 it('navigates to the parent and keeps the query on a direct link', async () => {
