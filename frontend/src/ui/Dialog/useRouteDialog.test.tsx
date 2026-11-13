@@ -20,6 +20,7 @@ import { SHEET_QUERY } from './useSheetDrag'
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function DialogRoute() {
@@ -97,7 +98,6 @@ it('goes back when dragged closed on a phone', async () => {
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(router.state.location.search).toBe('?category=movie')
   expect(router.state.historyAction).toBe('POP')
-  vi.unstubAllGlobals()
 })
 
 it('navigates to the parent and keeps the query on a direct link', async () => {
