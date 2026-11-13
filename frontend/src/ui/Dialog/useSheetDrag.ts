@@ -24,9 +24,19 @@ interface Drag {
   height: number
   reducedMotion: boolean
   dragging: boolean
+  /** Where the sheet was when the drag began, if a spring-back hadn't ended. */
+  offset: number
   dy: number
   previous: Sample
   last: Sample
+}
+
+/** How far down a spring-back has got, read from the running transition. */
+function currentOffset(sheet: HTMLElement) {
+  if (!sheet.style.transition) return 0
+  const matrix = /^matrix\((.+)\)$/.exec(getComputedStyle(sheet).transform)
+  const y = matrix ? Number(matrix[1]!.split(',')[5]) : 0
+  return Number.isFinite(y) && y > 0 ? y : 0
 }
 
 /**
@@ -49,7 +59,8 @@ export function useSheetDrag(
   }
 
   function onPointerDown(event: PointerEvent<HTMLElement>) {
-    if (event.button !== 0) return
+    // A second finger doesn't take over the drag.
+    if (event.button !== 0 || dragRef.current) return
     // Before matchMedia, which jsdom lacks: ‹ ›, Close and the like just click.
     if (event.target instanceof Element && event.target.closest(INTERACTIVE)) {
       return
@@ -65,6 +76,7 @@ export function useSheetDrag(
       height: sheet.getBoundingClientRect().height,
       reducedMotion: window.matchMedia(REDUCED_MOTION_QUERY).matches,
       dragging: false,
+      offset: 0,
       dy: 0,
       previous: start,
       last: start,
@@ -80,18 +92,22 @@ export function useSheetDrag(
       return
     }
 
-    // Never above the open position.
-    drag.dy = Math.max(0, event.clientY - drag.startY)
+    const moved = event.clientY - drag.startY
     drag.previous = drag.last
     drag.last = { y: event.clientY, time: performance.now() }
 
     const sheet = sheetRef.current
     if (!drag.dragging) {
-      if (drag.dy <= SLOP_PX) return
+      if (moved <= SLOP_PX) return
       drag.dragging = true
-      // Left by an earlier spring-back.
-      if (sheet) sheet.style.transition = ''
+      if (sheet) {
+        // Pick the sheet up where it is, then stop the spring-back.
+        drag.offset = currentOffset(sheet)
+        sheet.style.transition = ''
+      }
     }
+    // Never above the open position.
+    drag.dy = Math.max(0, drag.offset + moved)
     if (sheet && !drag.reducedMotion) {
       sheet.style.transform = `translateY(${drag.dy}px)`
     }
@@ -109,6 +125,7 @@ export function useSheetDrag(
     const elapsed = last.time - previous.time
     const speed = elapsed > 0 ? (last.y - previous.y) / elapsed : 0
     const flick =
+      drag.dy > SLOP_PX &&
       speed >= FLICK_PX_PER_MS &&
       performance.now() - last.time <= FLICK_MAX_AGE_MS
 

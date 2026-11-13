@@ -430,6 +430,51 @@ describe('drag to close', () => {
     expectSprungBack()
   })
 
+  it('does not flick closed back at the open position', async () => {
+    await setupSheet()
+
+    drag(handle(), {
+      moves: [
+        [80, 500],
+        [-20, 1000],
+        [-14, 1008],
+      ],
+    })
+
+    expectSprungBack()
+  })
+
+  it('keeps the first drag when a second finger touches the header', async () => {
+    await setupSheet()
+    drag(handle(), { ...slowLong, end: 'none' })
+
+    fireEvent.pointerDown(title(), { pointerId: 2, button: 0, clientY: 50 })
+    fireEvent.pointerUp(title(), { pointerId: 2, clientY: 50 })
+    expect(dialog().style.transform).toBe('translateY(300px)')
+    fireEvent.pointerUp(handle(), { pointerId: 1, clientY: START_Y + 300 })
+
+    await expectClosed()
+  })
+
+  it('picks the sheet up where a spring-back has got to', async () => {
+    await setupSheet()
+    drag(handle(), { moves: [[80, 500]], upAt: 600 })
+    expect(dialog().style.transition).not.toBe('')
+    // Partway back: jsdom has no transitions.
+    const sheet = dialog()
+    const getComputedStyle = window.getComputedStyle.bind(window)
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) =>
+      element === sheet
+        ? ({ transform: 'matrix(1, 0, 0, 1, 0, 50)' } as CSSStyleDeclaration)
+        : getComputedStyle(element),
+    )
+
+    drag(handle(), { moves: [[10, 100]], end: 'none' })
+
+    expect(dialog().style.transform).toBe('translateY(60px)')
+    expect(dialog().style.transition).toBe('')
+  })
+
   it('springs back on pointercancel', async () => {
     await setupSheet()
 
