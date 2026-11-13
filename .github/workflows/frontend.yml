@@ -64,8 +64,9 @@ jobs:
 
       - name: Start the image
         run: |
-          docker run -d --rm -p 8080:8080 --name critic-frontend critic-frontend:ci
-          curl --retry 10 --retry-connrefused -fsS http://localhost:8080/healthz
+          # No --rm: if nginx exits at startup, the logs step still has them.
+          docker run -d -p 8080:8080 --name critic-frontend critic-frontend:ci
+          curl --retry 10 --retry-all-errors -fsS http://localhost:8080/healthz
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
