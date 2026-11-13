@@ -4,7 +4,7 @@ import { HttpResponse } from 'msw'
 import { expect, it } from 'vitest'
 import { OWNER_USERNAME } from '../../config'
 import { makeProblem, makeReview, makeReviewPage } from '../../test/fixtures'
-import { http } from '../../test/handlers'
+import { CREATED_REVIEW_ID, http } from '../../test/handlers'
 import { createTestQueryClient, queryWrapper } from '../../test/render'
 import { server } from '../../test/server'
 import { ApiError } from '../client'
@@ -451,6 +451,29 @@ it('sends the new review, caches it and refetches the rest', async () => {
   expect(isInvalidated(queryClient, facetsKey)).toBe(true)
   expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
   expect(isInvalidated(queryClient, searchKey)).toBe(true)
+})
+
+it('gets the new review back from the default handler', async () => {
+  const { result } = renderHook(() => useCreateReview(), {
+    wrapper: queryWrapper(),
+  })
+
+  const returned = await act(() =>
+    result.current.mutateAsync({
+      item_id: 'igdb:1942',
+      rating: 7.5,
+      text: '',
+      tags: ['cozy'],
+    }),
+  )
+
+  expect(returned).toMatchObject({
+    id: CREATED_REVIEW_ID,
+    item: { id: 'igdb:1942' },
+    rating: 7.5,
+    text: null,
+    tags: ['cozy'],
+  })
 })
 
 function duplicateProblem(existing_review_id: unknown) {
