@@ -32,6 +32,8 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
   - http://devbox:5173: the new frontend, with hot reload and `/api` forwarded to Django
 - To run the frontend outside Compose, use `npm run dev` in `frontend/`. If Django isn't at `http://localhost:8000`, set `VITE_API_PROXY_TARGET` in your shell (`.env` files aren't read for it)
 - `npm run dev` outside Compose, and `npm run build` anywhere, need `VITE_OWNER_USERNAME`: the username whose reviews the site shows. Set it in your shell or in `frontend/.env.local`
+- To build and run the production frontend image (nginx on port 8080, no backend, so API calls fail): `docker build --build-arg VITE_OWNER_USERNAME=<username> -t critic-frontend frontend`, then `docker run --rm -p 8080:8080 critic-frontend`
+- To smoke-test that image, start it as above, then in `frontend/` run `npx playwright install chromium` once and `npm run test:e2e`. Set `SMOKE_BASE_URL` if it isn't at `http://localhost:8080`
 - Use `make test` to run tests
 
 ## Environment Notes
