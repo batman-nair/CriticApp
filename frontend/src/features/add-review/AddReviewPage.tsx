@@ -11,7 +11,12 @@ import { useAddFlow, type AddStep } from './useAddFlow'
 
 const STEPS = ['Find', 'Rate', 'Write']
 
-const STEP_INDEX: Record<AddStep, number> = { find: 0, rate: 1, write: 2 }
+const STEP_INDEX: Record<AddStep, number> = {
+  find: 0,
+  rate: 1,
+  write: 2,
+  done: 3,
+}
 
 export function AddReviewPage() {
   const dialog = useRouteDialog()
