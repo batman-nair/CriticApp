@@ -961,6 +961,7 @@ it('holds the question, Edit and ‹ › while the delete is out', async () => {
   await waitFor(() => expect(served.deleted).toEqual([1]))
 
   expect(keepButton()).toHaveAttribute('aria-disabled', 'true')
+  expect(editButton()).toHaveAttribute('aria-disabled', 'true')
   await user.click(keepButton())
   await user.click(editButton())
   await user.click(nextButton())
@@ -972,6 +973,45 @@ it('holds the question, Edit and ‹ › while the delete is out', async () => {
   gate.resolve()
   await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   expect(served.deleted).toEqual([1])
+})
+
+it('drops a › waiting for the next page once a delete starts', async () => {
+  const page = deferred()
+  const removal = deferred()
+  serveShelf(
+    {
+      0: makeReviewPage(reviews(2), { count: 3 }),
+      2: makeReviewPage(reviews(1, 3), { count: 3, offset: 2 }),
+    },
+    { 2: page.promise },
+  )
+  const deleted: number[] = []
+  server.use(
+    http.delete('/api/v3/reviews/{id}', async ({ params, response }) => {
+      deleted.push(Number(params.id))
+      await removal.promise
+      return response(204).empty()
+    }),
+  )
+  const { user, router } = await openFromCard('Title 2')
+
+  await user.click(nextButton())
+  await user.click(deleteButton())
+  await user.click(confirmButton())
+  await waitFor(() => expect(deleted).toEqual([2]))
+  page.resolve()
+
+  // The page lands, but the dialog stays on the review being deleted.
+  await waitFor(() =>
+    expect(
+      screen.getAllByRole('link', { name: /^Title /, hidden: true }).length,
+    ).toBeGreaterThanOrEqual(3),
+  )
+  expect(router.state.location.pathname).toBe('/reviews/2')
+  expect(queryBanner()).toBeInTheDocument()
+
+  removal.resolve()
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'))
 })
 
 it('says the delete failed and stays open', async () => {

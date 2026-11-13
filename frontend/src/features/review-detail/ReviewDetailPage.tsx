@@ -27,14 +27,17 @@ export function ReviewDetailPage() {
   const dialog = useRouteDialog()
   const review = useReview(id)
   const categories = useCategories()
-  const steps = useReviewSteps(id, dialog.open)
+  const deleteReview = useDeleteReview(id)
+  // While a delete is under way nothing else starts: it lands either way. That
+  // includes a › already waiting for the next page.
+  const deleting = deleteReview.isPending
+  const steps = useReviewSteps(id, dialog.open && !deleting)
   const session = useSession()
   const editor = useReviewEditor(id)
   const formId = useId()
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const keepButtonRef = useRef<HTMLButtonElement>(null)
-  const deleteReview = useDeleteReview(id)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { data } = review
 
@@ -68,9 +71,6 @@ export function ReviewDetailPage() {
   }
 
   // Asks first, with focus on "Keep it", the safe choice.
-  // While a delete is under way nothing else starts: it lands either way.
-  const deleting = deleteReview.isPending
-
   function askToDelete() {
     if (confirmDelete || deleting) return
     deleteReview.reset()
@@ -163,6 +163,7 @@ export function ReviewDetailPage() {
             variant="secondary"
             size="sm"
             className={cx(styles.soft, styles.edit)}
+            aria-disabled={deleting || undefined}
             onClick={() => {
               if (deleting) return
               setConfirmDelete(false)
@@ -178,6 +179,7 @@ export function ReviewDetailPage() {
             variant="soft"
             size="sm"
             className={cx(styles.soft, styles.icon)}
+            aria-disabled={deleting || undefined}
             onClick={askToDelete}
           >
             <Icon name="trash" />
@@ -244,12 +246,7 @@ export function ReviewDetailPage() {
         editing ? undefined : (
           <ReviewSteps
             {...steps}
-            {...(deleting && {
-              canGoPrevious: false,
-              canGoNext: false,
-              goPrevious: () => {},
-              goNext: () => {},
-            })}
+            {...(deleting && { canGoPrevious: false, canGoNext: false })}
           />
         )
       }
