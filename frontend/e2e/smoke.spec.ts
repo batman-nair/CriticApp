@@ -9,6 +9,14 @@ type Schemas = components['schemas']
 
 const POSTER_URL =
   'https://images.igdb.com/igdb/image/upload/t_cover_big/smoke.jpg'
+// Open Library covers redirect twice before the image, and the CSP checks
+// every hop. The hosts are the real ones; the paths are made up.
+const BOOK_COVER_URL = 'https://covers.openlibrary.org/b/id/1-L.jpg'
+const COVER_REDIRECTS: Record<string, string> = {
+  [BOOK_COVER_URL]: 'https://archive.org/download/olcovers1/1-L.jpg',
+  'https://archive.org/download/olcovers1/1-L.jpg':
+    'https://ia800603.us.archive.org/view_archive.php?file=1-L.jpg',
+}
 // A 1×1 transparent PNG.
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -40,6 +48,30 @@ const review: Schemas['Review'] = {
   updated_at: '2025-03-02T12:00:00Z',
 }
 
+const bookReview: Schemas['Review'] = {
+  id: 2,
+  user: { username: 'ci-owner' },
+  item: {
+    id: 'openlibrary:OL1W',
+    category: 'book',
+    title: 'The Smoke Test Book',
+    image_url: BOOK_COVER_URL,
+    start_year: 2019,
+    end_year: null,
+    genres: ['Fiction'],
+    creators: ['A. Writer'],
+    languages: ['English'],
+    description: null,
+    provider_rating: null,
+    details: { pages: 200 },
+  },
+  rating: 7,
+  text: null,
+  tags: [],
+  created_at: '2025-02-01T12:00:00Z',
+  updated_at: '2025-02-01T12:00:00Z',
+}
+
 const responses: Record<string, unknown> = {
   '/api/auth/session': {
     data: { user: null },
@@ -54,18 +86,28 @@ const responses: Record<string, unknown> = {
         rating_label: 'IGDB',
         subcategories: [],
       },
+      {
+        id: 'book',
+        label: 'Books',
+        source: 'Open Library',
+        rating_label: 'Open Library',
+        subcategories: [],
+      },
     ],
     meta: {},
   } satisfies Schemas['CategoryListResponse'],
   '/api/v3/reviews': {
-    data: [review],
-    meta: { pagination: { count: 1, limit: 20, offset: 0 } },
+    data: [review, bookReview],
+    meta: { pagination: { count: 2, limit: 20, offset: 0 } },
   } satisfies Schemas['ReviewPageResponse'],
   '/api/v3/reviews/facets': {
     data: {
-      total: 1,
-      categories: [{ id: 'game', count: 1 }],
-      languages: [{ name: 'English', count: 1 }],
+      total: 2,
+      categories: [
+        { id: 'game', count: 1 },
+        { id: 'book', count: 1 },
+      ],
+      languages: [{ name: 'English', count: 2 }],
     },
     meta: {},
   } satisfies Schemas['ReviewFacetsResponse'],
@@ -116,6 +158,15 @@ test.describe('pages', () => {
     await page.route('https://images.igdb.com/**', (route) =>
       route.fulfill({ contentType: 'image/png', body: PNG }),
     )
+    await page.route(
+      /^https:\/\/(covers\.openlibrary\.org|archive\.org|ia800603\.us\.archive\.org)\//,
+      (route) => {
+        const location = COVER_REDIRECTS[route.request().url()]
+        return location
+          ? route.fulfill({ status: 302, headers: { location } })
+          : route.fulfill({ contentType: 'image/png', body: PNG })
+      },
+    )
   })
 
   test.afterEach(() => {
@@ -128,6 +179,9 @@ test.describe('pages', () => {
       page.getByRole('heading', { name: 'Smoke Test Quest' }),
     ).toBeVisible()
     await expect(page.locator(`img[src="${POSTER_URL}"]`)).toBeVisible()
+    // Loaded through both redirects: a blocked hop would swap in the letter
+    // tile and log a CSP error.
+    await expect(page.locator(`img[src="${BOOK_COVER_URL}"]`)).toBeVisible()
     await expectThemeSet(page)
   })
 
@@ -202,6 +256,16 @@ test('security headers, gzip and the health check', async ({ request }) => {
   })
   expect(gzipped.headers()['content-encoding']).toBe('gzip')
   expect(gzipped.headers()['vary']).toBe('Accept-Encoding')
+
+  // Compressed behind a proxy too (gzip_proxied).
+  const proxied = await request.get(script, {
+    headers: { 'Accept-Encoding': 'gzip', Via: '1.1 ingress' },
+  })
+  expect(proxied.headers()['content-encoding']).toBe('gzip')
+
+  // The base image's stock error page is gone; the app answers instead.
+  const stock = await (await request.get('/50x.html')).text()
+  expect(stock).toContain('<div id="root"></div>')
 
   const manifest = await request.get('/site.webmanifest')
   expect(manifest.headers()['content-type']).toBe('application/manifest+json')
