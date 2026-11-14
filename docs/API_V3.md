@@ -1,8 +1,8 @@
 # API v3
 
 API v3 is the API the new frontend is built against. It lives under `/api/v3/`.
-v2 (`docs/API_ENDPOINTS.md`) is frozen for the current Django pages and will be
-removed after the cutover.
+v2 was removed in #114. `docs/API_ENDPOINTS.md` covers the JWT endpoints and
+the other non-v3 URLs.
 
 The shared base is in `critic/api/`, and the review-domain endpoints are in
 `review/api_v3/`. New v3 views subclass `V3APIView` or `V3GenericAPIView`
@@ -394,7 +394,7 @@ in upper case (that's where `NOT_ACCEPTABLE` comes from).
 - Missing values are `null`, never `"N/A"` or `""`. Lists are JSON arrays,
   never comma-separated strings.
 - Numbers are JSON numbers, not strings. Set `coerce_to_string=False` on each
-  decimal field in v3 serializers. It isn't set globally, so v2 doesn't change.
+  decimal field in v3 serializers. It isn't set globally.
 - Timestamps are ISO 8601 with a timezone.
 - JSON only: no browsable API on v3. Request bodies must be
   `application/json`.
@@ -426,13 +426,12 @@ The rates are in `REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']`:
 - Counts are kept in Django's default in-memory cache. That's correct with
   today's 1 pod and 1 gunicorn worker. **More worker processes or pods need a
   shared cache** (e.g. Redis), or each one counts separately.
-- v2 has no throttling.
 
 ## Schema
 
 - The v3 schema is served at `/api/v3/schema`, with Swagger at
   `/api/v3/docs`. It covers `/api/v3/...` and the session auth endpoints. The
-  v2 schema at `/api/schema/` leaves those out.
+  JWT schema at `/api/schema/` leaves those out.
 - It's generated from `critic/api/schema_urls.py` with
   `V3_SCHEMA_SETTINGS` (`critic/api/schema.py`).
 - Every v3 endpoint documents its real response types, never `dict`. Use

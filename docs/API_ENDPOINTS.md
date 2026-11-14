@@ -1,124 +1,40 @@
 # API Endpoints
 
-This document is the canonical reference for the current CriticApp API surface and behavior.
+This document covers what Django serves outside API v3. The app's API, the one the frontend uses, is v3 under `/api/v3/`, documented in [API_V3.md](API_V3.md).
 
-Application API endpoints are under `/api/v2/`. Documentation endpoints are at `/api/schema/` and `/api/docs/`. The operational endpoints `/health/` and `/metrics/` are pod-internal: in production the ingress has no public route to them.
+API v2 and the old Django pages were removed in #114.
 
-API v3 (`/api/v3/`, for the new frontend) is documented separately in [API_V3.md](API_V3.md).
+## JWT Auth Endpoints
 
-## Overview
+For scripts and other clients that use bearer tokens. The frontend uses the session endpoints in v3 instead. Access tokens last 15 minutes, refresh tokens 7 days; refreshing rotates the refresh token and blacklists the old one.
 
-Successful API responses use a JSON envelope with `data` and `meta` fields.
+- `POST /api/auth/token/` — body `{ "username", "password" }`, returns `{ "access", "refresh" }`
+- `POST /api/auth/token/refresh/` — body `{ "refresh" }`, returns a new `{ "access", "refresh" }`
+- `POST /api/auth/token/blacklist/` — body `{ "refresh" }`, blacklists that refresh token (logout)
+- `GET /api/auth/me/` — the current user, `{ "id", "username" }`; requires auth
+- `POST /api/auth/register/` — body `{ "username", "password", "email" }` (email optional), returns `{ "access", "refresh" }` (201). Returns 403 unless `REGISTRATION_ENABLED=true`
 
-```json
-{
-  "data": {},
-  "meta": {
-    "version": "2.0"
-  }
-}
+Send the access token as `Authorization: Bearer <access>`.
+
+```bash
+curl -X POST "http://localhost:8000/api/auth/token/" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "myuser", "password": "..."}'
+
+curl "http://localhost:8000/api/auth/me/" -H "Authorization: Bearer <access>"
 ```
 
-Application-level validation and domain errors use this envelope:
+## Schema and Interactive Docs
 
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message.",
-    "details": {}
-  },
-  "meta": {
-    "version": "2.0"
-  }
-}
-```
+The schema at these two URLs covers the JWT endpoints above. v3 has its own at `/api/v3/schema` and `/api/v3/docs`.
 
-Versioning options:
-- Header: `Accept: application/vnd.criticapp.v2+json`
-- URL path: `/api/v2/...`
-- Default behavior: requests without an explicit version are served as v2
+- OpenAPI schema: `GET /api/schema/`
+- Swagger UI: `GET /api/docs/`
 
-## Error codes
+## Staff Pages
 
-| Code | HTTP Status | Meaning |
-|------|-------------|---------|
-| `INVALID_REQUEST` | 400 | Request payload could not be processed |
-| `VALIDATION_ERROR` | 400 | Input validation failed |
-| `DUPLICATE_REVIEW` | 400 | User already reviewed the item |
-| `INVALID_CATEGORY` | 400 | Unsupported category |
-| `UPSTREAM_ERROR` | 400 | External lookup provider returned an error |
-| `SERIALIZATION_ERROR` | 400 | External item data could not be persisted |
-| `NOT_FOUND` | 404 | Resource was not found |
-| `PERMISSION_DENIED` | 403 | Authenticated user does not own the resource |
-| `UNAUTHENTICATED` | 403 | Authentication is required |
-| `PAGINATION_REQUIRED` | 500 | Pagination configuration is missing |
-
-## Review Endpoints
-
-### List reviews
-- Method: `GET`
-- Path: `/api/v2/reviews/`
-- Auth: optional (public)
-- Query params:
-  - `query` — free-text search across title, tags, description, attributes, language, year
-  - `username` — filter by reviewer username
-  - `item_id` — filter by review item ID (use with `username` to check if a user reviewed a specific item)
-  - `categories` — include list of `movie`, `series`, `game`, `anime`, `manga`, `book`; accepts comma-separated values or repeated params
-  - `exclude_categories` — exclude list; accepts comma-separated values or repeated params
-  - Both lists also accept `anime:series` and `anime:movie` to include or exclude only anime series (TV, ONA, OVA, specials, …) or anime movies
-  - `languages` — reviews whose item lists any of these languages (e.g. `Japanese,Korean`), case-insensitive; accepts comma-separated values or repeated params. Only movies and series have a language
-  - `ordering` — `alpha`, `-alpha`, `rating`, `-rating`, `date`, `-date`
-  - `limit` — page size (default 20)
-  - `offset` — pagination offset
-- Response: `{ "data": [...], "meta": { "version": "2.0", "pagination": { "count", "limit", "offset" } } }`
-
-### Create review
-- Method: `POST`
-- Path: `/api/v2/reviews/`
-- Auth: required
-- Required body fields: `review_item`, `review_rating`
-- Optional body fields: `review_data`, `review_tags`
-- Notes:
-  - `review_item` is the `ReviewItem` primary key, not the external `item_id` string
-  - `review_tags` is a comma-separated string with up to 10 tags
-- Body example: `{ "review_item": 42, "review_rating": 8.5, "review_data": "...", "review_tags": "tag1,tag2" }`
-- Response: `{ "data": { ... }, "meta": { "version": "2.0" } }` (201 Created)
-- Errors: 400 `DUPLICATE_REVIEW` if user already reviewed this item; other invalid payloads also return `400 Bad Request`
-
-### Review detail
-- Method: `GET`, `PUT`, `PATCH`, `DELETE`
-- Path: `/api/v2/reviews/<id>/`
-- Auth: read is public; write requires ownership
-- `GET` response: `{ "data": { ... }, "meta": { "version": "2.0" } }`
-- `PUT` request body: same fields as create; use for full replacement
-- `PATCH` request body: any writable subset of create fields
-- `DELETE` returns `204 No Content`
-- Common errors: `403 Forbidden` for non-owners, `404 Not Found` for missing reviews
-
-## External Lookup Endpoints
-
-### Search items from external provider
-- Method: `GET`
-- Path: `/api/v2/lookup/search/<category>/?q=<search_term>`
-- Auth: required
-- Categories: `movie`, `series`, `game`, `anime`, `manga`, `book`
-- Notes:
-  - `q` accepts normal title search text for all categories.
-  - For `movie` and `series`, `q` can also be a full IMDb title URL such as `https://www.imdb.com/title/tt0111161/`.
-  - IMDb title URLs are normalized to the existing `omdb_tt...` item ID and returned as a single exact-match result.
-- Response: `{ "data": [{ "item_id": "...", "title": "...", ... }], "meta": { "version": "2.0" } }`
-- Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`
-
-### Get item details from external provider
-- Method: `GET`
-- Path: `/api/v2/lookup/item/<category>/<item_id>/`
-- Auth: required
-- Categories: `movie`, `series`, `game`, `anime`, `manga`, `book`
-- Response: `{ "data": { "item_id": "...", "title": "...", ... }, "meta": { "version": "2.0" } }`
-- Behavior: returns cached item from DB if available, otherwise fetches from external provider and persists
-- `movie` and `series` both use OMDb. Searches only return titles of that type, and fetching a series under `movie` (or a non-series under `series`) returns `UPSTREAM_ERROR`.
-- Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`, 400 `SERIALIZATION_ERROR`
+- `/api/admin/` — Django admin
+- `GET /api/usage/` — external API usage (today, this month, last 30 days) against quotas, in the admin's layout; non-staff users are redirected to the admin login
 
 ## Operational Endpoints (pod-internal)
 
@@ -126,90 +42,3 @@ Not reachable from outside the cluster: the ingress sends `/` to the frontend an
 
 - `GET /health/` — health check, returns plain text `OK`
 - `GET /metrics/` — Prometheus metrics; auth depends on `METRICS_REQUIRE_AUTH`
-
-## Staff Pages
-
-- `GET /api/usage/` — HTML page with external API usage (today, this month, last 30 days) against quotas; non-staff users are redirected to the admin login
-
-## Schema and Interactive Docs
-
-- OpenAPI schema JSON: `GET /api/schema/`
-- Swagger UI: `GET /api/docs/`
-
-## Curl Examples
-
-```bash
-# List with pagination
-curl "http://localhost:8000/api/v2/reviews/?limit=10&offset=0"
-
-# Check if a user reviewed an item
-curl "http://localhost:8000/api/v2/reviews/?item_id=omdb_tt3896198&username=myuser"
-
-# Create review
-curl -X POST "http://localhost:8000/api/v2/reviews/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "review_item": 42,
-    "review_rating": 8.7,
-    "review_data": "Great pacing and cast.",
-    "review_tags": "sci-fi,action"
-  }'
-
-# Partial update
-curl -X PATCH "http://localhost:8000/api/v2/reviews/1/" \
-  -H "Content-Type: application/json" \
-  -d '{"review_rating": 9.1}'
-
-# Delete
-curl -X DELETE "http://localhost:8000/api/v2/reviews/1/"
-
-# Search items
-curl "http://localhost:8000/api/v2/lookup/search/movie/?q=inception"
-
-# Search movie by full IMDb title URL
-curl "http://localhost:8000/api/v2/lookup/search/movie/?q=https%3A%2F%2Fwww.imdb.com%2Ftitle%2Ftt0111161%2F"
-
-# Get item details
-curl "http://localhost:8000/api/v2/lookup/item/movie/omdb_tt1375666/"
-```
-
-## JavaScript Examples
-
-```javascript
-// Request v2 explicitly with an Accept header if needed
-const acceptHeader = { Accept: 'application/vnd.criticapp.v2+json' };
-
-// List reviews
-const listResp = await fetch('/api/v2/reviews/?limit=20&offset=0', { headers: acceptHeader });
-const { data: reviews, meta } = await listResp.json();
-
-// Check if user reviewed an item
-const checkResp = await fetch('/api/v2/reviews/?item_id=omdb_tt3896198&username=myuser');
-const checkData = await checkResp.json();
-const hasReviewed = checkData.data.length > 0;
-
-// Create review
-const createResp = await fetch('/api/v2/reviews/', {
-  method: 'POST',
-  headers: { ...acceptHeader, 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    review_item: 42,
-    review_rating: 8.4,
-    review_data: 'Responsive controls and good level design.',
-    review_tags: 'platformer,indie'
-  })
-});
-const createData = await createResp.json();
-
-// Search external items
-const searchResp = await fetch('/api/v2/lookup/search/movie/?q=inception');
-const { data: results } = await searchResp.json();
-
-// Search a movie by full IMDb title URL
-const imdbResp = await fetch('/api/v2/lookup/search/movie/?q=' + encodeURIComponent('https://www.imdb.com/title/tt0111161/'));
-const { data: imdbResults } = await imdbResp.json();
-
-// Get item details
-const itemResp = await fetch('/api/v2/lookup/item/movie/omdb_tt1375666/');
-const { data: item } = await itemResp.json();
-```

@@ -224,16 +224,7 @@ kubectl logs -n criticapp deploy/criticapp-frontend --tail=200
 
 ### Rollback of the frontend cutover
 
-Revert the cutover PR on `master`. The next deploy re-applies the old Ingress, so `/` goes back to Django (the old pages stay until #58's cleanup). `/api/...` works either way.
-
-`kubectl apply` doesn't delete objects, so the frontend pod and the redirect middleware stay behind. Remove them by hand, **only after the revert's deploy has finished** and the old Ingress is applied:
-
-```bash
-kubectl delete deployment,service criticapp-frontend -n criticapp
-kubectl delete middleware redirect-https -n criticapp
-```
-
-Deleting the middleware while the new Ingress still references it makes Traefik drop the router, and the whole site returns 404.
+Since #114 there is no Django UI to roll back to: reverting the cutover PR would send `/` to a Django that has no pages. To undo a bad frontend change, revert that frontend PR on `master`; the deploy rebuilds and rolls out the frontend image. `/api/...` is served by Django either way.
 
 ### Refresh Review Item Metadata
 

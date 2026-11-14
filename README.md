@@ -10,7 +10,7 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 
 - Stores personal reviews across movie, series, game, anime, manga, and book categories
 - Fetches item metadata from OMDb, IGDB, MyAnimeList, and Open Library
-- Supports user profiles and searchable review lists
+- Searchable, filterable review list
 - Exposes API endpoints for review CRUD and item lookups
 - Includes an API usage page with Telegram quota alerts, and machine monitoring via Beszel
 
@@ -28,8 +28,8 @@ It has also been a way to build and run a full-stack Django project end-to-end, 
 
 - Set up `.env` from `.env.example`
 - Use `make dev` to run the app. It serves two URLs:
-  - http://devbox:8000: Django, the current site
-  - http://devbox:5173: the new frontend, with hot reload and `/api` forwarded to Django
+  - http://devbox:8000: Django's API and admin (`/api/...`; `/` is a 404 there)
+  - http://devbox:5173: the site (the frontend), with hot reload and `/api` forwarded to Django
 - To run the frontend outside Compose, use `npm run dev` in `frontend/`. If Django isn't at `http://localhost:8000`, set `VITE_API_PROXY_TARGET` in your shell (`.env` files aren't read for it)
 - `npm run dev` outside Compose, and `npm run build` anywhere, need `VITE_OWNER_USERNAME`: the username whose reviews the site shows. Set it in your shell or in `frontend/.env.local`
 - To build and run the production frontend image (nginx on port 8080, no backend, so API calls fail): `docker build --build-arg VITE_OWNER_USERNAME=<username> -t critic-frontend frontend`, then `docker run --rm -p 8080:8080 critic-frontend`
