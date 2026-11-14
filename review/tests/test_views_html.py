@@ -34,6 +34,9 @@ class HTMLViewSmokeTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'review/api_usage.html')
         self.assertTemplateUsed(response, 'admin/base_site.html')
+        # The admin context: page title and the user tools (logout link).
+        self.assertContains(response, '<h1>API usage</h1>', html=True)
+        self.assertContains(response, 'id="user-tools"')
         self.assertContains(response, '812')
         self.assertContains(response, '1000 / today')
         self.assertContains(response, 'table-warning')
