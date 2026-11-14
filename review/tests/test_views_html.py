@@ -5,9 +5,11 @@ from django.utils import timezone
 
 from review.models import UpstreamApiUsage
 
+USAGE_URL = reverse('admin:review_upstreamapiusage_changelist')
+
 
 class HTMLViewSmokeTest(TestCase):
-    """Smoke tests for the pages Django still serves: health, usage page, admin."""
+    """Smoke tests for the pages Django still serves: health and the admin (with its usage page)."""
 
     def test_health_check(self):
         response = self.client.get('/health/')
@@ -15,14 +17,14 @@ class HTMLViewSmokeTest(TestCase):
         self.assertEqual(response.content, b'OK')
 
     def test_api_usage_page_redirects_anonymous_users(self):
-        response = self.client.get('/api/usage/')
+        response = self.client.get(USAGE_URL)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response['Location'].startswith('/api/admin/login/'))
 
     def test_api_usage_page_redirects_non_staff_users(self):
         get_user_model().objects.create_user(username='plainuser', password='pass12345')
         self.client.login(username='plainuser', password='pass12345')
-        response = self.client.get('/api/usage/')
+        response = self.client.get(USAGE_URL)
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response['Location'].startswith('/api/admin/login/'))
 
@@ -30,7 +32,7 @@ class HTMLViewSmokeTest(TestCase):
         UpstreamApiUsage.objects.create(provider='omdb', date=timezone.now().date(), requests=812)
         get_user_model().objects.create_user(username='staffuser', password='pass12345', is_staff=True)
         self.client.login(username='staffuser', password='pass12345')
-        response = self.client.get('/api/usage/')
+        response = self.client.get(USAGE_URL)
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'review/api_usage.html')
         self.assertTemplateUsed(response, 'admin/base_site.html')
@@ -41,9 +43,23 @@ class HTMLViewSmokeTest(TestCase):
         self.assertContains(response, '1000 / today')
         self.assertContains(response, 'table-warning')
 
+    def test_api_usage_page_is_listed_in_the_admin_and_read_only(self):
+        UpstreamApiUsage.objects.create(provider='omdb', date=timezone.now().date(), requests=5)
+        usage = UpstreamApiUsage.objects.get()
+        get_user_model().objects.create_user(username='staffonly', password='pass12345', is_staff=True)
+        self.client.login(username='staffonly', password='pass12345')
+        self.assertContains(self.client.get('/api/admin/'), f'href="{USAGE_URL}"')
+        for path in (
+            '/api/admin/review/upstreamapiusage/add/',
+            f'/api/admin/review/upstreamapiusage/{usage.pk}/change/',
+            f'/api/admin/review/upstreamapiusage/{usage.pk}/delete/',
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 403)
+
     def test_admin_and_usage_urls_are_under_api(self):
         self.assertEqual(reverse('admin:index'), '/api/admin/')
-        self.assertEqual(reverse('review:api_usage'), '/api/usage/')
+        self.assertEqual(USAGE_URL, '/api/admin/review/upstreamapiusage/')
 
     def test_admin_login_page_loads(self):
         response = self.client.get('/api/admin/login/')
@@ -57,7 +73,7 @@ class HTMLViewSmokeTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_old_admin_and_usage_paths_are_gone(self):
-        for path in ('/admin/', '/usage/'):
+        for path in ('/admin/', '/usage/', '/api/usage/'):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
 

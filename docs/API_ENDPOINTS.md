@@ -34,7 +34,7 @@ The schema at these two URLs covers the JWT endpoints above. v3 has its own at `
 ## Staff Pages
 
 - `/api/admin/` — Django admin
-- `GET /api/usage/` — external API usage (today, this month, last 30 days) against quotas, in the admin's layout; non-staff users are redirected to the admin login
+- `/api/admin/review/upstreamapiusage/` — external API usage (today, this month, last 30 days) against quotas, listed in the admin as Review › "Upstream api usages". Read-only, open to any staff user; others are redirected to the admin login
 
 ## Operational Endpoints (pod-internal)
 

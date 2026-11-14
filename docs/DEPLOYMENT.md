@@ -20,7 +20,7 @@ CriticApp runs on the following production components:
 
 Routing on the main Ingress (`k8s/ingress.yaml`), all on one domain:
 
-- `/api` → `criticapp-web` (Django: the API, `/api/admin/`, `/api/usage/`)
+- `/api` → `criticapp-web` (Django: the API and `/api/admin/`)
 - `/` → `criticapp-frontend` (everything else, including deep links)
 - `/metrics` → blocked (403) by a higher-priority Ingress
 - `/health/` has no public route; it is only used by the pod probes
@@ -208,7 +208,7 @@ Application endpoints:
 
 - `/health/` for readiness and liveness (pod-internal; no public route)
 - `/metrics/` Prometheus-format metrics (blocked at the ingress; nothing scrapes it since the move to Beszel)
-- `/api/usage/` staff-only page with external API usage against quotas
+- `/api/admin/review/upstreamapiusage/` staff-only admin page with external API usage against quotas
 
 The frontend pod's probes use nginx's `/healthz` on port 8080.
 
@@ -304,7 +304,7 @@ Notes:
 Monitoring is lean on purpose: kube-prometheus-stack used about 1 GB of RAM on a ~4 GB box.
 
 - **Machine health** (CPU, memory, disk, disk I/O, network, load) comes from [Beszel](https://beszel.dev), installed on the host, outside k3s.
-- **External API usage** (OMDb, IGDB, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it at `https://<APP_DOMAIN>/api/usage/` (staff only).
+- **External API usage** (OMDb, IGDB, MyAnimeList, Open Library) is counted per UTC day in Postgres. Every HTTP attempt counts, including retries, from both the web app and the refresh CronJob. See it in the admin under Review › "Upstream api usages" (`https://<APP_DOMAIN>/api/admin/review/upstreamapiusage/`, staff only).
 - **Quota alerts:** the app sends one Telegram message when OMDb reaches 80% and 100% of 1,000 requests per day. The other APIs have no quota. The quotas live in `UPSTREAM_API_QUOTAS` in `critic/settings/common.py`. Check them against your API accounts.
 - **Prod integration tests:** a daily CronJob runs the integration test suite against the real APIs with prod's keys, and sends one Telegram message naming the failed tests (see below).
 - **Box down:** Beszel's hub runs on the same machine, so it can't report the machine being down. Use an outside check (below).
@@ -365,7 +365,7 @@ kubectl delete job criticapp-integration-manual -n criticapp
 
 Notes:
 
-- It makes about 20 real API calls a day. They aren't counted on `/api/usage/`, because counting needs the database and the tests run without it.
+- It makes about 20 real API calls a day. They aren't counted on the admin's API usage page, because counting needs the database and the tests run without it.
 - If the job's pod can't start at all (bad image, k3s down), nothing reports it. UptimeRobot covers k3s and the box going down.
 - The GitHub Actions integration run (03:00 UTC) stays. It runs even when the box is down, and separates "the APIs changed" from "prod is broken".
 
