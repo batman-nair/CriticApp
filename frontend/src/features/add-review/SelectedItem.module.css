@@ -1,0 +1,139 @@
+/* From boards 04, 05 and 21; below 640px, 09 and 22. */
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  padding: var(--space-10) var(--space-12) var(--space-10) var(--space-10);
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line));
+  border-radius: var(--radius-16);
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-card),
+    var(--surface)
+  );
+}
+
+.poster {
+  --poster-width: 52px;
+  --poster-radius: 8px;
+
+  flex: none;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-16);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-125);
+}
+
+.year {
+  color: var(--muted);
+  font-weight: var(--weight-medium);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat);
+}
+
+.genres {
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  margin: var(--space-2) 0 0;
+}
+
+/*
+ * In RatingBadge's colours. The desktop Write step shows the rating beside its
+ * field instead.
+ */
+.mine {
+  display: none;
+  padding: var(--space-2) var(--space-8);
+  border-radius: 7px;
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-badge),
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--cat-base),
+    var(--badge-ink) var(--badge-ink-mix)
+  );
+  font-size: var(--text-12);
+  font-weight: var(--weight-extrabold);
+}
+
+/* A link-like button, as on the boards. */
+.change {
+  flex: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-12);
+    padding: var(--space-8) var(--space-10) var(--space-8) var(--space-8);
+  }
+
+  .poster {
+    --poster-width: 44px;
+    --poster-radius: 7px;
+  }
+
+  /* One line under the title: the category, then the badges. */
+  .genres {
+    display: none;
+  }
+
+  .mine {
+    display: inline-flex;
+  }
+
+  /* A class and an element, so these beat RatingBadge's single classes. */
+  .badges > span {
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-8);
+    border-radius: 7px;
+    font-size: var(--text-12);
+  }
+
+  .badges svg {
+    width: 11px;
+    height: 11px;
+  }
+}

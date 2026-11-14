@@ -9,6 +9,7 @@ interface ApiErrorInit {
   code: string
   detail: string
   errors?: FieldError[]
+  problem?: Record<string, unknown> | null
   cause?: unknown
 }
 
@@ -18,8 +19,21 @@ export class ApiError extends Error {
   readonly code: string
   readonly detail: string
   readonly errors: FieldError[]
+  /**
+   * The whole Problem body for `kind: 'problem'`, extra members such as a
+   * 409's `existing_review_id` included. Null otherwise.
+   */
+  readonly problem: Record<string, unknown> | null
 
-  constructor({ kind, status, code, detail, errors, cause }: ApiErrorInit) {
+  constructor({
+    kind,
+    status,
+    code,
+    detail,
+    errors,
+    problem,
+    cause,
+  }: ApiErrorInit) {
     super(detail, { cause })
     this.name = 'ApiError'
     this.kind = kind
@@ -27,6 +41,7 @@ export class ApiError extends Error {
     this.code = code
     this.detail = detail
     this.errors = errors ?? []
+    this.problem = problem ?? null
   }
 }
 
@@ -98,6 +113,7 @@ export async function unwrap<T>(
       code: error.code,
       detail: error.detail,
       errors: error.errors,
+      problem: { ...error },
     })
   }
   throw genericHttpError(response.status)

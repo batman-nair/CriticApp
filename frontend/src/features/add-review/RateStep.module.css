@@ -1,0 +1,59 @@
+/* Boards 04 and 21; below 640px, 05 and 22. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-10) var(--space-14);
+  border-radius: var(--radius-12);
+  background: var(--soft);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+}
+
+/* As ReviewEditForm's rating box. */
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-14) var(--space-14) var(--space-10);
+  border: 1px solid
+    color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line));
+  border-radius: var(--radius-16);
+}
+
+/* About the ruler's height, so the sheet doesn't jump when it arrives. */
+.rulerSkeleton {
+  --skeleton-width: 100%;
+  --skeleton-height: 128px;
+}
+
+.loadError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  min-height: 128px;
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
+.loadError p {
+  margin: 0;
+}
+
+/* Below 640px: the ruler runs the sheet's full width. */
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-24);
+  }
+
+  .rating {
+    padding: 0;
+    border: 0;
+  }
+}

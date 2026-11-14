@@ -40,6 +40,9 @@ export const defaultReviews = [
   }),
 ]
 
+/** The id the default POST /api/v3/reviews handler gives a new review. */
+export const CREATED_REVIEW_ID = 3
+
 /** The token the CSRF handler sets. */
 export const CSRF_TOKEN = 'test-token'
 
@@ -102,6 +105,21 @@ export const handlers = [
   http.get('/api/v3/reviews/facets', ({ response }) =>
     response(200).json(makeReviewFacets()),
   ),
+  // Created from the body, so the happy path needs no override. Tests for a
+  // 400, 409 or 502 override it with server.use.
+  http.post('/api/v3/reviews', async ({ request, response }) => {
+    const { item_id, rating, text, tags } = await request.json()
+    return response(201).json({
+      data: makeReview({
+        id: CREATED_REVIEW_ID,
+        item: makeItem({ id: item_id }),
+        rating,
+        text: text || null,
+        tags: tags ?? [],
+      }),
+      meta: {},
+    })
+  }),
   // After the facets, which {id} would match too. A test that overrides this
   // with server.use also catches /facets.
   http.get('/api/v3/reviews/{id}', ({ params, response }) => {
