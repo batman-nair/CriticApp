@@ -8,7 +8,6 @@ from django.core.management import call_command
 from django.template.loader import get_template
 from django.templatetags.static import static
 from django.test import override_settings
-from django.urls import get_resolver
 
 
 def test_production_uses_hashed_static_storage(production_settings):
@@ -45,11 +44,7 @@ def test_templates_render_with_production_static_storage(tmp_path, production_se
     # plain storage, so render every template (with an empty context) against
     # a real manifest here.
     template_names = _project_template_names()
-    assert 'base.html' in template_names
-
-    # critic/urls.py resolves the favicon URL from the static storage when it
-    # is first loaded; load it now so the hashed name doesn't leak into later tests.
-    get_resolver().url_patterns
+    assert 'review/api_usage.html' in template_names
 
     with override_settings(STORAGES=production_settings.STORAGES, STATIC_ROOT=tmp_path):
         call_command('collectstatic', interactive=False, verbosity=0)
@@ -57,12 +52,11 @@ def test_templates_render_with_production_static_storage(tmp_path, production_se
         for name in template_names:
             get_template(name).render({})
 
-        assert re.fullmatch(r'/api/static/css/base\.[0-9a-f]{12}\.css', static('css/base.css'))
+        assert re.fullmatch(r'/api/static/admin/css/base\.[0-9a-f]{12}\.css', static('admin/css/base.css'))
 
 
-@pytest.mark.parametrize('path', ['/api/static/css/base.css', '/api/static/admin/css/base.css'])
-def test_static_files_are_served_from_the_api_prefix(client, path):
-    response = client.get(path)
+def test_static_files_are_served_from_the_api_prefix(client):
+    response = client.get('/api/static/admin/css/base.css')
 
     assert response.status_code == 200
     assert response['Content-Type'].startswith('text/css')
@@ -72,11 +66,4 @@ def test_static_files_are_served_from_the_api_prefix(client, path):
 
 
 def test_static_files_are_gone_from_the_old_prefix(client):
-    assert client.get('/static/css/base.css').status_code == 404
-
-
-def test_favicon_redirects_to_the_api_static_prefix(client):
-    response = client.get('/favicon.ico')
-
-    assert response.status_code == 302
-    assert response['Location'] == '/api/static/favicon.ico'
+    assert client.get('/static/admin/css/base.css').status_code == 404

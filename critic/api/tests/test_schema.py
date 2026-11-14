@@ -91,7 +91,7 @@ class TestV3Schema(TestCase):
         response = self.client.get('/api/v3/schema', {'format': 'json'})
         self.assertEqual(response.status_code, 200)
         schema = response.json()
-        # Without versioning_class=None the global versioning reports "3.0 (2.0)".
+        # The version comes from V3_SCHEMA_SETTINGS, not from a request version.
         self.assertEqual(schema['info']['version'], '3.0')
         self.assertIn('/api/v3/categories', schema['paths'])
         paths = set(schema['paths'])
@@ -106,12 +106,14 @@ class TestV3Schema(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('swagger', response.content.decode().lower())
 
-    def test_v2_schema_leaves_out_v3(self):
+    def test_jwt_schema_leaves_out_v3(self):
         out = StringIO()
         call_command('spectacular', stdout=out, stderr=StringIO())
         schema = out.getvalue()
-        self.assertIn('/api/v2/reviews/', schema)
-        self.assertNotIn('/api/v3/', schema)
+        self.assertNotIn('/api/v2/', schema)
+        self.assertIn('/api/auth/token/', schema)
+        # Path keys only: the description links to the v3 docs.
+        self.assertNotRegex(schema, r'(?m)^  /api/v3/')
         for path in V3_SESSION_AUTH_PATHS:
             self.assertNotIn(f'{path}:', schema)
         self.assertIn('/api/auth/me/', schema)

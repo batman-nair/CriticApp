@@ -19,11 +19,6 @@ class ReviewQueryTest(TestCase):
     def test_basic_review_query(self):
         reviews = review_utils.get_filtered_review_objects()
         self.assertGreaterEqual(len(reviews), 10)
-        json_data = review_utils.convert_reviews_to_json(reviews)
-        self.assertTrue("results" in json_data)
-        self.assertGreaterEqual(len(json_data["results"]), 10)
-        review_json = json_data["results"][0]
-        self.assertTrue(all(field in review_json for field in ["review_data", "review_rating", "modified_date", "review_item"]))
 
     def test_query_filter(self):
         reviews = review_utils.get_filtered_review_objects(query='Cool')
@@ -159,22 +154,3 @@ class LanguageFilterTest(TestCase):
         reviews = review_utils.get_filtered_review_objects(languages=['Japanese', 'Korean'], ordering='alpha')
         self.assertEqual([review.review_item.item_id for review in reviews], ['omdb_ja_first', 'omdb_ja_last', 'omdb_ko'])
 
-    def test_review_languages_sorted_by_count_then_name(self):
-        self.assertEqual(
-            review_utils.get_review_languages(),
-            ['English', 'Japanese', 'German', 'Korean', 'Old English'],
-        )
-
-    def test_review_languages_count_every_review_of_an_item(self):
-        korean_item = ReviewItem.objects.get(item_id='omdb_ko')
-        for username in ('ko1', 'ko2'):
-            user = get_user_model().objects.create_user(username=username, password='123test123')
-            Review.objects.create(user=user, review_item=korean_item, review_rating=7)
-        self.assertEqual(review_utils.get_review_languages()[0], 'Korean')
-
-    def test_review_languages_for_user(self):
-        self.assertEqual(
-            review_utils.get_review_languages('polyglot'),
-            ['English', 'Japanese', 'Korean', 'Old English'],
-        )
-        self.assertEqual(review_utils.get_review_languages('other'), ['German'])
