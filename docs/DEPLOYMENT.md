@@ -384,7 +384,7 @@ Notes:
 
 ### Outside check for the box being down
 
-Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/api/auth/session` (5-minute interval) with email or app notifications. It is public, returns 200 and goes through Django. `https://<APP_DOMAIN>/health/` now reaches the frontend, not Django, so don't use it.
+Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/api/auth/session` (5-minute interval) with email or app notifications. It is public, returns 200 and goes through Django. `https://<APP_DOMAIN>/health/` now reaches the frontend, which answers 200 even when Django is down, so don't use it.
 
 ## Troubleshooting
 

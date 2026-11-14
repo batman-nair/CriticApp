@@ -43,8 +43,8 @@ spec:
         # length, so /api outranks /. The /metrics Ingress above has an explicit
         # priority of 100, which outranks both while the domain is under about
         # 60 characters. /health/ and /metrics/ have no public route to Django:
-        # /health/ falls through to the frontend (its 404 page) and /metrics
-        # stays blocked.
+        # /health/ falls through to the frontend, which serves its own
+        # not-found page with a 200, and /metrics stays blocked.
         paths:
           - path: /api
             pathType: Prefix
