@@ -46,7 +46,7 @@ class MoveSeriesToSeriesCategoryTest(TestCase):
 
 class RenameJikanItemIdsToMalTest(TestCase):
     REFRESHED_AT = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
-    OLD_DATE = date(2020, 5, 6)
+    OLD_UPDATED_AT = datetime(2020, 5, 6, 7, 8, 9, tzinfo=timezone.utc)
 
     def setUp(self):
         User = get_user_model()
@@ -77,7 +77,7 @@ class RenameJikanItemIdsToMalTest(TestCase):
         self._create_review(self.alice, manga_id, '8.0')
         self._create_review(self.alice, 'omdb_tt1', '6.0')
         # Reviews keep their dates; auto_now would set today on a save().
-        Review.objects.update(modified_date=self.OLD_DATE)
+        Review.objects.update(updated_at=self.OLD_UPDATED_AT)
 
     def _items(self):
         """Every item's fields, by item id, without the id itself."""
@@ -89,16 +89,16 @@ class RenameJikanItemIdsToMalTest(TestCase):
     def _reviews(self):
         return sorted(
             Review.objects.values_list(
-                'user__username', 'review_item_id', 'review_rating', 'review_data', 'review_tags', 'modified_date',
+                'user__username', 'review_item_id', 'review_rating', 'review_data', 'review_tags', 'updated_at',
             )
         )
 
     def _expected_reviews(self, anime_id, manga_id):
         return sorted([
-            ('alice', anime_id, Decimal('9.00'), 'Notes', 'tag1,tag2', self.OLD_DATE),
-            ('bob', anime_id, Decimal('7.50'), 'Notes', 'tag1,tag2', self.OLD_DATE),
-            ('alice', manga_id, Decimal('8.00'), 'Notes', 'tag1,tag2', self.OLD_DATE),
-            ('alice', 'omdb_tt1', Decimal('6.00'), 'Notes', 'tag1,tag2', self.OLD_DATE),
+            ('alice', anime_id, Decimal('9.00'), 'Notes', 'tag1,tag2', self.OLD_UPDATED_AT),
+            ('bob', anime_id, Decimal('7.50'), 'Notes', 'tag1,tag2', self.OLD_UPDATED_AT),
+            ('alice', manga_id, Decimal('8.00'), 'Notes', 'tag1,tag2', self.OLD_UPDATED_AT),
+            ('alice', 'omdb_tt1', Decimal('6.00'), 'Notes', 'tag1,tag2', self.OLD_UPDATED_AT),
         ])
 
     def test_forward_renames_anime_and_manga_items_and_keeps_reviews(self):
@@ -222,3 +222,67 @@ class ReviewTimestampsMigrationTest(TransactionTestCase):
         self.assertFalse({'created_at', 'updated_at'} & self._review_columns())
         self.assertEqual(Review.objects.get(pk=self.first.pk).modified_date, self.FIRST_DAY)
         self.assertEqual(Review.objects.get(pk=self.second.pk).modified_date, self.SECOND_DAY)
+
+
+class RemoveModifiedDateMigrationTest(TransactionTestCase):
+    BEFORE = [('review', '0012_review_created_at_updated_at')]
+    AFTER = [('review', '0013_remove_review_modified_date')]
+    CREATED_AT = datetime(2020, 5, 6, 7, 8, 9, tzinfo=timezone.utc)
+    UPDATED_AT = datetime(2021, 7, 8, 9, 10, 11, tzinfo=timezone.utc)
+
+    def setUp(self):
+        self.apps = self._migrate(self.BEFORE)
+        User = self.apps.get_model('users', 'User')
+        ReviewItem = self.apps.get_model('review', 'ReviewItem')
+        Review = self.apps.get_model('review', 'Review')
+        alice = User.objects.create(username='alice', password='x')
+        bob = User.objects.create(username='bob', password='x')
+        item = ReviewItem.objects.create(
+            item_id='omdb_tt1', category='movie', title='Title', image_url='https://example.com/i.png',
+            year='2000', attr1='a', attr2='b', attr3='movie', description='d', rating='5',
+        )
+        self.first = Review.objects.create(user=alice, review_item=item, review_rating=Decimal('8.0'))
+        self.second = Review.objects.create(user=bob, review_item=item, review_rating=Decimal('6.0'))
+        # A queryset update, because auto_now would set now on a save().
+        Review.objects.update(created_at=self.CREATED_AT, updated_at=self.UPDATED_AT)
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def _migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.migrate(targets)
+        return MigrationExecutor(connection).loader.project_state(targets).apps
+
+    def _review_columns(self):
+        with connection.cursor() as cursor:
+            description = connection.introspection.get_table_description(cursor, 'review_review')
+        return {column.name for column in description}
+
+    def _rows(self, Review):
+        return list(
+            Review.objects.order_by('pk').values_list('pk', 'review_rating', 'created_at', 'updated_at')
+        )
+
+    def _expected_rows(self):
+        return [
+            (self.first.pk, Decimal('8.00'), self.CREATED_AT, self.UPDATED_AT),
+            (self.second.pk, Decimal('6.00'), self.CREATED_AT, self.UPDATED_AT),
+        ]
+
+    def test_forward_drops_the_column_and_keeps_the_rows(self):
+        self.assertIn('modified_date', self._review_columns())
+
+        Review = self._migrate(self.AFTER).get_model('review', 'Review')
+
+        self.assertNotIn('modified_date', self._review_columns())
+        self.assertEqual(self._rows(Review), self._expected_rows())
+
+    def test_reverse_adds_the_column_back_and_keeps_the_rows(self):
+        self._migrate(self.AFTER)
+
+        Review = self._migrate(self.BEFORE).get_model('review', 'Review')
+
+        self.assertIn('modified_date', self._review_columns())
+        self.assertEqual(self._rows(Review), self._expected_rows())
