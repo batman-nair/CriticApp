@@ -6,6 +6,7 @@
   .api-usage tr.table-warning th, .api-usage tr.table-warning td { background: var(--message-warning-bg); }
   .api-usage tr.table-danger th, .api-usage tr.table-danger td { background: var(--message-error-bg); }
   .api-usage table { margin-bottom: 20px; }
+  .api-usage .date { white-space: nowrap; }
 </style>
 {% endblock %}
 
@@ -47,7 +48,7 @@
     <tbody>
       {% for row in daily %}
       <tr>
-        <th scope="row">{{ row.date|date:"Y-m-d" }}</th>
+        <th scope="row" class="date">{{ row.date|date:"Y-m-d" }}</th>
         {% for count in row.counts %}<td class="num">{{ count }}</td>{% endfor %}
       </tr>
       {% endfor %}
