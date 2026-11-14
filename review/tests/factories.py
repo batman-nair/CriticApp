@@ -1,6 +1,6 @@
 """Shared test constants and factory helpers."""
 
-from review.serializers import ReviewItemSerializer
+from review.models import ReviewItem
 
 
 SAMPLE_REVIEW_ITEM_DATA = {
@@ -20,8 +20,5 @@ JUNK_DATA = 'alskdjflaskjdflkasjdflkasjdflkasglhasldgfkj'
 
 
 def create_review_item(**overrides):
-    """Create and return a ReviewItem via serializer. Accepts field overrides."""
-    data = {**SAMPLE_REVIEW_ITEM_DATA, "response": "True", **overrides}
-    serializer = ReviewItemSerializer(data=data)
-    serializer.is_valid(raise_exception=True)
-    return serializer.save()
+    """Create and return a ReviewItem. Accepts field overrides."""
+    return ReviewItem.objects.create(**{**SAMPLE_REVIEW_ITEM_DATA, **overrides})
