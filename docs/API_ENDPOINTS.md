@@ -2,7 +2,7 @@
 
 This document is the canonical reference for the current CriticApp API surface and behavior.
 
-Application API endpoints are under `/api/v2/`. Operational and documentation endpoints remain at `/health/`, `/metrics/`, `/api/schema/`, and `/api/docs/`.
+Application API endpoints are under `/api/v2/`. Documentation endpoints are at `/api/schema/` and `/api/docs/`. The operational endpoints `/health/` and `/metrics/` are pod-internal: in production the ingress has no public route to them.
 
 API v3 (`/api/v3/`, for the new frontend) is documented separately in [API_V3.md](API_V3.md).
 
@@ -120,7 +120,9 @@ Versioning options:
 - `movie` and `series` both use OMDb. Searches only return titles of that type, and fetching a series under `movie` (or a non-series under `series`) returns `UPSTREAM_ERROR`.
 - Errors: 400 `INVALID_CATEGORY`, 400 `UPSTREAM_ERROR`, 400 `SERIALIZATION_ERROR`
 
-## Public Endpoints
+## Operational Endpoints (pod-internal)
+
+Not reachable from outside the cluster: the ingress sends `/` to the frontend and blocks `/metrics`.
 
 - `GET /health/` — health check, returns plain text `OK`
 - `GET /metrics/` — Prometheus metrics; auth depends on `METRICS_REQUIRE_AUTH`

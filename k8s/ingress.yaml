@@ -29,6 +29,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: criticapp-redirect-https@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
@@ -38,11 +39,24 @@ spec:
   rules:
     - host: __APP_DOMAIN__
       http:
+        # Traefik gives each router a default priority equal to its rule's
+        # length, so /api outranks /. The /metrics Ingress above has an explicit
+        # priority of 100, which outranks both while the domain is under about
+        # 60 characters. /health/ and /metrics/ have no public route to Django:
+        # /health/ falls through to the frontend, which serves its own
+        # not-found page with a 200, and /metrics stays blocked.
         paths:
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: criticapp-web
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: criticapp-frontend
                 port:
                   number: 80
