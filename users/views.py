@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
@@ -25,11 +24,6 @@ from .serializers import (
 )
 
 User = get_user_model()
-
-
-def logout_view(request):
-    logout(request)
-    return redirect('/')
 
 
 class MeView(APIView):
