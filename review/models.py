@@ -34,7 +34,6 @@ class Review(models.Model):
     )
     review_data = models.TextField(null=True)
     review_tags = models.CharField(max_length=100, null=True)
-    modified_date = models.DateField(auto_now=True)
     created_at = models.DateTimeField(null=True, auto_now_add=True)
     updated_at = models.DateTimeField(null=True, auto_now=True)
 

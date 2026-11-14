@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from unittest import mock
 
@@ -451,17 +451,17 @@ class MapRawgToIgdbCommandTest(TestCase):
         self.assertIn('    moved 0 review(s) to igdb_26226', stdout)
         self.assertEqual(stdout.splitlines()[-1], 'mapped=0 skipped=0 conflicts=1 left=0')
 
-    def test_moving_reviews_keeps_modified_date(self):
+    def test_moving_reviews_keeps_updated_at(self):
         provider = self._four_statuses()
         self._review(self.bob, self.witcher)
-        past = date(2020, 1, 2)
-        Review.objects.filter(review_item=self.witcher).update(modified_date=past)
+        past = datetime(2020, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+        Review.objects.filter(review_item=self.witcher).update(updated_at=past)
 
         self._run(provider, '--apply')
 
         moved = Review.objects.filter(review_item_id='igdb_1942')
         self.assertEqual(moved.count(), 2)
-        self.assertEqual(set(moved.values_list('modified_date', flat=True)), {past})
+        self.assertEqual(set(moved.values_list('updated_at', flat=True)), {past})
 
     def test_rawg_item_deleted_only_when_no_review_points_at_it(self):
         provider = self._four_statuses()

@@ -10,8 +10,6 @@ ORDERING_DICT = {
     '-alpha': '-review_item__title',
     'rating': 'review_rating',
     '-rating': '-review_rating',
-    'date': 'modified_date',
-    '-date': '-modified_date',
 }
 
 # Filters narrower than a category, used as "<category>:<subcategory>" in the

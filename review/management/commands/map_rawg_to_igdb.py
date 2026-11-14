@@ -266,7 +266,7 @@ class Command(BaseCommand):
             # Users who already reviewed the target keep that review; theirs
             # stays on the RAWG item (unique user + item, no merging).
             taken = list(Review.objects.filter(review_item=target).values_list('user_id', flat=True))
-            # A queryset update leaves modified_date (auto_now) as it was.
+            # A queryset update leaves updated_at (auto_now) as it was.
             moved = (
                 Review.objects.filter(review_item=row)
                 .exclude(user_id__in=taken)
