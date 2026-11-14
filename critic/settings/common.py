@@ -15,8 +15,6 @@ from datetime import timedelta
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 
-from django.contrib.messages import constants as messages
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -64,7 +62,7 @@ ROOT_URLCONF = 'critic.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -114,9 +112,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = 'api/static/'
-STATICFILES_DIRS = [
-    os.path.join(os.path.join(BASE_DIR, 'web', 'static')),
-]
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
@@ -125,20 +120,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-LOGIN_URL = 'users:login'
+LOGIN_URL = 'admin:login'
 
 AUTH_USER_MODEL = 'users.User'
-LOGIN_REDIRECT_URL = '/u'
 LOGOUT_REDIRECT_URL = '/'
-
-
-MESSAGE_TAGS = {
-    messages.DEBUG: 'alert-secondary',
-    messages.INFO: 'alert-info',
-    messages.SUCCESS: 'alert-success',
-    messages.WARNING: 'alert-warning',
-    messages.ERROR: 'alert-danger',
-}
 
 METRICS_REQUIRE_AUTH = os.environ.get('METRICS_REQUIRE_AUTH', 'False').lower() == 'true'
 PUSHGATEWAY_URL = os.environ.get('PUSHGATEWAY_URL', '').rstrip('/')
@@ -167,18 +152,15 @@ CSRF_COOKIE_HTTPONLY = False
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
-    'DEFAULT_VERSIONING_CLASS': 'review.versioning.URLPathAndHeaderVersioning',
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'ALLOWED_VERSIONS': ('2.0',),
-    'DEFAULT_VERSION': '2.0',
     'PAGE_SIZE': 20,
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     # Only throttle classes read these two, and only v3 views set
-    # throttle_classes (ScopedRateThrottle), so v2 is unaffected. Rates apply
+    # throttle_classes (ScopedRateThrottle), so other views are unaffected. Rates apply
     # per user when logged in, otherwise per client IP. Counts are
     # kept in the default in-memory cache: correct with 1 pod and 1 gunicorn
     # worker; more processes or pods need a shared cache.
@@ -202,18 +184,10 @@ SIMPLE_JWT = {
 CORS_ALLOW_CREDENTIALS = True
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'CriticApp API',
-    'DESCRIPTION': 'Review and item lookup APIs for movies, games, anime, manga, and books.',
-    'VERSION': '2.0',
+    'TITLE': 'CriticApp JWT auth API',
+    'DESCRIPTION': "JWT auth endpoints. The app's API is v3, documented at /api/v3/docs.",
+    'VERSION': '1.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    # This is the v2 schema; v3 has its own (critic.api.schema).
+    # This is the JWT auth schema; v3 has its own (critic.api.schema).
     'PREPROCESSING_HOOKS': ['critic.api.schema.exclude_v3_paths'],
-    'TAGS': [
-        {'name': 'reviews', 'description': 'CRUD operations for reviews'},
-        {'name': 'lookup', 'description': 'External item search and details lookup'},
-        {'name': 'ops', 'description': 'Operational endpoints'},
-    ],
 }
-
-# API Response format versioning
-API_RESPONSE_VERSION = '2.0'

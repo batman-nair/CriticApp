@@ -1,7 +1,4 @@
-"""GET /api/v3/categories and the category table behind it.
-
-v2's FILTER_CATEGORIES (review/views.py) stays as it is for the old pages.
-"""
+"""GET /api/v3/categories and the category table behind it."""
 
 from dataclasses import dataclass
 
