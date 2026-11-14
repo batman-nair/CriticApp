@@ -14,8 +14,19 @@ CriticApp runs on the following production components:
 - Postgres in-cluster deployment and service
 - Django app deployment served by Gunicorn
 - WhiteNoise for static asset delivery from app containers
+- Frontend deployment: nginx serving the built React app (`frontend/`)
 - Beszel on the host for machine monitoring, and a staff-only API usage page with Telegram quota alerts (see [Monitoring](#monitoring))
 - GitHub Actions workflow at `.github/workflows/deploy-k8s.yml`
+
+Routing on the main Ingress (`k8s/ingress.yaml`), all on one domain:
+
+- `/api` → `criticapp-web` (Django: the API, `/api/admin/`, `/api/usage/`)
+- `/` → `criticapp-frontend` (everything else, including deep links)
+- `/metrics` → blocked (403) by a higher-priority Ingress
+- `/health/` has no public route; it is only used by the pod probes
+- HTTP redirects to HTTPS at Traefik (`redirect-https` middleware)
+
+Traefik orders routers by rule length by default, so `/api` wins over `/`.
 
 ## Prerequisites
 
@@ -71,6 +82,16 @@ The deployment workflow requires:
 - `CSRF_TRUSTED_ORIGINS` (optional but recommended)
 - `LETSENCRYPT_EMAIL` (required if workflow should apply ClusterIssuer)
 
+### GitHub Actions Variables
+
+The deployment workflow also requires this repository **variable** (Settings → Secrets and variables → Actions → Variables, not a secret):
+
+- `VITE_OWNER_USERNAME`: the username whose reviews the site shows. It is baked into the frontend image at build time. The deploy fails before building anything if it is empty.
+
+The frontend image is pushed to `ghcr.io/batman-nair/criticapp-frontend`. Like the web image, the cluster pulls it without credentials, so the GHCR package must be public. GitHub may create it as private on the first push; then the frontend rollout fails with `ImagePullBackOff` (prod keeps its previous routing). Make the package public and re-run the deploy.
+
+### Integration Test Workflow Secrets
+
 The integration test workflow (`.github/workflows/integration.yml`) requires:
 
 - `OMDB_API_KEY`
@@ -98,6 +119,7 @@ kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/secret.yaml
 kubectl apply -f k8s/postgres.yaml
 kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/frontend-service.yaml
 kubectl apply -f k8s/middleware.yaml
 ```
 
@@ -115,6 +137,7 @@ kubectl create configmap criticapp-config -n criticapp \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/frontend-deployment.yaml
 ```
 
 Sign-ups through `POST /api/auth/register/` are off by default. To allow them,
@@ -151,13 +174,16 @@ kubectl get certificate -n criticapp
 
 On every push to `master`, `.github/workflows/deploy-k8s.yml` does the following:
 
-1. Builds and pushes Docker image tags to GHCR
-2. Uploads `k8s/` manifests to the target server over SSH
-3. Applies core Kubernetes resources
-4. Creates or updates `criticapp-config` ConfigMap from workflow values
-5. Applies ingress resources and optional ClusterIssuer
-6. Runs migration job with the new image
-7. Rolls out `criticapp-web` with zero-downtime strategy
+1. Checks that the `VITE_OWNER_USERNAME` repository variable is set
+2. Builds and pushes the web and frontend images to GHCR
+3. Uploads `k8s/` manifests to the target server over SSH
+4. Applies core Kubernetes resources
+5. Creates or updates `criticapp-config` ConfigMap from workflow values
+6. Applies the optional ClusterIssuer and the Traefik middlewares
+7. Runs migration job with the new image
+8. Rolls out `criticapp-web` with zero-downtime strategy
+9. Rolls out `criticapp-frontend`
+10. Applies the ingress resources, last, so routing only changes once both rollouts are healthy
 
 ## Configuration Source of Truth
 
@@ -180,17 +206,34 @@ Recommended operational rule:
 
 Application endpoints:
 
-- `/health/` for readiness and liveness
+- `/health/` for readiness and liveness (pod-internal; no public route)
 - `/metrics/` Prometheus-format metrics (blocked at the ingress; nothing scrapes it since the move to Beszel)
 - `/api/usage/` staff-only page with external API usage against quotas
+
+The frontend pod's probes use nginx's `/healthz` on port 8080.
 
 Useful checks:
 
 ```bash
-kubectl get deployment criticapp-web -n criticapp
+kubectl get deployment criticapp-web criticapp-frontend -n criticapp
 kubectl rollout status deployment/criticapp-web -n criticapp --timeout=300s
+kubectl rollout status deployment/criticapp-frontend -n criticapp --timeout=300s
 kubectl logs -n criticapp deploy/criticapp-web --tail=200
+kubectl logs -n criticapp deploy/criticapp-frontend --tail=200
 ```
+
+### Rollback of the frontend cutover
+
+Revert the cutover PR on `master`. The next deploy re-applies the old Ingress, so `/` goes back to Django (the old pages stay until #58's cleanup). `/api/...` works either way.
+
+`kubectl apply` doesn't delete objects, so the frontend pod and the redirect middleware stay behind. Remove them by hand, **only after the revert's deploy has finished** and the old Ingress is applied:
+
+```bash
+kubectl delete deployment,service criticapp-frontend -n criticapp
+kubectl delete middleware redirect-https -n criticapp
+```
+
+Deleting the middleware while the new Ingress still references it makes Traefik drop the router, and the whole site returns 404.
 
 ### Refresh Review Item Metadata
 
@@ -341,7 +384,7 @@ Notes:
 
 ### Outside check for the box being down
 
-Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/health/` (5-minute interval) with email or app notifications.
+Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor for `https://<APP_DOMAIN>/api/auth/session` (5-minute interval) with email or app notifications. It is public, returns 200 and goes through Django. `https://<APP_DOMAIN>/health/` now reaches the frontend, not Django, so don't use it.
 
 ## Troubleshooting
 
@@ -360,6 +403,16 @@ kubectl describe deployment criticapp-web -n criticapp
 kubectl get pods -n criticapp -l app=criticapp-web
 kubectl logs -n criticapp deploy/criticapp-web --tail=200
 ```
+
+### Frontend rollout stuck
+
+```bash
+kubectl describe deployment criticapp-frontend -n criticapp
+kubectl get pods -n criticapp -l app=criticapp-frontend
+kubectl logs -n criticapp deploy/criticapp-frontend --tail=200
+```
+
+`ImagePullBackOff` usually means the `criticapp-frontend` GHCR package is private. Make it public and re-run the deploy.
 
 ### TLS certificate not ready
 
