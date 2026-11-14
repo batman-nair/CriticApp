@@ -252,3 +252,54 @@ def test_production_cookies_are_secure_by_default(production_settings, monkeypat
 
     assert production_settings.SESSION_COOKIE_SECURE is True
     assert production_settings.CSRF_COOKIE_SECURE is True
+
+
+# The frontend and Django share an origin behind the ingress: Traefik
+# terminates TLS and forwards Host and X-Forwarded-Proto. Env as the deploy
+# workflow's ConfigMap sets it (CSRF_TRUSTED_ORIGINS left out on purpose: a
+# same-origin request must not depend on it).
+PROD_DOMAIN = 'reviews.example.com'
+PROD_ALLOWED_HOSTS = f'{PROD_DOMAIN},127.0.0.1,localhost,criticapp-web,criticapp-web.criticapp.svc.cluster.local'
+PROXY_HEADERS = {'HTTP_HOST': PROD_DOMAIN, 'HTTP_X_FORWARDED_PROTO': 'https'}
+
+
+@pytest.fixture
+def behind_prod_proxy(production_settings, monkeypatch):
+    monkeypatch.setenv('ALLOWED_HOSTS', PROD_ALLOWED_HOSTS)
+    monkeypatch.delenv('CSRF_TRUSTED_ORIGINS', raising=False)
+    prod = reload(production_settings)
+    with override_settings(
+        ALLOWED_HOSTS=prod.ALLOWED_HOSTS,
+        SECURE_PROXY_SSL_HEADER=prod.SECURE_PROXY_SSL_HEADER,
+        CSRF_TRUSTED_ORIGINS=prod.CSRF_TRUSTED_ORIGINS,
+    ):
+        yield
+
+
+def _login_from(origin):
+    User.objects.create_user(username='alice', password=PASSWORD)
+    client = APIClient(enforce_csrf_checks=True)
+    assert client.get(CSRF_URL, **PROXY_HEADERS).status_code == status.HTTP_204_NO_CONTENT
+    token = client.cookies['csrftoken'].value
+    response = client.post(
+        LOGIN_URL, CREDENTIALS, format='json', HTTP_ORIGIN=origin, HTTP_X_CSRFTOKEN=token, **PROXY_HEADERS
+    )
+    return client, response
+
+
+@pytest.mark.django_db
+def test_prod_same_origin_login_through_the_proxy(behind_prod_proxy):
+    client, response = _login_from(f'https://{PROD_DOMAIN}')
+
+    assert response.status_code == status.HTTP_200_OK
+    assert client.get(SESSION_URL, **PROXY_HEADERS).json()['data']['user']['username'] == 'alice'
+
+
+@pytest.mark.django_db
+def test_prod_cross_origin_login_is_rejected(behind_prod_proxy):
+    client, response = _login_from('https://evil.example.com')
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response['Content-Type'] == 'application/problem+json'
+    assert response.json()['code'] == 'PERMISSION_DENIED'
+    assert client.get(SESSION_URL, **PROXY_HEADERS).json()['data']['user'] is None

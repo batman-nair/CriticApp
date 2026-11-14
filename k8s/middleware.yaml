@@ -10,3 +10,16 @@ spec:
     sourceRange:
       - 127.0.0.1/32
       - ::1/128
+---
+# Redirect HTTP to HTTPS for the main Ingress. Django used to do this for
+# every path (SECURE_SSL_REDIRECT), but / now reaches the frontend's nginx,
+# which doesn't. Requests that are already HTTPS pass through unchanged.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: criticapp
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

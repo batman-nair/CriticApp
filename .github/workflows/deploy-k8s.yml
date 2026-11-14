@@ -15,10 +15,21 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: batman-nair/criticapp
+      FRONTEND_IMAGE_NAME: batman-nair/criticapp-frontend
       KUBE_NAMESPACE: criticapp
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # Before anything is built or pushed, so a missing variable leaves prod untouched.
+      - name: Check repository variables
+        env:
+          VITE_OWNER_USERNAME: ${{ vars.VITE_OWNER_USERNAME }}
+        run: |
+          if [ -z "$VITE_OWNER_USERNAME" ]; then
+            echo "::error::VITE_OWNER_USERNAME repository variable is required"
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -30,7 +41,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push web image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -38,6 +49,17 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          build-args: |
+            VITE_OWNER_USERNAME=${{ vars.VITE_OWNER_USERNAME }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
 
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.9.0
@@ -106,6 +128,7 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          FRONTEND_IMAGE_NAME: ${{ env.FRONTEND_IMAGE_NAME }}
           KUBE_NAMESPACE: ${{ env.KUBE_NAMESPACE }}
           IMAGE_TAG: ${{ github.sha }}
           APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
@@ -126,7 +149,7 @@ jobs:
           REMOTE_DIR="/tmp/criticapp-deploy-${{ github.sha }}"
 
           ssh -p "$PORT" "$SSH_USER@$SSH_HOST" \
-            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
+            "KUBE_NAMESPACE='$KUBE_NAMESPACE' REGISTRY='$REGISTRY' IMAGE_NAME='$IMAGE_NAME' FRONTEND_IMAGE_NAME='$FRONTEND_IMAGE_NAME' IMAGE_TAG='$IMAGE_TAG' APP_DOMAIN='$APP_DOMAIN' ALLOWED_HOSTS='$ALLOWED_HOSTS' CSRF_TRUSTED_ORIGINS='$CSRF_TRUSTED_ORIGINS' LETSENCRYPT_EMAIL='$LETSENCRYPT_EMAIL' REMOTE_DIR='$REMOTE_DIR' bash -s" <<'EOF'
           set -euo pipefail
 
           if kubectl get ns >/dev/null 2>&1; then
@@ -167,8 +190,8 @@ jobs:
             sed "s|__LETSENCRYPT_EMAIL__|$LETSENCRYPT_EMAIL|g" "$REMOTE_DIR/k8s/clusterissuer.yaml" | kubectl_cmd apply -f -
           fi
 
+          # Before the Ingress, which references its middlewares.
           kubectl_cmd apply -f "$REMOTE_DIR/k8s/middleware.yaml"
-          sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
 
           kubectl_cmd delete job criticapp-migrate -n "$KUBE_NAMESPACE" --ignore-not-found
           sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/migration-job.yaml" | kubectl_cmd apply -f -
@@ -176,6 +199,14 @@ jobs:
 
           kubectl_cmd set image deployment/criticapp-web web="$REGISTRY/$IMAGE_NAME:$IMAGE_TAG" -n "$KUBE_NAMESPACE"
           kubectl_cmd rollout status deployment/criticapp-web -n "$KUBE_NAMESPACE" --timeout=300s
+
+          sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$FRONTEND_IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/frontend-deployment.yaml" | kubectl_cmd apply -f -
+          kubectl_cmd apply -f "$REMOTE_DIR/k8s/frontend-service.yaml"
+          kubectl_cmd rollout status deployment/criticapp-frontend -n "$KUBE_NAMESPACE" --timeout=300s
+
+          # Last, so / only switches to the frontend once both rollouts are
+          # healthy. A failed deploy leaves the previous routing in place.
+          sed "s|__APP_DOMAIN__|$APP_DOMAIN|g" "$REMOTE_DIR/k8s/ingress.yaml" | kubectl_cmd apply -f -
 
           # After a successful rollout, so the daily checks test the image that is live.
           sed "s|^\(\s*image:\s*\).*|\1$REGISTRY/$IMAGE_NAME:$IMAGE_TAG|" "$REMOTE_DIR/k8s/integration-cronjob.yaml" | kubectl_cmd apply -f -
