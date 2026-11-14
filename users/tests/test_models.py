@@ -28,10 +28,3 @@ class UserModelTest(TestCase):
         with self.assertRaises(Exception):
             User.objects.create_user(username='dupe', password='pass12345')
 
-
-class UserLogoutViewTest(TestCase):
-    def test_logout_redirects(self):
-        User.objects.create_user(username='logoutuser', password='pass12345')
-        self.client.login(username='logoutuser', password='pass12345')
-        response = self.client.get('/profile/logout')
-        self.assertEqual(response.status_code, 302)

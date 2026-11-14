@@ -15,8 +15,7 @@ from .pagination import V3LimitOffsetPagination
 class V3ViewMixin:
     """Settings shared by every v3 view.
 
-    - No versioning class: the global one only allows v2, and v3 is
-      versioned by its URL.
+    - No versioning class: v3 is versioned by its URL.
     - Errors go through the v3 problem+json handler instead of the global one.
     - JSON only, no browsable API.
     - Throttled by `throttle_scope` ('search', 'login'); views without a

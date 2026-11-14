@@ -151,7 +151,7 @@ class ItemSerializer(serializers.BaseSerializer):
 
 
 class ItemDetailView(V3APIView):
-    # Fetching an unknown item spends upstream quota, as in v2.
+    # Fetching an unknown item spends upstream quota.
     permission_classes = [IsAuthenticated]
 
     @extend_schema(

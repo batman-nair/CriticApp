@@ -14,7 +14,7 @@ from .errors import PROBLEM_CONTENT_TYPE, ProblemSerializer, status_title
 
 V3_PATH_PREFIX = '/api/v3/'
 # Unversioned, but part of the v3 schema. By exact path: the JWT endpoints
-# under /api/auth/ stay in v2.
+# under /api/auth/ stay in the JWT schema at /api/schema/.
 V3_SESSION_AUTH_PATHS = frozenset({
     '/api/auth/csrf',
     '/api/auth/login',
@@ -30,7 +30,7 @@ V3_SCHEMA_SETTINGS = {
         'stable `code`. See docs/API_V3.md.'
     ),
     'VERSION': '3.0',
-    # The global hook drops /api/v3/ from the v2 schema; it must not run here.
+    # The global hook drops /api/v3/ from the JWT schema; it must not run here.
     'PREPROCESSING_HOOKS': [],
     # Separate request and response components, for the frontend's generated
     # types. Set from the start, because turning it on renames components.
@@ -47,7 +47,7 @@ V3_SCHEMA_SETTINGS = {
 
 
 def exclude_v3_paths(endpoints, **kwargs):
-    """Preprocessing hook for the v2 schema: leave out what's in the v3 schema."""
+    """Preprocessing hook for the JWT schema (/api/schema/): leave out what's in the v3 schema."""
     return [
         endpoint for endpoint in endpoints
         if not endpoint[0].startswith(V3_PATH_PREFIX) and endpoint[0] not in V3_SESSION_AUTH_PATHS

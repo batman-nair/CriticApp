@@ -1,7 +1,6 @@
 """Query params of the v3 review endpoints, and the filtering and sorting behind them.
 
-Filtering goes through v2's get_filtered_review_objects(), so `q`, `category`
-and `language` can't drift from v2.
+Filtering goes through get_filtered_review_objects() (review/utils/review_utils.py).
 """
 
 from django.db.models import F

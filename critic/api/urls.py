@@ -7,8 +7,8 @@ from .schema import V3_SCHEMA_SETTINGS
 from .views import V3NotFoundView
 
 urlpatterns = [
-    # versioning_class=None: the global versioning would report version 2.0
-    # to the schema generator.
+    # versioning_class=None: v3 is versioned by its URL, so the schema
+    # generator gets no request version.
     path('schema', SpectacularAPIView.as_view(
         urlconf='critic.api.schema_urls',
         custom_settings=V3_SCHEMA_SETTINGS,

@@ -3,7 +3,6 @@ from collections import Counter
 
 from django.db.models import Count, Q
 from typing import Optional
-from review.serializers import ReviewSerializer
 from review.models import Review
 
 ORDERING_DICT = {
@@ -128,14 +127,6 @@ def count_review_languages(reviews) -> list[tuple[str, int]]:
     return sorted(counts.items(), key=lambda entry: (-entry[1], entry[0]))
 
 
-def get_review_languages(username: str='') -> list[str]:
-    """Languages of the reviewed items, most common first, then by name."""
-    reviews = Review.objects.all()
-    if username:
-        reviews = reviews.filter(user__username=username)
-    return [language for language, _ in count_review_languages(reviews)]
-
-
 def count_reviews_by_category(reviews, categories: list) -> tuple[int, dict[str, int]]:
     """(total, {category: count}) for a review queryset, in one query.
 
@@ -147,9 +138,3 @@ def count_reviews_by_category(reviews, categories: list) -> tuple[int, dict[str,
         **{f'c{index}': Count('id', filter=_categories_to_q([category])) for index, category in enumerate(categories)},
     )
     return counts['total'], {category: counts[f'c{index}'] for index, category in enumerate(categories)}
-
-def convert_reviews_to_json(reviews: list) -> dict:
-    json_data = {'results': []}
-    for review in reviews:
-        json_data['results'].append(ReviewSerializer(review).data)
-    return json_data
