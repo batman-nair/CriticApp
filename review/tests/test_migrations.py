@@ -241,7 +241,9 @@ class RemoveModifiedDateMigrationTest(TransactionTestCase):
             item_id='omdb_tt1', category='movie', title='Title', image_url='https://example.com/i.png',
             year='2000', attr1='a', attr2='b', attr3='movie', description='d', rating='5',
         )
-        self.first = Review.objects.create(user=alice, review_item=item, review_rating=Decimal('8.0'))
+        self.first = Review.objects.create(
+            user=alice, review_item=item, review_rating=Decimal('8.0'), review_data='Notes', review_tags='tag1',
+        )
         self.second = Review.objects.create(user=bob, review_item=item, review_rating=Decimal('6.0'))
         # A queryset update, because auto_now would set now on a save().
         Review.objects.update(created_at=self.CREATED_AT, updated_at=self.UPDATED_AT)
@@ -262,13 +264,16 @@ class RemoveModifiedDateMigrationTest(TransactionTestCase):
 
     def _rows(self, Review):
         return list(
-            Review.objects.order_by('pk').values_list('pk', 'review_rating', 'created_at', 'updated_at')
+            Review.objects.order_by('pk').values_list(
+                'pk', 'user__username', 'review_item_id', 'review_rating', 'review_data', 'review_tags',
+                'created_at', 'updated_at',
+            )
         )
 
     def _expected_rows(self):
         return [
-            (self.first.pk, Decimal('8.00'), self.CREATED_AT, self.UPDATED_AT),
-            (self.second.pk, Decimal('6.00'), self.CREATED_AT, self.UPDATED_AT),
+            (self.first.pk, 'alice', 'omdb_tt1', Decimal('8.00'), 'Notes', 'tag1', self.CREATED_AT, self.UPDATED_AT),
+            (self.second.pk, 'bob', 'omdb_tt1', Decimal('6.00'), None, None, self.CREATED_AT, self.UPDATED_AT),
         ]
 
     def test_forward_drops_the_column_and_keeps_the_rows(self):
