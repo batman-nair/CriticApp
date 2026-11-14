@@ -222,10 +222,6 @@ kubectl logs -n criticapp deploy/criticapp-web --tail=200
 kubectl logs -n criticapp deploy/criticapp-frontend --tail=200
 ```
 
-### Rollback of the frontend cutover
-
-Since #114 there is no Django UI to roll back to: reverting the cutover PR would send `/` to a Django that has no pages. To undo a bad frontend change, revert that frontend PR on `master`; the deploy rebuilds and rolls out the frontend image. `/api/...` is served by Django either way.
-
 ### Refresh Review Item Metadata
 
 CronJob manifest: `k8s/refresh-cronjob.yaml`
