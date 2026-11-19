@@ -70,12 +70,16 @@ class ListTest(WatchlistApiTestCase):
 
     def test_category_filter(self):
         movie = add_entry(self.alice, category='movie').review_item_id
+        series = add_entry(self.alice, category='series').review_item_id
         game = add_entry(self.alice, category='game').review_item_id
+        manga = add_entry(self.alice, category='manga').review_item_id
         anime_tv = add_entry(self.alice, category='anime', attr3='tv').review_item_id
         anime_movie = add_entry(self.alice, category='anime', attr3='Movie').review_item_id
         cases = [
             ('category=movie', {movie}),
+            ('category=series', {series}),
             ('category=game', {game}),
+            ('category=manga', {manga}),
             ('category=book', set()),
             ('category=anime', {anime_tv, anime_movie}),
             ('category=anime:series', {anime_tv}),
