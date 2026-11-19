@@ -122,9 +122,10 @@ class WatchlistView(V3GenericAPIView):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
-        # A reviewed item is always stored, and a stored item is returned
-        # without an upstream request, so one check after the lookup costs no
-        # quota. It uses the stored id, which also catches an alias id.
+        # One check, after the lookup. A reviewed item is always stored, and
+        # the lookup returns a stored id without an upstream request, so a
+        # check before it would save no quota. An alias id costs a request
+        # either way; checking by the stored item catches it too.
         try:
             item = get_or_fetch_item(validated['item_id'])
         except ProviderError as ex:
