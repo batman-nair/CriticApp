@@ -240,6 +240,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v3/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the user's watchlist
+         * @description The logged-in user's entries, newest `added_at` first. `category` can be repeated or separated with commas.
+         */
+        get: operations["watchlist_list"];
+        put?: never;
+        /**
+         * Add an item to the watchlist
+         * @description Add an item by its id. An item that isn't stored yet is fetched from its provider (picked by the id prefix) and stored. 201 with the new entry; 200 with the existing entry, unchanged, when the item is already on the watchlist (a sent `added_at` is ignored then). 400 for a future `added_at`; 404 when the prefix is unknown or the provider has no such item; 502 when the provider fails; 409 ALREADY_REVIEWED when the user already reviewed the item.
+         */
+        post: operations["watchlist_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v3/watchlist/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an item from the watchlist
+         * @description By the stored item id (`item.id` of a listed entry). 404 when the item isn't on the watchlist.
+         */
+        delete: operations["watchlist_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v3/watchlist/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count watchlist entries by category
+         * @description Counts for the logged-in user's watchlist, for the watchlist page's category chips.
+         */
+        get: operations["watchlist_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -620,6 +684,39 @@ export interface components {
         };
         TagListResponse: {
             data: components["schemas"]["Tag"][];
+            /** @description Always empty for responses without pagination */
+            meta: Record<string, never>;
+        };
+        WatchlistEntry: {
+            item: components["schemas"]["Item"];
+            /** Format: date-time */
+            added_at: string;
+        };
+        WatchlistEntryCreateRequest: {
+            item_id: string;
+            /**
+             * Format: date-time
+             * @description When the entry was added. Defaults to now; undoing a removal sends the entry's original value
+             */
+            added_at?: string;
+        };
+        WatchlistEntryPageResponse: {
+            data: components["schemas"]["WatchlistEntry"][];
+            meta: components["schemas"]["PaginatedMeta"];
+        };
+        WatchlistEntryResponse: {
+            data: components["schemas"]["WatchlistEntry"];
+            /** @description Always empty for responses without pagination */
+            meta: Record<string, never>;
+        };
+        WatchlistFacets: {
+            /** @description Entries on the watchlist */
+            total: number;
+            /** @description Every chip, in /categories order, zero counts included */
+            categories: components["schemas"]["CategoryFacet"][];
+        };
+        WatchlistFacetsResponse: {
+            data: components["schemas"]["WatchlistFacets"];
             /** @description Always empty for responses without pagination */
             meta: Record<string, never>;
         };
@@ -1332,6 +1429,228 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    watchlist_list: {
+        parameters: {
+            query?: {
+                /** @description Only these categories. Repeat the param or separate values with commas */
+                category?: ("movie" | "series" | "game" | "anime" | "anime:series" | "anime:movie" | "manga" | "book")[];
+                /** @description Page size. Default 20; values above 100 are cut down to 100, and invalid values fall back to the default. */
+                limit?: number;
+                /** @description How many entries to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistEntryPageResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    watchlist_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistEntryCreateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistEntryResponse"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistEntryResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    watchlist_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    watchlist_facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistFacetsResponse"];
                 };
             };
             /** @description Unauthorized */

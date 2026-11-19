@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 class ReviewItem(models.Model):
@@ -40,6 +41,21 @@ class Review(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['user', 'review_item'], name='unique review')
+            ]
+
+    def __str__(self):
+        return '{}'.format(self.review_item.title)
+
+
+class WatchlistEntry(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    review_item = models.ForeignKey(ReviewItem, on_delete=models.CASCADE)
+    # Not auto_now_add: undoing a removal sends the original value back.
+    added_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'review_item'], name='unique watchlist entry')
             ]
 
     def __str__(self):

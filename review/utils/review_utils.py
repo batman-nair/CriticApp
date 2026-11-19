@@ -33,7 +33,7 @@ def _normalize_categories(values: Optional[list]) -> list:
     return normalized
 
 
-def _categories_to_q(categories: list) -> Optional[Q]:
+def categories_to_q(categories: list) -> Optional[Q]:
     plain_categories = [category for category in categories if ':' not in category]
     query_obj = Q(review_item__category__in=plain_categories) if plain_categories else None
     for category in categories:
@@ -91,13 +91,13 @@ def get_filtered_review_objects(
     explicit_exclude_categories = _normalize_categories(exclude_categories)
 
     if include_categories:
-        reviews = reviews.filter(_categories_to_q(include_categories))
+        reviews = reviews.filter(categories_to_q(include_categories))
 
     if legacy_exclude_categories:
-        reviews = reviews.exclude(_categories_to_q(legacy_exclude_categories))
+        reviews = reviews.exclude(categories_to_q(legacy_exclude_categories))
 
     if explicit_exclude_categories:
-        reviews = reviews.exclude(_categories_to_q(explicit_exclude_categories))
+        reviews = reviews.exclude(categories_to_q(explicit_exclude_categories))
 
     include_languages = _normalize_categories(languages)
     if include_languages:
@@ -126,13 +126,14 @@ def count_review_languages(reviews) -> list[tuple[str, int]]:
 
 
 def count_reviews_by_category(reviews, categories: list) -> tuple[int, dict[str, int]]:
-    """(total, {category: count}) for a review queryset, in one query.
+    """(total, {category: count}) for a queryset of rows with a `review_item`
+    FK (reviews or watchlist entries), in one query.
 
     `categories` are the ids the category filters take, subcategories included.
     """
     # Aliased by position, so an id like "anime:series" isn't a SQL alias.
     counts = reviews.aggregate(
         total=Count('id'),
-        **{f'c{index}': Count('id', filter=_categories_to_q([category])) for index, category in enumerate(categories)},
+        **{f'c{index}': Count('id', filter=categories_to_q([category])) for index, category in enumerate(categories)},
     )
     return counts['total'], {category: counts[f'c{index}'] for index, category in enumerate(categories)}

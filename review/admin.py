@@ -2,11 +2,12 @@ from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.template.response import TemplateResponse
 
-from .models import ReviewItem, Review, UpstreamApiUsage
+from .models import ReviewItem, Review, UpstreamApiUsage, WatchlistEntry
 from .utils import api_usage
 
 admin.site.register(ReviewItem)
 admin.site.register(Review)
+admin.site.register(WatchlistEntry)
 
 
 @admin.register(UpstreamApiUsage)
