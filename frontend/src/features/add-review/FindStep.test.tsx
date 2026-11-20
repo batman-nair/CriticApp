@@ -272,9 +272,8 @@ describe('in the watchlist sheet', () => {
     tt1: { status: 'add', fresh: false },
     tt2: { status: 'on', fresh: true },
   }
-  const watchlistStatus = vi.fn(
-    (result: SearchResult) => statuses[result.id] ?? statuses.tt1,
-  )
+  const watchlistStatus = (result: SearchResult): WatchlistRowStatus =>
+    statuses[result.id] ?? { status: 'add', fresh: false }
   const movies = () => screen.getByRole('searchbox', { name: 'Search movies' })
 
   function renderSheetStep(onSelect = vi.fn()) {

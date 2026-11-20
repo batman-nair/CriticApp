@@ -147,7 +147,7 @@ it('is described by its description, under the title', async () => {
 
   expect(dialog()).toHaveAccessibleDescription('Tap a title to save it.')
   const description = screen.getByText('Tap a title to save it.')
-  expect(description).toHaveClass(styles.description, 'extra')
+  expect(description).toHaveClass(styles.description!, 'extra')
   expect(
     screen.getByRole('heading', { name: 'Details' }).nextElementSibling,
   ).toBe(description)
