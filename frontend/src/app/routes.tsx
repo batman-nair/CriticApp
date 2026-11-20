@@ -4,6 +4,7 @@ import { RequireOwner } from '../auth/RequireOwner'
 import { AddReviewPage } from '../features/add-review/AddReviewPage'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
+import { WatchlistPage } from '../features/watchlist/WatchlistPage'
 import { AppLayout } from '../layout/AppLayout'
 import { DialogErrorPage } from '../layout/DialogErrorPage'
 import { NotFoundPage } from '../layout/NotFoundPage'
@@ -46,6 +47,17 @@ export const routes: RouteObject[] = [
                     handle: { title: 'Add review' },
                   },
                 ],
+              },
+              {
+                path: 'watchlist',
+                element: (
+                  <RequireOwner>
+                    <WatchlistPage />
+                  </RequireOwner>
+                ),
+                handle: { title: 'Watchlist' },
+                // The add sheet (`add`) and Review it (`review/:itemId`)
+                // become its children, like `/` has `add` (#131, #132).
               },
               {
                 path: '*',

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../test/axe'
+import { makeSessionUser } from '../test/fixtures'
 import { sessionAs } from '../test/handlers'
 import { stubSystemTheme } from '../test/matchMedia'
 import { renderRoute } from '../test/renderRoute'
@@ -111,6 +112,35 @@ describe('routes', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows the watchlist at /watchlist to the owner', async () => {
+    renderRoute('/watchlist')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Up next.' }),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole('article', { name: 'Dune: Part Two' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+  })
+
+  it('sends someone logged out from /watchlist to the login page', async () => {
+    server.use(sessionAs(null))
+    const { router } = renderRoute('/watchlist?category=movie')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe(
+      '?next=%2Fwatchlist%3Fcategory%3Dmovie',
+    )
+  })
+
+  it('sends another user from /watchlist home', async () => {
+    server.use(sessionAs(makeSessionUser({ id: 2, username: 'someone' })))
+    const { router } = renderRoute('/watchlist')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(
+      await screen.findByRole('heading', { level: 1, name: HERO }),
+    ).toBeInTheDocument()
+  })
+
   it('shows /login without the header or footer', () => {
     server.use(sessionAs(null))
     renderRoute('/login')
@@ -142,6 +172,7 @@ describe('document title', () => {
     ['/', 'Critic'],
     ['/reviews/1', 'Review · Critic'],
     ['/add', 'Add review · Critic'],
+    ['/watchlist', 'Watchlist · Critic'],
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
   ])('at %s is %s', (path, title) => {
