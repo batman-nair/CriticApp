@@ -139,7 +139,7 @@ export interface paths {
         put?: never;
         /**
          * Create a review
-         * @description Review an item by its id. An item that isn't stored yet is fetched from its provider (picked by the id prefix) and stored. 404 when the prefix is unknown or the provider has no such item; 502 when the provider fails; 409 DUPLICATE_REVIEW with `existing_review_id` when the user already reviewed the item.
+         * @description Review an item by its id. An item that isn't stored yet is fetched from its provider (picked by the id prefix) and stored. 404 when the prefix is unknown or the provider has no such item; 502 when the provider fails; 409 DUPLICATE_REVIEW with `existing_review_id` when the user already reviewed the item. Creating a review removes the item from the user's watchlist.
          */
         post: operations["reviews_create"];
         delete?: never;
@@ -615,6 +615,8 @@ export interface components {
             provider_rating: number | null;
             /** @description The logged-in user's review of this item, if any */
             my_review: components["schemas"]["MyReview"] | null;
+            /** @description Whether the item is on the logged-in user's watchlist */
+            on_watchlist: boolean;
         };
         /**
          * @description * `movie` - movie

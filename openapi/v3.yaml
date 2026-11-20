@@ -330,7 +330,7 @@ paths:
         from its provider (picked by the id prefix) and stored. 404 when the prefix
         is unknown or the provider has no such item; 502 when the provider fails;
         409 DUPLICATE_REVIEW with `existing_review_id` when the user already reviewed
-        the item.
+        the item. Creating a review removes the item from the user's watchlist.
       summary: Create a review
       tags:
       - reviews
@@ -1710,6 +1710,9 @@ components:
           - $ref: '#/components/schemas/MyReview'
           nullable: true
           description: The logged-in user's review of this item, if any
+        on_watchlist:
+          type: boolean
+          description: Whether the item is on the logged-in user's watchlist
       required:
       - category
       - end_year
@@ -1717,6 +1720,7 @@ components:
       - id
       - image_url
       - my_review
+      - on_watchlist
       - provider_rating
       - start_year
       - title

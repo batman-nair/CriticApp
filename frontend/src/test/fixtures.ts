@@ -130,6 +130,7 @@ export function makeSearchResult(
     genres: ['Role-playing (RPG)', 'Adventure'],
     provider_rating: 9.3,
     my_review: null,
+    on_watchlist: false,
     ...overrides,
   }
 }
