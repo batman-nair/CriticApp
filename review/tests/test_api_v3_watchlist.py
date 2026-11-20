@@ -95,6 +95,109 @@ class ListTest(WatchlistApiTestCase):
     def test_unknown_category_is_rejected(self):
         self.assertFieldError(self.client.get(f'{LIST_URL}?category=podcast'), 'category.0', 'invalid_choice')
 
+    def test_q_matches_title_people_genre_and_year(self):
+        title = add_entry(self.alice, title='Heat').review_item_id
+        person = add_entry(self.alice, attr1='Michael Mann').review_item_id
+        genre = add_entry(self.alice, attr2='Crime, Drama').review_item_id
+        year = add_entry(self.alice, year='1995').review_item_id
+        cases = [
+            ('q=heat', [title]),
+            ('q=MANN', [person]),
+            ('q=crime', [genre]),
+            ('q=1995', [year]),
+            ('q=nothing', []),
+            ('q=', [year, genre, person, title]),
+        ]
+        for query, expected in cases:
+            with self.subTest(query=query):
+                self.assertEqual(self.list_item_ids(query), expected)
+
+    def test_q_matches_every_word(self):
+        both = add_entry(self.alice, title='Blue Planet').review_item_id
+        add_entry(self.alice, title='Blue Velvet')
+        split = add_entry(self.alice, title='Blue', attr2='Planet').review_item_id
+        self.assertCountEqual(self.list_item_ids('q=blue planet'), [both, split])
+        self.assertEqual(self.list_item_ids('q=blue planet velvet'), [])
+
+    def test_language_matches_whole_entries(self):
+        match = add_entry(self.alice, language='Korean, English').review_item_id
+        add_entry(self.alice, language='Old English')
+        add_entry(self.alice, language='')
+        french = add_entry(self.alice, language='French').review_item_id
+        self.assertEqual(self.list_item_ids('language=English'), [match])
+        self.assertEqual(self.list_item_ids('language=Eng'), [])
+        self.assertCountEqual(self.list_item_ids('language=English,French'), [match, french])
+
+    def test_filters_combine(self):
+        match = add_entry(self.alice, title='Heat', category='movie', language='English').review_item_id
+        add_entry(self.alice, title='Heat', category='series', language='English')
+        add_entry(self.alice, title='Heat', category='movie', language='French')
+        add_entry(self.alice, title='Cold', category='movie', language='English')
+        self.assertEqual(self.list_item_ids('q=heat&category=movie&language=English'), [match])
+
+    def test_sort_title(self):
+        now = timezone.now()
+        banana = add_entry(self.alice, title='Banana', added_at=now - timedelta(days=3)).review_item_id
+        cherry = add_entry(self.alice, title='cherry', added_at=now - timedelta(days=2)).review_item_id
+        apple_old = add_entry(self.alice, title='Apple', added_at=now - timedelta(days=1)).review_item_id
+        apple_new = add_entry(self.alice, title='apple', added_at=now).review_item_id
+        self.assertEqual(self.list_item_ids('sort=title'), [apple_new, apple_old, banana, cherry])
+
+    def test_sort_rating_puts_missing_ratings_last_both_ways(self):
+        now = timezone.now()
+
+        def add(rating, days_ago):
+            return add_entry(self.alice, rating=rating, added_at=now - timedelta(days=days_ago)).review_item_id
+
+        not_rated = add('N/A', 6)
+        seven_old = add('7', 5)
+        ten = add('10', 4)
+        blank = add('', 3)
+        eight = add('8.5', 2)
+        seven_new = add('7.0', 1)
+        cases = [
+            ('sort=-rating', [ten, eight, seven_new, seven_old, blank, not_rated]),
+            ('sort=rating', [seven_new, seven_old, eight, ten, blank, not_rated]),
+        ]
+        for query, expected in cases:
+            with self.subTest(query=query):
+                self.assertEqual(self.list_item_ids(query), expected)
+
+    def test_sort_year_newest_release_first(self):
+        now = timezone.now()
+
+        def add(year, days_ago):
+            return add_entry(self.alice, year=year, added_at=now - timedelta(days=days_ago)).review_item_id
+
+        tba = add('TBA', 6)
+        range_ = add('2018–2021', 5)
+        date = add('2019-05-01', 4)
+        blank = add('', 3)
+        plain = add('2019', 2)
+        open_range = add('2020–', 1)
+        self.assertEqual(self.list_item_ids('sort=-year'), [open_range, plain, date, range_, blank, tba])
+
+    def test_sort_added_is_the_default(self):
+        now = timezone.now()
+        older = add_entry(self.alice, title='A', added_at=now - timedelta(days=1)).review_item_id
+        newer = add_entry(self.alice, title='B', added_at=now).review_item_id
+        self.assertEqual(self.list_item_ids('sort=-added'), [newer, older])
+        self.assertEqual(self.list_item_ids(), [newer, older])
+
+    def test_unknown_sort_is_rejected(self):
+        self.assertFieldError(self.client.get(f'{LIST_URL}?sort=-updated'), 'sort', 'invalid_choice')
+
+    def test_other_users_entries_stay_out_under_every_filter(self):
+        mine = add_entry(self.alice, title='Heat', category='movie', language='English').review_item_id
+        add_entry(self.bob, title='Heat', category='movie', language='English')
+        queries = [
+            'q=heat', 'category=movie', 'language=English', 'q=heat&category=movie&language=English',
+            'sort=title', 'sort=-rating', 'sort=rating', 'sort=-year',
+        ]
+        for query in queries:
+            with self.subTest(query=query):
+                self.assertEqual(self.list_item_ids(query), [mine])
+
     def test_pagination(self):
         now = timezone.now()
         entries = [add_entry(self.alice, added_at=now - timedelta(minutes=minutes)) for minutes in range(5)]
@@ -116,14 +219,17 @@ class ListTest(WatchlistApiTestCase):
 
 
 class FacetsTest(WatchlistApiTestCase):
-    def get_facets(self):
-        response = self.client.get(FACETS_URL)
+    def get_facets(self, query=''):
+        response = self.client.get(f'{FACETS_URL}?{query}')
         self.assertEqual(response.status_code, 200, response.content)
         return response.json()['data']
 
+    def category_counts(self, data):
+        return {chip['id']: chip['count'] for chip in data['categories'] if chip['count']}
+
     def test_empty_watchlist(self):
         self.assertEqual(self.get_facets(), {
-            'total': 0, 'categories': [{'id': chip, 'count': 0} for chip in CHIPS],
+            'total': 0, 'categories': [{'id': chip, 'count': 0} for chip in CHIPS], 'languages': [],
         })
 
     def test_counts_every_chip_in_order(self):
@@ -135,7 +241,7 @@ class FacetsTest(WatchlistApiTestCase):
         add_entry(self.alice, category='anime', attr3='Movie')
         expected = {'movie': 2, 'book': 1, 'anime:series': 2, 'anime:movie': 1}
         self.assertEqual(self.get_facets(), {
-            'total': 6, 'categories': [{'id': chip, 'count': expected.get(chip, 0)} for chip in CHIPS],
+            'total': 6, 'categories': [{'id': chip, 'count': expected.get(chip, 0)} for chip in CHIPS], 'languages': [],
         })
 
     def test_other_users_entries_are_not_counted(self):
@@ -145,6 +251,56 @@ class FacetsTest(WatchlistApiTestCase):
         data = self.get_facets()
         self.assertEqual(data['total'], 1)
         self.assertEqual({chip['id']: chip['count'] for chip in data['categories'] if chip['count']}, {'game': 1})
+
+    def test_languages_most_common_first(self):
+        add_entry(self.alice, language='Korean, English')
+        add_entry(self.alice, language='English')
+        add_entry(self.alice, language='French')
+        add_entry(self.alice, language='')
+        add_entry(self.bob, language='French, German')
+        self.assertEqual(self.get_facets()['languages'], [
+            {'name': 'English', 'count': 2}, {'name': 'French', 'count': 1}, {'name': 'Korean', 'count': 1},
+        ])
+
+    def test_q_and_language_narrow_total_and_category_counts(self):
+        add_entry(self.alice, title='Heat', category='movie', language='English')
+        add_entry(self.alice, title='Heat', category='series', language='French')
+        add_entry(self.alice, title='Heat', category='movie', language='French')
+        add_entry(self.alice, title='Cold', category='game', language='English')
+        cases = [
+            ('q=heat', 3, {'movie': 2, 'series': 1}),
+            ('language=English', 2, {'movie': 1, 'game': 1}),
+            ('q=heat&language=French', 2, {'movie': 1, 'series': 1}),
+            ('q=nothing', 0, {}),
+        ]
+        for query, total, categories in cases:
+            with self.subTest(query=query):
+                data = self.get_facets(query)
+                self.assertEqual(data['total'], total)
+                self.assertEqual(self.category_counts(data), categories)
+
+    def test_category_does_not_change_total_or_category_counts(self):
+        add_entry(self.alice, category='movie', language='English')
+        add_entry(self.alice, category='game', language='French')
+        data = self.get_facets('category=movie')
+        self.assertEqual(data['total'], 2)
+        self.assertEqual(self.category_counts(data), {'movie': 1, 'game': 1})
+
+    def test_category_and_q_narrow_languages_but_language_does_not(self):
+        add_entry(self.alice, title='Heat', category='movie', language='English')
+        add_entry(self.alice, title='Heat', category='game', language='French')
+        add_entry(self.alice, title='Cold', category='movie', language='German')
+        cases = [
+            ('language=English', ['English', 'French', 'German']),
+            ('category=movie', ['English', 'German']),
+            ('q=heat&language=German', ['English', 'French']),
+        ]
+        for query, names in cases:
+            with self.subTest(query=query):
+                self.assertEqual([language['name'] for language in self.get_facets(query)['languages']], names)
+
+    def test_unknown_category_is_rejected(self):
+        self.assertFieldError(self.client.get(f'{FACETS_URL}?category=podcast'), 'category.0', 'invalid_choice')
 
 
 class AddTest(WatchlistApiTestCase):

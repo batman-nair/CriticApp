@@ -762,8 +762,12 @@ paths:
   /api/v3/watchlist:
     get:
       operationId: watchlist_list
-      description: The logged-in user's entries, newest `added_at` first. `category`
-        can be repeated or separated with commas.
+      description: 'The logged-in user''s entries. `q` searches the items'' titles,
+        descriptions, people, genres, years and languages; every word has to match.
+        `category` and `language` can be repeated or separated with commas. `sort`:
+        `-added` (newest `added_at` first, the default), `title`, `-rating` and `rating`
+        (the provider rating), `-year` (newest release first). Missing or unparseable
+        ratings and years go last in both directions; ties go to the newest `added_at`.'
       summary: List the user's watchlist
       parameters:
       - in: query
@@ -793,6 +797,15 @@ paths:
         description: Only these categories. Repeat the param or separate values with
           commas
       - in: query
+        name: language
+        schema:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        description: Only items in these languages. Repeat the param or separate values
+          with commas
+      - in: query
         name: limit
         schema:
           type: integer
@@ -803,6 +816,30 @@ paths:
         schema:
           type: integer
         description: How many entries to skip.
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+        description: Search text. Every word has to match
+      - in: query
+        name: sort
+        schema:
+          enum:
+          - -added
+          - title
+          - -rating
+          - rating
+          - -year
+          type: string
+          default: -added
+          minLength: 1
+        description: |-
+          * `-added` - -added
+          * `title` - title
+          * `-rating` - -rating
+          * `rating` - rating
+          * `-year` - -year
       tags:
       - watchlist
       security:
@@ -944,8 +981,53 @@ paths:
     get:
       operationId: watchlist_facets
       description: Counts for the logged-in user's watchlist, for the watchlist page's
-        category chips.
-      summary: Count watchlist entries by category
+        category chips and language menu. Takes the filters of `GET /api/v3/watchlist`.
+        `category` has no effect on `total` and the category counts, and `language`
+        has no effect on the language counts, so a chip shows what you'd get by switching
+        to it.
+      summary: Count watchlist entries by category and language
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: array
+          items:
+            enum:
+            - movie
+            - series
+            - game
+            - anime
+            - anime:series
+            - anime:movie
+            - manga
+            - book
+            type: string
+            description: |-
+              * `movie` - movie
+              * `series` - series
+              * `game` - game
+              * `anime` - anime
+              * `anime:series` - anime:series
+              * `anime:movie` - anime:movie
+              * `manga` - manga
+              * `book` - book
+        description: Only these categories. Repeat the param or separate values with
+          commas
+      - in: query
+        name: language
+        schema:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        description: Only items in these languages. Repeat the param or separate values
+          with commas
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+        description: Search text. Every word has to match
       tags:
       - watchlist
       security:
@@ -958,6 +1040,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/WatchlistFacetsResponse'
           description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
         '401':
           content:
             application/problem+json:
@@ -1934,14 +2022,20 @@ components:
       properties:
         total:
           type: integer
-          description: Entries on the watchlist
+          description: Entries matching every filter except the category one
         categories:
           type: array
           items:
             $ref: '#/components/schemas/CategoryFacet'
           description: Every chip, in /categories order, zero counts included
+        languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/LanguageFacet'
+          description: Most common first, then by name
       required:
       - categories
+      - languages
       - total
     WatchlistFacetsResponse:
       type: object
