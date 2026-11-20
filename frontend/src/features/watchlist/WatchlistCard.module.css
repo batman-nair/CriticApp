@@ -67,6 +67,37 @@
   line-height: var(--leading-125);
 }
 
+/* Under the title, at the card's foot. Remove joins Review it here (#133). */
+.actions {
+  display: flex;
+  gap: var(--space-6);
+  margin-top: auto;
+}
+
+.review {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  height: 40px;
+  border-radius: var(--radius-10);
+  /* The board mixes in the poster's hue; the app has the category's. */
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-card-action),
+    var(--surface)
+  );
+  color: var(--fg);
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.reviewIcon {
+  flex: none;
+}
+
 @media (max-width: 639px) {
   .card {
     gap: var(--space-10);
@@ -99,5 +130,16 @@
 
   .title {
     font-size: var(--text-15);
+  }
+
+  .review {
+    gap: 5px;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .reviewIcon {
+    width: 13px;
+    height: 13px;
   }
 }

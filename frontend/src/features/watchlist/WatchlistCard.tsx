@@ -1,7 +1,10 @@
 import { useId } from 'react'
+import { Link, useLocation } from 'react-router'
 import type { WatchlistEntry } from '../../api/types'
 import { categoryVars, reviewCategory } from '../../lib/categories'
 import { formatYears } from '../../lib/format'
+import { fromParentState } from '../../ui/Dialog/useRouteDialog'
+import { Icon } from '../../ui/Icon/Icon'
 import { Poster } from '../../ui/Poster/Poster'
 import styles from './WatchlistCard.module.css'
 
@@ -24,6 +27,7 @@ interface WatchlistCardProps {
 
 export function WatchlistCard({ entry, fresh = false }: WatchlistCardProps) {
   const titleId = useId()
+  const location = useLocation()
   const { item } = entry
   const category =
     item.category === 'anime'
@@ -58,6 +62,22 @@ export function WatchlistCard({ entry, fresh = false }: WatchlistCardProps) {
         <h2 id={titleId} className={styles.title}>
           {item.title}
         </h2>
+      </div>
+      <div className={styles.actions}>
+        {/* Over the page, keeping its query; closing goes Back. */}
+        <Link
+          to={{
+            pathname: `/watchlist/review/${encodeURIComponent(item.id)}`,
+            search: location.search,
+          }}
+          state={fromParentState}
+          preventScrollReset
+          className={styles.review}
+          aria-label={`Review ${item.title}`}
+        >
+          <Icon name="star-outline" size={14} className={styles.reviewIcon} />
+          Review it
+        </Link>
       </div>
     </article>
   )

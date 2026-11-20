@@ -1,11 +1,22 @@
 import { render, screen } from '@testing-library/react'
+import type { ReactElement, ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import { expect, it } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import { makeItem, makeWatchlistEntry } from '../../test/fixtures'
 import { WatchlistCard } from './WatchlistCard'
 
+/** The card on the watchlist page at `path`, for its link. */
+function renderCard(ui: ReactElement, path = '/watchlist') {
+  return render(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+    ),
+  })
+}
+
 it('is an article named by the title, with the poster', () => {
-  render(<WatchlistCard entry={makeWatchlistEntry()} />)
+  renderCard(<WatchlistCard entry={makeWatchlistEntry()} />)
 
   expect(
     screen.getByRole('article', { name: 'Cowboy Bebop' }),
@@ -39,14 +50,14 @@ it.each([
     'Book · 2021',
   ],
 ])('labels the category in the singular, with the years', (item, meta) => {
-  render(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
 
   expect(screen.getByText(meta)).toBeInTheDocument()
 })
 
 it('leaves out the years without a start year', () => {
   const item = makeItem({ category: 'manga', start_year: null, end_year: null })
-  render(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
 
   expect(screen.getByText('Manga')).toBeInTheDocument()
   expect(screen.queryByText(/·/)).not.toBeInTheDocument()
@@ -54,22 +65,34 @@ it('leaves out the years without a start year', () => {
 
 it('shows the fallback letter, named for the title, without an image', () => {
   const item = makeItem({ image_url: null })
-  render(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
 
   expect(
     screen.getByRole('img', { name: 'Poster for Cowboy Bebop' }),
   ).toHaveTextContent('C')
 })
 
-it('has no actions yet', () => {
-  render(<WatchlistCard entry={makeWatchlistEntry()} />)
+it('links Review it to the sheet for the title, keeping the page’s query', () => {
+  const item = makeItem({ id: 'mal:52991', title: 'Frieren' })
+  renderCard(
+    <WatchlistCard entry={makeWatchlistEntry({ item })} />,
+    '/watchlist?category=anime%3Aseries',
+  )
 
+  const link = screen.getByRole('link', { name: 'Review Frieren' })
+  expect(link).toHaveAttribute(
+    'href',
+    '/watchlist/review/mal%3A52991?category=anime%3Aseries',
+  )
+  expect(link).toHaveTextContent('Review it')
+  // Remove comes in #133.
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
-  expect(screen.queryByRole('link')).not.toBeInTheDocument()
 })
 
 it('is marked when just added, and not otherwise', () => {
-  const { rerender } = render(<WatchlistCard entry={makeWatchlistEntry()} />)
+  const { rerender } = renderCard(
+    <WatchlistCard entry={makeWatchlistEntry()} />,
+  )
   const card = screen.getByRole('article')
   expect(card).not.toHaveAttribute('data-fresh')
 
@@ -78,7 +101,9 @@ it('is marked when just added, and not otherwise', () => {
 })
 
 it('has no axe violations', async () => {
-  const { container } = render(<WatchlistCard entry={makeWatchlistEntry()} />)
+  const { container } = renderCard(
+    <WatchlistCard entry={makeWatchlistEntry()} />,
+  )
 
   await expectNoAxeViolations(container)
 })
