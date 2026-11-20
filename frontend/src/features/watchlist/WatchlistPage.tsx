@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, Outlet } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, Outlet, useMatch } from 'react-router'
 import { useWatchlist, useWatchlistFacets } from '../../api/queries/watchlist'
 import type { WatchlistPage as WatchlistPageData } from '../../api/types'
 import {
@@ -9,6 +9,7 @@ import {
 } from '../../lib/categories'
 import { cx } from '../../lib/cx'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
+import type { WatchlistOutlet } from '../../lib/watchlistOutlet'
 import { Button } from '../../ui/Button/Button'
 import { buttonClass } from '../../ui/Button/buttonClass'
 import { Chip } from '../../ui/Chip/Chip'
@@ -69,6 +70,37 @@ export function WatchlistPage() {
     isFetchNextPageError,
     fetchNextPage,
   } = query
+
+  // The cards added in the add sheet's last visit are outlined. Opening it
+  // again clears them, as on the board. Adjusted during render.
+  const sheetOpen = useMatch('/watchlist/add') !== null
+  const [highlighted, setHighlighted] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const [wasSheetOpen, setWasSheetOpen] = useState(sheetOpen)
+  if (sheetOpen !== wasSheetOpen) {
+    setWasSheetOpen(sheetOpen)
+    if (sheetOpen) setHighlighted(new Set())
+  }
+
+  // Something was added: show it under All once the sheet has closed. Not
+  // while it's open, or its closing `navigate(-1)` would undo the write. A
+  // flag, not `highlighted`, so a chip picked later stays picked; and an add
+  // that lands after Done still resets.
+  const resetPending = useRef(false)
+  useEffect(() => {
+    if (sheetOpen || !resetPending.current) return
+    resetPending.current = false
+    setCategory('', { replace: true })
+  }, [sheetOpen, highlighted, setCategory])
+
+  const outlet: WatchlistOutlet = {
+    onAdded: (itemId) => {
+      resetPending.current = true
+      setHighlighted((ids) => new Set(ids).add(itemId))
+    },
+  }
+
   const sentinelRef = useLoadMoreOnScroll({
     // Not during a background refetch either, even one paused offline:
     // fetchNextPage would cancel it.
@@ -170,7 +202,10 @@ export function WatchlistPage() {
         <ul className={grid.grid}>
           {entries.map((entry) => (
             <li key={entry.item.id}>
-              <WatchlistCard entry={entry} />
+              <WatchlistCard
+                entry={entry}
+                fresh={highlighted.has(entry.item.id)}
+              />
             </li>
           ))}
         </ul>
@@ -204,7 +239,7 @@ export function WatchlistPage() {
         >
           <Icon name="plus" size={16} strokeWidth={2.2} />
           <span>
-            Add<span className={styles.desktopOnly}> to watchlist</span>
+            Add <span className={styles.desktopOnly}>to watchlist</span>
           </span>
         </Link>
       </section>
@@ -275,8 +310,8 @@ export function WatchlistPage() {
           </>
         )}
       </div>
-      {/* #131 and #132 add the add sheet and Review it here. */}
-      <Outlet />
+      {/* The add sheet, and Review it from #132. */}
+      <Outlet context={outlet} />
     </>
   )
 }
