@@ -92,6 +92,11 @@
   padding-bottom: 88px;
 }
 
+/* Focused only from code, when the toast closes with focus in it. */
+.results:focus {
+  outline: none;
+}
+
 .sentinel {
   height: 1px;
 }

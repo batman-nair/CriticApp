@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Outlet, useMatch } from 'react-router'
-import { useWatchlist, useWatchlistFacets } from '../../api/queries/watchlist'
-import type { WatchlistPage as WatchlistPageData } from '../../api/types'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Link, Outlet, useMatch, useOutlet } from 'react-router'
+import {
+  useAddToWatchlist,
+  useRemoveFromWatchlist,
+  useWatchlist,
+  useWatchlistFacets,
+} from '../../api/queries/watchlist'
+import type {
+  WatchlistEntry,
+  WatchlistPage as WatchlistPageData,
+} from '../../api/types'
 import {
   categoryLabel,
   FILTER_CATEGORIES,
@@ -15,6 +23,7 @@ import { buttonClass } from '../../ui/Button/buttonClass'
 import { Chip } from '../../ui/Chip/Chip'
 import { Icon } from '../../ui/Icon/Icon'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
+import { Toast } from '../../ui/Toast/Toast'
 import grid from './grid.module.css'
 import {
   searchCategoryFor,
@@ -47,6 +56,17 @@ function uniqueEntries(pages: WatchlistPageData[]) {
       return true
     })
 }
+
+/** What the toast says. `id` tells one notice from the next. */
+type Notice =
+  | {
+      kind: 'removed'
+      id: number
+      entry: WatchlistEntry
+      /** Whether the remove went through. Never rejects. */
+      removal: Promise<boolean>
+    }
+  | { kind: 'error'; id: number; text: string }
 
 function countLabel(total: number) {
   if (total === 0) return 'Nothing saved yet.'
@@ -94,10 +114,72 @@ export function WatchlistPage() {
     setCategory('', { replace: true })
   }, [sheetOpen, highlighted, setCategory])
 
-  const entries = useMemo(
-    () => (data ? uniqueEntries(data.pages) : []),
-    [data],
-  )
+  const entries = useMemo(() => (data ? uniqueEntries(data.pages) : []), [data])
+
+  // Remove, with Undo in a toast.
+  const remove = useRemoveFromWatchlist()
+  const add = useAddToWatchlist()
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const noticeId = useRef(0)
+  const undoRef = useRef<HTMLButtonElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+  // Set when Remove was pressed from the keyboard, so focus can go to Undo.
+  // Not after a click: focus in the toast pauses its timer.
+  const focusUndo = useRef(false)
+
+  function showError(text: string) {
+    setNotice({ kind: 'error', id: ++noticeId.current, text })
+  }
+
+  function handleRemove(
+    entry: WatchlistEntry,
+    event: MouseEvent<HTMLButtonElement>,
+  ) {
+    const removal = remove.mutateAsync(entry.item.id).then(
+      () => true,
+      () => false,
+    )
+    // Replaces whatever the toast said.
+    setNotice({ kind: 'removed', id: ++noticeId.current, entry, removal })
+    focusUndo.current = event.detail === 0
+    void removal.then((removed) => {
+      // The card is back already: the cache was rolled back.
+      if (!removed) showError(`Couldn’t remove ${entry.item.title}. Try again.`)
+    })
+  }
+
+  async function handleUndo() {
+    if (notice?.kind !== 'removed') return
+    const { entry, removal } = notice
+    setNotice(null)
+    // Not before the DELETE has settled, or it could land after the POST.
+    // A failed remove has its own message.
+    if (!(await removal)) return
+    try {
+      // The original date puts it back in its place; the list refetches.
+      await add.mutateAsync({
+        item_id: entry.item.id,
+        added_at: entry.added_at,
+      })
+    } catch {
+      showError(`Couldn’t put ${entry.item.title} back on your watchlist.`)
+    }
+  }
+
+  useEffect(() => {
+    if (!focusUndo.current || notice?.kind !== 'removed') return
+    focusUndo.current = false
+    undoRef.current?.focus()
+  }, [notice])
+
+  // The boards never show the toast over a sheet. Opening one (the add sheet
+  // or Review it) dismisses it; the removal stays. Adjusted during render.
+  const childOpen = useOutlet() !== null
+  const [wasChildOpen, setWasChildOpen] = useState(childOpen)
+  if (childOpen !== wasChildOpen) {
+    setWasChildOpen(childOpen)
+    if (childOpen) setNotice(null)
+  }
 
   // One object, so the sheets re-render only when the list's data changes,
   // not with every page render.
@@ -214,6 +296,7 @@ export function WatchlistPage() {
               <WatchlistCard
                 entry={entry}
                 fresh={highlighted.has(entry.item.id)}
+                onRemove={(event) => handleRemove(entry, event)}
               />
             </li>
           ))}
@@ -289,6 +372,9 @@ export function WatchlistPage() {
         </div>
       )}
       <div
+        ref={resultsRef}
+        // Where focus goes when the toast closes with focus in it.
+        tabIndex={-1}
         className={styles.results}
         // The last category's cards stay on screen while the next ones load.
         aria-busy={query.isPlaceholderData || undefined}
@@ -319,6 +405,28 @@ export function WatchlistPage() {
           </>
         )}
       </div>
+      <Toast
+        // An error that comes in while a sheet is open waits for it to close.
+        open={notice !== null && !childOpen}
+        messageKey={notice?.id}
+        onClose={() => setNotice(null)}
+        action={
+          notice?.kind === 'removed'
+            ? { label: 'Undo', onClick: () => void handleUndo() }
+            : undefined
+        }
+        actionRef={undoRef}
+        returnFocusRef={resultsRef}
+      >
+        {notice?.kind === 'removed' && (
+          <>
+            Removed <strong>{notice.entry.item.title}</strong>
+            {/* The phone board's copy is shorter. */}
+            <span className={styles.desktopOnly}> from your watchlist</span>.
+          </>
+        )}
+        {notice?.kind === 'error' && notice.text}
+      </Toast>
       {/* The add sheet and Review it, which starts on a loaded card's title. */}
       <Outlet context={outlet} />
     </>
