@@ -135,7 +135,8 @@ search results are a shorter form of it (see `/search`):
       "id": "omdb_tt5884052", "category": "movie", "title": "Pokémon Detective Pikachu",
       "image_url": "https://...", "start_year": 2019, "end_year": null,
       "genres": null, "provider_rating": null,
-      "my_review": {"id": 42, "rating": 7.5}
+      "my_review": {"id": 42, "rating": 7.5},
+      "on_watchlist": false
     }
   ],
   "meta": {}
@@ -160,6 +161,7 @@ search results are a shorter form of it (see `/search`):
   | OMDb | `null` | `null` |
 
 - `my_review` is the logged-in user's review of the item, or `null`.
+- `on_watchlist` is whether the item is on the logged-in user's watchlist.
 - Nothing found is `200` with `data: []`. A failing data source is 502
   `UPSTREAM_ERROR`. Search spends the sources' quotas, so it needs a login
   and uses the `search` rate limit.
@@ -282,6 +284,10 @@ and changes only the fields sent.
 | The user already reviewed the item | 409 `DUPLICATE_REVIEW` |
 | The data source fails | 502 `UPSTREAM_ERROR` |
 
+Creating a review removes the item from the user's watchlist, in the same
+transaction: a failed create keeps the entry. Deleting the review later
+doesn't put it back.
+
 The 409 body has the id of the existing review:
 
 ```json
@@ -336,6 +342,8 @@ value, so it goes back to its place in the list.
 `DELETE /api/v3/watchlist/{item_id}` takes the stored item id (`item.id` of a
 listed entry) and returns 204 with no body, or 404 `NOT_FOUND` when the item
 isn't on the user's watchlist.
+
+Reviewing an item removes its entry (see [Writing reviews](#writing-reviews)).
 
 ### Session auth
 
