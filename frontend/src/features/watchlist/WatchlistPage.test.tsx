@@ -331,6 +331,7 @@ it('shows the empty state for an empty list under All, whatever the counts say',
   expect(
     screen.queryByRole('button', { name: 'Show all' }),
   ).not.toBeInTheDocument()
+  expect(screen.getByText('Nothing saved yet.')).toBeInTheDocument()
 })
 
 it('leaves out a chip the page can’t filter by', async () => {

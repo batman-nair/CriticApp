@@ -115,6 +115,9 @@ export function WatchlistPage() {
   let subtitle
   if (firstLoad && state === 'error') {
     subtitle = <p className={styles.subtitle}>{FALLBACK_SUBTITLE}</p>
+  } else if (state === 'empty') {
+    // Not older counts that say otherwise.
+    subtitle = <p className={styles.subtitle}>{countLabel(0)}</p>
   } else if (total !== undefined) {
     subtitle = <p className={styles.subtitle}>{countLabel(total)}</p>
   } else if (facets.isPending || query.isPending) {
