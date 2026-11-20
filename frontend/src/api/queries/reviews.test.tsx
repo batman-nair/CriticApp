@@ -24,6 +24,7 @@ import {
 } from './reviews'
 import { searchKeys } from './search'
 import { tagKeys } from './tags'
+import { watchlistKeys } from './watchlist'
 
 function reviews(count: number, firstId = 1) {
   return Array.from({ length: count }, (_, i) =>
@@ -332,10 +333,11 @@ it('keys a review under all, outside the lists', () => {
 const listKey = reviewKeys.list({ username: OWNER_USERNAME })
 const facetsKey = reviewKeys.facets({ username: OWNER_USERNAME })
 const searchKey = searchKeys.list({ category: 'game', q: 'witcher' })
+const watchlistKey = watchlistKeys.list({})
 
 /**
- * A client holding a list, the counts, the tags and a search, none of them
- * stale.
+ * A client holding a list, the counts, the tags, a search and the watchlist
+ * with its counts, none of them stale.
  */
 function seededQueryClient() {
   const queryClient = createTestQueryClient()
@@ -343,6 +345,8 @@ function seededQueryClient() {
   queryClient.setQueryData(facetsKey, 'old facets')
   queryClient.setQueryData(tagKeys.list(), 'old tags')
   queryClient.setQueryData(searchKey, 'old search')
+  queryClient.setQueryData(watchlistKey, 'old watchlist')
+  queryClient.setQueryData(watchlistKeys.facets(), 'old watchlist facets')
   return queryClient
 }
 
@@ -380,6 +384,8 @@ it('sends the update, shows the saved review and refetches the rest, search incl
   expect(isInvalidated(queryClient, facetsKey)).toBe(true)
   expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
   expect(isInvalidated(queryClient, searchKey)).toBe(true)
+  // Only a create takes a title off the watchlist.
+  expect(isInvalidated(queryClient, watchlistKey)).toBe(false)
 })
 
 it('rejects a refused update with an ApiError carrying the field errors', async () => {
@@ -451,6 +457,9 @@ it('sends the new review, caches it and refetches the rest', async () => {
   expect(isInvalidated(queryClient, facetsKey)).toBe(true)
   expect(isInvalidated(queryClient, tagKeys.list())).toBe(true)
   expect(isInvalidated(queryClient, searchKey)).toBe(true)
+  // The server took the title off the watchlist.
+  expect(isInvalidated(queryClient, watchlistKey)).toBe(true)
+  expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
 })
 
 it('gets the new review back from the default handler', async () => {
