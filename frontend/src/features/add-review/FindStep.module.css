@@ -71,6 +71,16 @@
   gap: var(--space-6);
 }
 
+/* The watchlist sheet, before anything is typed. */
+.prompt {
+  margin: 0;
+  padding: var(--space-18);
+  border-radius: var(--radius-14);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
 /* Nothing found, or the search failed. */
 .notice {
   display: flex;
@@ -104,5 +114,9 @@
 
   .skeletonRow {
     gap: var(--space-12);
+  }
+
+  .prompt {
+    padding: var(--space-16);
   }
 }
