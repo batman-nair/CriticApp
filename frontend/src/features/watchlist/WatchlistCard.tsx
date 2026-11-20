@@ -1,10 +1,11 @@
-import { useId } from 'react'
+import { useId, type MouseEvent } from 'react'
 import { Link, useLocation } from 'react-router'
 import type { WatchlistEntry } from '../../api/types'
 import { categoryVars, reviewCategory } from '../../lib/categories'
 import { formatYears } from '../../lib/format'
 import { fromParentState } from '../../ui/Dialog/useRouteDialog'
 import { Icon } from '../../ui/Icon/Icon'
+import { IconButton } from '../../ui/IconButton/IconButton'
 import { Poster } from '../../ui/Poster/Poster'
 import styles from './WatchlistCard.module.css'
 
@@ -23,9 +24,15 @@ interface WatchlistCardProps {
   entry: WatchlistEntry
   /** Just added in the add sheet: outlined until the sheet opens again. */
   fresh?: boolean
+  /** The click, so the page can tell a keyboard press (`detail` 0). */
+  onRemove: (event: MouseEvent<HTMLButtonElement>) => void
 }
 
-export function WatchlistCard({ entry, fresh = false }: WatchlistCardProps) {
+export function WatchlistCard({
+  entry,
+  fresh = false,
+  onRemove,
+}: WatchlistCardProps) {
   const titleId = useId()
   const location = useLocation()
   const { item } = entry
@@ -78,6 +85,15 @@ export function WatchlistCard({ entry, fresh = false }: WatchlistCardProps) {
           <Icon name="star-outline" size={14} className={styles.reviewIcon} />
           Review it
         </Link>
+        <IconButton
+          variant="outline"
+          size="sm"
+          label={`Remove ${item.title} from your watchlist`}
+          className={styles.remove}
+          onClick={onRemove}
+        >
+          <Icon name="bookmark-minus" size={16} strokeWidth={1.9} />
+        </IconButton>
       </div>
     </article>
   )

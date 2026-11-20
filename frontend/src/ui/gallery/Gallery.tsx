@@ -23,6 +23,7 @@ import { Stepper } from '../Stepper/Stepper'
 import { TagInput } from '../TagInput/TagInput'
 import { TextArea } from '../TextArea/TextArea'
 import { TextField } from '../TextField/TextField'
+import { Toast } from '../Toast/Toast'
 import styles from './Gallery.module.css'
 
 const CATEGORIES = [
@@ -64,6 +65,7 @@ const ICON_NAMES: IconName[] = [
   'check',
   'bookmark',
   'bookmark-plus',
+  'bookmark-minus',
 ]
 
 const SORT_OPTIONS = [
@@ -99,6 +101,7 @@ const LONG_BODY = Array.from({ length: 30 }, (_, index) => (
 
 const TAG_SUGGESTIONS = ['favourite', 'rewatch', 'comfort', 'slow-burn']
 const LONG_SUGGESTION = 'a-very-long-suggestion-right-at-the-fifty-char-max'
+const LONG_TITLE = 'Neon Genesis Evangelion: The End of Evangelion'
 const TOO_MANY_TAGS = Array.from({ length: 11 }, (_, index) => `tag-${index}`)
 const OVER_LONG_TAG = 'a'.repeat(51)
 const OVER_LONG_JOINED = ['a'.repeat(50), 'b'.repeat(50)]
@@ -273,6 +276,79 @@ function DialogActionButtons() {
         <Icon name="trash" size={17} />
       </IconButton>
     </div>
+  )
+}
+
+interface ToastNotice {
+  id: number
+  message: ReactNode
+  undo: boolean
+}
+
+/** One Toast for the page, as an app renders it; each button replaces it. */
+function ToastDemo() {
+  const [notice, setNotice] = useState<ToastNotice | null>(null)
+  const [undone, setUndone] = useState(0)
+
+  function show(message: ReactNode, undo: boolean) {
+    setNotice((last) => ({ id: (last?.id ?? 0) + 1, message, undo }))
+  }
+
+  return (
+    <>
+      <Row label={`Opens at the foot of the screen · undone ${undone}×`}>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            show(
+              <>
+                Removed <strong>Dune</strong> from your watchlist.
+              </>,
+              true,
+            )
+          }
+        >
+          With Undo
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            show(
+              <>
+                Removed <strong>{LONG_TITLE}</strong> from your watchlist.
+              </>,
+              true,
+            )
+          }
+        >
+          Long title
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => show('Couldn’t remove Dune. Try again.', false)}
+        >
+          No action
+        </Button>
+      </Row>
+      <Toast
+        open={notice !== null}
+        messageKey={notice?.id}
+        onClose={() => setNotice(null)}
+        action={
+          notice?.undo
+            ? {
+                label: 'Undo',
+                onClick: () => {
+                  setUndone((n) => n + 1)
+                  setNotice(null)
+                },
+              }
+            : undefined
+        }
+      >
+        {notice?.message}
+      </Toast>
+    </>
   )
 }
 
@@ -818,6 +894,10 @@ export function Gallery() {
               <p>{LONG_TEXT}</p>
             </DialogDemo>
           </Row>
+        </Section>
+
+        <Section title="Toast">
+          <ToastDemo />
         </Section>
 
         <Section title="Stepper">

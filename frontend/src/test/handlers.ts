@@ -200,6 +200,10 @@ export const handlers = [
       meta: {},
     })
   }),
+  // Removed. Tests that need a 404 or an error override it with server.use.
+  http.delete('/api/v3/watchlist/{item_id}', ({ response }) =>
+    response(204).empty(),
+  ),
   // The owner's most-used tags.
   http.get('/api/v3/tags', ({ response }) =>
     response(200).json({

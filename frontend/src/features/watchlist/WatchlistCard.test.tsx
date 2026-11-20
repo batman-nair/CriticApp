@@ -1,10 +1,13 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import { makeItem, makeWatchlistEntry } from '../../test/fixtures'
 import { WatchlistCard } from './WatchlistCard'
+
+const noop = () => {}
 
 /** The card on the watchlist page at `path`, for its link. */
 function renderCard(ui: ReactElement, path = '/watchlist') {
@@ -16,7 +19,7 @@ function renderCard(ui: ReactElement, path = '/watchlist') {
 }
 
 it('is an article named by the title, with the poster', () => {
-  renderCard(<WatchlistCard entry={makeWatchlistEntry()} />)
+  renderCard(<WatchlistCard onRemove={noop} entry={makeWatchlistEntry()} />)
 
   expect(
     screen.getByRole('article', { name: 'Cowboy Bebop' }),
@@ -50,14 +53,18 @@ it.each([
     'Book · 2021',
   ],
 ])('labels the category in the singular, with the years', (item, meta) => {
-  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry({ item })} />,
+  )
 
   expect(screen.getByText(meta)).toBeInTheDocument()
 })
 
 it('leaves out the years without a start year', () => {
   const item = makeItem({ category: 'manga', start_year: null, end_year: null })
-  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry({ item })} />,
+  )
 
   expect(screen.getByText('Manga')).toBeInTheDocument()
   expect(screen.queryByText(/·/)).not.toBeInTheDocument()
@@ -65,7 +72,9 @@ it('leaves out the years without a start year', () => {
 
 it('shows the fallback letter, named for the title, without an image', () => {
   const item = makeItem({ image_url: null })
-  renderCard(<WatchlistCard entry={makeWatchlistEntry({ item })} />)
+  renderCard(
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry({ item })} />,
+  )
 
   expect(
     screen.getByRole('img', { name: 'Poster for Cowboy Bebop' }),
@@ -75,7 +84,7 @@ it('shows the fallback letter, named for the title, without an image', () => {
 it('links Review it to the sheet for the title, keeping the page’s query', () => {
   const item = makeItem({ id: 'mal:52991', title: 'Frieren' })
   renderCard(
-    <WatchlistCard entry={makeWatchlistEntry({ item })} />,
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry({ item })} />,
     '/watchlist?category=anime%3Aseries',
   )
 
@@ -85,24 +94,42 @@ it('links Review it to the sheet for the title, keeping the page’s query', () 
     '/watchlist/review/mal%3A52991?category=anime%3Aseries',
   )
   expect(link).toHaveTextContent('Review it')
-  // Remove comes in #133.
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+it('has a Remove button for the title, after Review it', async () => {
+  const onRemove = vi.fn()
+  const item = makeItem({ title: 'Frieren' })
+  renderCard(
+    <WatchlistCard entry={makeWatchlistEntry({ item })} onRemove={onRemove} />,
+  )
+
+  const remove = screen.getByRole('button', {
+    name: 'Remove Frieren from your watchlist',
+  })
+  expect(
+    screen
+      .getByRole('link', { name: 'Review Frieren' })
+      .compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  await userEvent.click(remove)
+  expect(onRemove).toHaveBeenCalledOnce()
+  expect(onRemove.mock.calls[0]?.[0]).toMatchObject({ type: 'click' })
 })
 
 it('is marked when just added, and not otherwise', () => {
   const { rerender } = renderCard(
-    <WatchlistCard entry={makeWatchlistEntry()} />,
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry()} />,
   )
   const card = screen.getByRole('article')
   expect(card).not.toHaveAttribute('data-fresh')
 
-  rerender(<WatchlistCard entry={makeWatchlistEntry()} fresh />)
+  rerender(<WatchlistCard onRemove={noop} entry={makeWatchlistEntry()} fresh />)
   expect(card).toHaveAttribute('data-fresh')
 })
 
 it('has no axe violations', async () => {
   const { container } = renderCard(
-    <WatchlistCard entry={makeWatchlistEntry()} />,
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry()} />,
   )
 
   await expectNoAxeViolations(container)

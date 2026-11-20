@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -112,6 +112,12 @@ function cards() {
 
 async function waitForCards(count: number) {
   await waitFor(() => expect(cards()).toHaveLength(count))
+}
+
+/** The page's own live region, not the toast's. */
+function pageStatus() {
+  const results = document.querySelector<HTMLElement>(`.${styles.results}`)
+  return within(results!).getByRole('status')
 }
 
 function chips() {
@@ -234,7 +240,7 @@ it('shows skeletons in the hero, the chips and the grid until the first page', a
   serveFacets({ movie: 2 }, gate.promise)
   const { container } = renderPage()
 
-  expect(screen.getByRole('status')).toHaveTextContent('Loading your watchlist')
+  expect(pageStatus()).toHaveTextContent('Loading your watchlist')
   expect(
     container.querySelector(`.${styles.subtitleSkeleton}`),
   ).toBeInTheDocument()
@@ -303,9 +309,7 @@ it('shows the empty state, never "no matches", for a category on an empty watchl
 
   // The list is in, the counts aren't.
   await waitFor(() =>
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Loading your watchlist',
-    ),
+    expect(pageStatus()).toHaveTextContent('Loading your watchlist'),
   )
   await new Promise((done) => setTimeout(done, 20))
   expect(
@@ -493,7 +497,7 @@ it('loads the next page when the end of the list comes near', async () => {
   )
   renderPage()
   await waitForCards(20)
-  const status = screen.getByRole('status')
+  const status = pageStatus()
   expect(status).toBeEmptyDOMElement()
 
   // Hold the second page, to see the status while it loads.
@@ -765,5 +769,357 @@ describe('with the add sheet, on the real routes', () => {
     )
     expect(router.state.location.search).toBe('?category=game')
     expect(router.state.historyAction).toBe('POP')
+  })
+})
+
+describe('Remove and Undo', () => {
+  const movie = (id: string, title: string, added_at: string) =>
+    makeWatchlistEntry({
+      item: makeItem({ id, category: 'movie', title }),
+      added_at,
+    })
+  const dune = movie('tt1160419', 'Dune', '2025-03-03T00:00:00Z')
+  const arrival = movie('tt2543164', 'Arrival', '2025-03-02T00:00:00Z')
+  const heat = movie('tt0113277', 'Heat', '2025-03-01T00:00:00Z')
+
+  interface Options {
+    /** Each DELETE waits for it. */
+    deleteGate?: Promise<void>
+    deleteStatus?: 404 | 500
+    postStatus?: 500
+  }
+
+  /**
+   * A watchlist server that keeps its entries newest first, removes on
+   * DELETE and adds on POST, recording each write in order.
+   */
+  function serveWatchlist(initial: WatchlistEntry[], options: Options = {}) {
+    let list = [...initial]
+    const writes: string[] = []
+    const posts: unknown[] = []
+    const sorted = () =>
+      [...list].sort((a, b) => b.added_at.localeCompare(a.added_at))
+    server.use(
+      http.get('/api/v3/watchlist', ({ response }) =>
+        response(200).json(makeWatchlistPage(sorted())),
+      ),
+      http.get('/api/v3/watchlist/facets', ({ response }) =>
+        response(200).json(makeWatchlistFacets({ movie: list.length })),
+      ),
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          writes.push(`DELETE ${params.item_id}`)
+          await options.deleteGate
+          if (options.deleteStatus === 404) {
+            // Removed elsewhere already.
+            list = list.filter((entry) => entry.item.id !== params.item_id)
+          }
+          if (options.deleteStatus) {
+            return response.untyped(
+              new HttpResponse(null, { status: options.deleteStatus }),
+            )
+          }
+          list = list.filter((entry) => entry.item.id !== params.item_id)
+          return response(204).empty()
+        },
+      ),
+      http.post('/api/v3/watchlist', async ({ request, response }) => {
+        const body = await request.json()
+        writes.push(`POST ${body.item_id}`)
+        posts.push(body)
+        if (options.postStatus) {
+          return response.untyped(
+            new HttpResponse(null, { status: options.postStatus }),
+          )
+        }
+        const entry = initial.find((e) => e.item.id === body.item_id)!
+        const added = { ...entry, added_at: body.added_at ?? entry.added_at }
+        list.push(added)
+        return response(201).json({ data: added, meta: {} })
+      }),
+    )
+    return { writes, posts }
+  }
+
+  /** The toast's live region, not the page's own. */
+  function toast() {
+    const results = document.querySelector(`.${styles.results}`)!
+    return screen
+      .getAllByRole('status')
+      .find((region) => !results.contains(region))!
+  }
+
+  const titles = () =>
+    cards().map((card) => within(card).getByRole('heading').textContent)
+
+  const removeButton = (title: string) =>
+    screen.getByRole('button', { name: `Remove ${title} from your watchlist` })
+
+  it('takes the card off at once and says so, with Undo', async () => {
+    const user = userEvent.setup()
+    const gate = deferred()
+    const { writes } = serveWatchlist([dune, arrival, heat], {
+      deleteGate: gate.promise,
+    })
+    renderPage()
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+
+    await waitFor(() => expect(titles()).toEqual(['Dune', 'Heat']))
+    expect(toast()).toHaveTextContent('Removed Arrival from your watchlist.')
+    expect(
+      within(toast()).getByRole('button', { name: 'Undo' }),
+    ).toBeInTheDocument()
+    expect(writes).toEqual([`DELETE ${arrival.item.id}`])
+
+    gate.resolve()
+    expect(await screen.findByText('2 titles to watch, play or read later.'))
+    expect(titles()).toEqual(['Dune', 'Heat'])
+  })
+
+  it('puts it back in its place with Undo, with the original date', async () => {
+    const user = userEvent.setup()
+    const { posts } = serveWatchlist([dune, arrival, heat])
+    renderPage()
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+    await screen.findByText('2 titles to watch, play or read later.')
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
+
+    await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival', 'Heat']))
+    expect(posts).toEqual([
+      { item_id: arrival.item.id, added_at: arrival.added_at },
+    ])
+    expect(toast()).toBeEmptyDOMElement()
+    expect(
+      await screen.findByText('3 titles to watch, play or read later.'),
+    ).toBeInTheDocument()
+    expect(chip('All')).toHaveAccessibleName('All 3')
+  })
+
+  it('waits for the remove to finish before Undo puts it back', async () => {
+    const user = userEvent.setup()
+    const gate = deferred()
+    const { writes } = serveWatchlist([dune, arrival], {
+      deleteGate: gate.promise,
+    })
+    renderPage()
+    await waitForCards(2)
+
+    await user.click(removeButton('Arrival'))
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
+    await new Promise((done) => setTimeout(done, 20))
+    expect(writes).toEqual([`DELETE ${arrival.item.id}`])
+
+    gate.resolve()
+    await waitFor(() =>
+      expect(writes).toEqual([
+        `DELETE ${arrival.item.id}`,
+        `POST ${arrival.item.id}`,
+      ]),
+    )
+    await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival']))
+  })
+
+  it('counts a title already gone as removed', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([dune, arrival], { deleteStatus: 404 })
+    renderPage()
+    await waitForCards(2)
+
+    await user.click(removeButton('Arrival'))
+    // Settled: the counts refetched.
+    await screen.findByText('1 title to watch, play or read later.')
+
+    expect(titles()).toEqual(['Dune'])
+    expect(toast()).toHaveTextContent('Removed Arrival from your watchlist.')
+    expect(screen.queryByText(/Couldn’t/)).not.toBeInTheDocument()
+  })
+
+  it('brings the card back and says so when the remove fails', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([dune, arrival, heat], { deleteStatus: 500 })
+    renderPage()
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+
+    await waitFor(() =>
+      expect(toast()).toHaveTextContent('Couldn’t remove Arrival. Try again.'),
+    )
+    expect(within(toast()).queryByRole('button')).not.toBeInTheDocument()
+    expect(titles()).toEqual(['Dune', 'Arrival', 'Heat'])
+  })
+
+  it('keeps a newer title’s Undo when an older remove fails', async () => {
+    const user = userEvent.setup()
+    const gate = deferred()
+    serveWatchlist([dune, arrival, heat])
+    server.use(
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          if (params.item_id !== arrival.item.id) return response(204).empty()
+          await gate.promise
+          return response.untyped(new HttpResponse(null, { status: 500 }))
+        },
+      ),
+    )
+    renderPage()
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+    await user.click(removeButton('Heat'))
+    gate.resolve()
+
+    await waitFor(() => expect(titles()).toContain('Arrival'))
+    expect(toast()).toHaveTextContent('Removed Heat from your watchlist.')
+    expect(
+      within(toast()).getByRole('button', { name: 'Undo' }),
+    ).toBeInTheDocument()
+  })
+
+  it('says so when Undo fails', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([dune, arrival], { postStatus: 500 })
+    renderPage()
+    await waitForCards(2)
+
+    await user.click(removeButton('Arrival'))
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
+
+    await waitFor(() =>
+      expect(toast()).toHaveTextContent(
+        'Couldn’t put Arrival back on your watchlist.',
+      ),
+    )
+    expect(titles()).toEqual(['Dune'])
+  })
+
+  it('shows the empty state after the last card, with the toast still up', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([dune])
+    renderPage()
+    await waitForCards(1)
+
+    await user.click(removeButton('Dune'))
+
+    expect(
+      await screen.findByRole('link', { name: 'Add your first title' }),
+    ).toBeInTheDocument()
+    expect(toast()).toHaveTextContent('Removed Dune from your watchlist.')
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
+    await waitForCards(1)
+  })
+
+  describe('timing and focus', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const setupUser = () =>
+      userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms))
+
+    it('closes after 6 seconds after a click, which leaves focus alone', async () => {
+      const user = setupUser()
+      serveWatchlist([dune, arrival])
+      renderPage()
+      await waitForCards(2)
+
+      await user.click(removeButton('Arrival'))
+      await waitFor(() => expect(titles()).toEqual(['Dune']))
+      expect(toast()).not.toContainElement(
+        document.activeElement as HTMLElement,
+      )
+
+      wait(5900)
+      expect(toast()).toHaveTextContent('Removed Arrival')
+      wait(100)
+      expect(toast()).toBeEmptyDOMElement()
+    })
+
+    it('replaces the toast, and its time, on the next Remove', async () => {
+      const user = setupUser()
+      serveWatchlist([dune, arrival, heat])
+      renderPage()
+      await waitForCards(3)
+
+      await user.click(removeButton('Arrival'))
+      wait(4000)
+      await user.click(removeButton('Heat'))
+
+      expect(toast()).toHaveTextContent('Removed Heat from your watchlist.')
+      expect(toast()).not.toHaveTextContent('Arrival')
+      wait(4000)
+      expect(toast()).toHaveTextContent('Removed Heat')
+      wait(2000)
+      expect(toast()).toBeEmptyDOMElement()
+    })
+
+    it('moves focus to Undo after Remove from the keyboard; Enter undoes', async () => {
+      const user = setupUser()
+      const { posts } = serveWatchlist([dune, arrival])
+      renderPage()
+      await waitForCards(2)
+
+      removeButton('Arrival').focus()
+      await user.keyboard('{Enter}')
+
+      const undo = within(toast()).getByRole('button', { name: 'Undo' })
+      await waitFor(() => expect(undo).toHaveFocus())
+      // Paused while focus is in it.
+      wait(10000)
+      expect(toast()).toHaveTextContent('Removed Arrival')
+
+      await user.keyboard('{Enter}')
+      await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival']))
+      expect(posts).toHaveLength(1)
+      // Not dropped to <body>.
+      expect(document.querySelector(`.${styles.results}`)).toHaveFocus()
+    })
+  })
+})
+
+describe('Remove with a sheet, on the real routes', () => {
+  beforeEach(() => {
+    stubSystemTheme('light')
+  })
+
+  afterEach(() => {
+    delete document.documentElement.dataset.theme
+  })
+
+  it('dismisses the toast when the add sheet opens; the removal stays', async () => {
+    const user = userEvent.setup()
+    const deletes: string[] = []
+    server.use(
+      http.delete('/api/v3/watchlist/{item_id}', ({ params, response }) => {
+        deletes.push(params.item_id)
+        return response(204).empty()
+      }),
+    )
+    renderRoute('/watchlist')
+    await waitForCards(2)
+    const [first] = defaultWatchlist
+
+    await user.click(
+      screen.getByRole('button', {
+        name: `Remove ${first!.item.title} from your watchlist`,
+      }),
+    )
+    expect(screen.getByText(/^Removed/)).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Add to watchlist' }))
+    await screen.findByRole('dialog', { name: 'Add to watchlist' })
+
+    expect(screen.queryByText(/^Removed/)).not.toBeInTheDocument()
+    expect(deletes).toEqual([first!.item.id])
   })
 })

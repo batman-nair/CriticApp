@@ -1,3 +1,4 @@
+import type { InfiniteData } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
@@ -18,6 +19,7 @@ import { searchKeys, useSearch } from './search'
 import {
   WATCHLIST_PAGE_SIZE,
   useAddToWatchlist,
+  useRemoveFromWatchlist,
   useWatchlist,
   useWatchlistFacets,
   watchlistKeys,
@@ -371,5 +373,314 @@ describe('useAddToWatchlist', () => {
 
     expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
     expect(isInvalidated(queryClient, searchKeys.list(elsewhere))).toBe(false)
+  })
+})
+
+function deferredGate() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => (resolve = done))
+  return { promise, resolve }
+}
+
+describe('useRemoveFromWatchlist', () => {
+  const dune = makeWatchlistEntry({
+    item: makeItem({ id: 'tt15239678', category: 'movie', title: 'Dune' }),
+  })
+  const frieren = makeWatchlistEntry({
+    item: makeItem({ id: 'mal:52991', title: 'Frieren' }),
+  })
+  const arrival = makeWatchlistEntry({
+    item: makeItem({ id: 'tt2543164', category: 'movie', title: 'Arrival' }),
+  })
+  const all = watchlistKeys.list({})
+  const movies = watchlistKeys.list({ category: ['movie'] })
+
+  function infinite(...pages: WatchlistPage[]): InfiniteData<WatchlistPage> {
+    return { pages, pageParams: pages.map((_, i) => i * 20) }
+  }
+
+  /** All on two pages, and the movies, as the page would have cached them. */
+  function seededQueryClient() {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(
+      all,
+      infinite(
+        makeWatchlistPage([dune, frieren], { count: 3 }),
+        makeWatchlistPage([arrival], { count: 3, offset: 2 }),
+      ),
+    )
+    queryClient.setQueryData(
+      movies,
+      infinite(makeWatchlistPage([dune, arrival])),
+    )
+    queryClient.setQueryData(watchlistKeys.facets(), makeWatchlistFacets())
+    return queryClient
+  }
+
+  function cachedIds(
+    queryClient: ReturnType<typeof createTestQueryClient>,
+    queryKey: readonly unknown[],
+  ) {
+    return queryClient
+      .getQueryData<InfiniteData<WatchlistPage>>(queryKey)
+      ?.pages.flatMap((page) => ids(page))
+  }
+
+  function isInvalidated(
+    queryClient: ReturnType<typeof createTestQueryClient>,
+    queryKey: readonly unknown[],
+  ) {
+    return queryClient.getQueryState(queryKey)?.isInvalidated
+  }
+
+  /** Holds each DELETE until its id is released; records the ids. */
+  function holdDeletes() {
+    const sent: string[] = []
+    const gates = new Map<string, () => void>()
+    server.use(
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          sent.push(params.item_id)
+          await new Promise<void>((resolve) =>
+            gates.set(params.item_id, resolve),
+          )
+          return response(204).empty()
+        },
+      ),
+    )
+    const release = (id: string) => gates.get(id)?.()
+    return { sent, release, gates }
+  }
+
+  function renderRemove(queryClient = seededQueryClient()) {
+    return renderHook(() => useRemoveFromWatchlist(), {
+      wrapper: queryWrapper(queryClient),
+    })
+  }
+
+  it('sends DELETE for the item and takes it out of every cached list at once', async () => {
+    const { sent, release, gates } = holdDeletes()
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    let removal!: Promise<void>
+    act(() => {
+      removal = result.current.mutateAsync(dune.item.id)
+    })
+
+    await waitFor(() => expect(gates.has(dune.item.id)).toBe(true))
+    expect(sent).toEqual([dune.item.id])
+    expect(cachedIds(queryClient, all)).toEqual([
+      frieren.item.id,
+      arrival.item.id,
+    ])
+    expect(cachedIds(queryClient, movies)).toEqual([arrival.item.id])
+
+    release(dune.item.id)
+    await act(() => removal)
+  })
+
+  it('leaves a list without the item as it was', async () => {
+    const queryClient = seededQueryClient()
+    const before = queryClient.getQueryData(movies)
+    const { result } = renderRemove(queryClient)
+
+    await act(() => result.current.mutateAsync(frieren.item.id))
+
+    expect(queryClient.getQueryData(movies)).toBe(before)
+  })
+
+  it('counts a 404 as removed', async () => {
+    server.use(
+      http.delete('/api/v3/watchlist/{item_id}', ({ response }) =>
+        response(404).json(makeProblem()),
+      ),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    await act(() => result.current.mutateAsync(dune.item.id))
+
+    expect(cachedIds(queryClient, movies)).toEqual([arrival.item.id])
+  })
+
+  it('rejects any other failure with an ApiError and puts the lists back', async () => {
+    server.use(
+      http.delete('/api/v3/watchlist/{item_id}', ({ response }) =>
+        response(500).json(
+          makeProblem({ status: 500, code: 'SERVER_ERROR', title: 'Oops' }),
+        ),
+      ),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    await act(async () => {
+      const error = await result.current
+        .mutateAsync(dune.item.id)
+        .catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error).toMatchObject({ status: 500 })
+    })
+
+    expect(cachedIds(queryClient, all)).toEqual([
+      dune.item.id,
+      frieren.item.id,
+      arrival.item.id,
+    ])
+    expect(cachedIds(queryClient, movies)).toEqual([
+      dune.item.id,
+      arrival.item.id,
+    ])
+  })
+
+  it('unmarks the cached search result without refetching, and refetches the watchlist and counts', async () => {
+    const searches: string[] = []
+    const onScreen = { category: 'movie', q: 'dune' } as const
+    server.use(
+      http.get('/api/v3/search', ({ request, response }) => {
+        searches.push(new URL(request.url).search)
+        return response(200).json({
+          data: [
+            makeSearchResult({ id: dune.item.id, on_watchlist: true }),
+            makeSearchResult({ id: 'tt0816692', on_watchlist: true }),
+          ],
+          meta: {},
+        })
+      }),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderHook(
+      () => ({ search: useSearch(onScreen), remove: useRemoveFromWatchlist() }),
+      { wrapper: queryWrapper(queryClient) },
+    )
+    await waitFor(() => expect(result.current.search.isSuccess).toBe(true))
+
+    await act(() => result.current.remove.mutateAsync(dune.item.id))
+
+    expect(
+      queryClient
+        .getQueryData<SearchResult[]>(searchKeys.list(onScreen))
+        ?.map((r) => [r.id, r.on_watchlist]),
+    ).toEqual([
+      [dune.item.id, false],
+      ['tt0816692', true],
+    ])
+    expect(isInvalidated(queryClient, searchKeys.list(onScreen))).toBe(false)
+    expect(searches).toHaveLength(1)
+    expect(isInvalidated(queryClient, all)).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+  })
+
+  it('puts back only its own card when one of two removes fails', async () => {
+    const gates = new Map<string, () => void>()
+    server.use(
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          await new Promise<void>((resolve) =>
+            gates.set(params.item_id, resolve),
+          )
+          return params.item_id === dune.item.id
+            ? response.untyped(new HttpResponse(null, { status: 500 }))
+            : response(204).empty()
+        },
+      ),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    let first!: Promise<unknown>
+    act(() => {
+      first = result.current.mutateAsync(dune.item.id).catch((e) => e)
+      void result.current.mutateAsync(arrival.item.id)
+    })
+    await waitFor(() => expect(gates.size).toBe(2))
+
+    gates.get(dune.item.id)!()
+    await act(() => first)
+
+    expect(cachedIds(queryClient, all)).toEqual([dune.item.id, frieren.item.id])
+    expect(cachedIds(queryClient, movies)).toEqual([dune.item.id])
+    gates.get(arrival.item.id)!()
+  })
+
+  it('doesn’t hold up a list loading for the first time', async () => {
+    const { release, gates } = holdDeletes()
+    const games = deferredGate()
+    server.use(
+      http.get('/api/v3/watchlist', async ({ response }) => {
+        await games.promise
+        return response(200).json(makeWatchlistPage([]))
+      }),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderHook(
+      () => ({
+        list: useWatchlist({ category: ['game'] }),
+        remove: useRemoveFromWatchlist(),
+      }),
+      { wrapper: queryWrapper(queryClient) },
+    )
+    await waitFor(() => expect(result.current.list.isFetching).toBe(true))
+
+    act(() => void result.current.remove.mutateAsync(dune.item.id))
+    await waitFor(() => expect(gates.size).toBe(1))
+    games.resolve()
+
+    // While the remove is still in flight.
+    await waitFor(() => expect(result.current.list.isSuccess).toBe(true))
+    release(dune.item.id)
+  })
+
+  it('makes an add wait for the removes in flight before refetching', async () => {
+    const { release, gates } = holdDeletes()
+    const queryClient = seededQueryClient()
+    const { result } = renderHook(
+      () => ({ remove: useRemoveFromWatchlist(), add: useAddToWatchlist() }),
+      { wrapper: queryWrapper(queryClient) },
+    )
+
+    let removal!: Promise<void>
+    act(() => {
+      removal = result.current.remove.mutateAsync(arrival.item.id)
+    })
+    await waitFor(() => expect(gates.size).toBe(1))
+    await act(() =>
+      result.current.add.mutateAsync({ item_id: frieren.item.id }),
+    )
+    expect(isInvalidated(queryClient, all)).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+
+    release(arrival.item.id)
+    await act(() => removal)
+    expect(isInvalidated(queryClient, all)).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+  })
+
+  it('waits for the last of two removes before refetching', async () => {
+    const { release, gates } = holdDeletes()
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    let first!: Promise<void>
+    let second!: Promise<void>
+    act(() => {
+      first = result.current.mutateAsync(dune.item.id)
+      second = result.current.mutateAsync(arrival.item.id)
+    })
+    await waitFor(() => expect(gates.size).toBe(2))
+
+    release(dune.item.id)
+    await act(() => first)
+    expect(isInvalidated(queryClient, all)).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+    expect(cachedIds(queryClient, all)).toEqual([frieren.item.id])
+
+    release(arrival.item.id)
+    await act(() => second)
+    expect(isInvalidated(queryClient, all)).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
   })
 })
