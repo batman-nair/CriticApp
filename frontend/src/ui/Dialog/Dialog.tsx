@@ -25,7 +25,10 @@ interface DialogProps {
   onExited?: () => void
   title: string
   hideTitle?: boolean
-  /** A line under the visible title, read as the dialog's description. */
+  /**
+   * A line under the visible title, read as the dialog's description. Left
+   * out with `hideTitle`.
+   */
   description?: ReactNode
   /** On the description itself, such as to hide it at some widths. */
   descriptionClassName?: string

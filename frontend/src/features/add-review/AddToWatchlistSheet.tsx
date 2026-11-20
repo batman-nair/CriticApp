@@ -21,8 +21,8 @@ import type { WatchlistRowStatus } from './SearchResultRow'
 type RowState = 'pending' | 'added' | 'reviewed'
 
 /**
- * The category the page's link asked for. Movies without one, such as on a
- * direct link or a reload, as on the board.
+ * The category the page's link asked for (a reload keeps it in the history
+ * entry). Movies without one, such as on a direct link, as on the board.
  */
 function startCategory(state: unknown): SearchCategory {
   const category = (state as Partial<WatchlistAddState> | null)?.category

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Outlet, useMatch } from 'react-router'
 import { useWatchlist, useWatchlistFacets } from '../../api/queries/watchlist'
 import type { WatchlistPage as WatchlistPageData } from '../../api/types'
@@ -94,12 +94,16 @@ export function WatchlistPage() {
     setCategory('', { replace: true })
   }, [sheetOpen, highlighted, setCategory])
 
-  const outlet: WatchlistOutlet = {
-    onAdded: (itemId) => {
-      resetPending.current = true
-      setHighlighted((ids) => new Set(ids).add(itemId))
-    },
-  }
+  // One object, so the sheet doesn't re-render with every page render.
+  const outlet = useMemo<WatchlistOutlet>(
+    () => ({
+      onAdded: (itemId) => {
+        resetPending.current = true
+        setHighlighted((ids) => new Set(ids).add(itemId))
+      },
+    }),
+    [],
+  )
 
   const sentinelRef = useLoadMoreOnScroll({
     // Not during a background refetch either, even one paused offline:

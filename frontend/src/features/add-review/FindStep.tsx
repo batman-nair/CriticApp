@@ -66,7 +66,7 @@ export function FindStep({
     error?.status === 401 && error.code === 'UNAUTHENTICATED'
 
   // The sheet was open when the session ran out: the owner guard then goes to
-  // the login page, which comes back to /add.
+  // the login page, which comes back to the sheet.
   useEffect(() => {
     if (unauthenticated) markSessionExpired(queryClient)
   }, [unauthenticated, queryClient])

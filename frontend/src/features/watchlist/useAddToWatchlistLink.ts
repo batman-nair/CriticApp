@@ -2,6 +2,7 @@ import { useLocation, type To } from 'react-router'
 import type { SearchCategory } from '../../api/types'
 import type { FilterCategory } from '../../lib/categories'
 import type { WatchlistAddState } from '../../lib/watchlistOutlet'
+import { fromParentState } from '../../ui/Dialog/useRouteDialog'
 
 /** Props to spread onto a `Link` that opens the add sheet. */
 export interface AddToWatchlistLink {
@@ -20,8 +21,7 @@ export function useAddToWatchlistLink(
   const location = useLocation()
   return {
     to: { pathname: '/watchlist/add', search: location.search },
-    // `fromParentState`, typed for the sheet.
-    state: category ? { fromParent: true, category } : { fromParent: true },
+    state: category ? { ...fromParentState, category } : fromParentState,
   }
 }
 
