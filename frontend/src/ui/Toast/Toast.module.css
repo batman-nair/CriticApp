@@ -3,10 +3,13 @@
   position: fixed;
   /* Under the dialogs (100). */
   z-index: 50;
+  right: 0;
   bottom: calc(28px + env(safe-area-inset-bottom));
-  left: 50%;
+  left: 0;
+  /* Centred, as wide as its message, up to the page's width less 16px a side. */
+  width: fit-content;
   max-width: calc(100% - 32px);
-  transform: translateX(-50%);
+  margin-inline: auto;
   pointer-events: none;
 }
 
@@ -55,8 +58,9 @@
     right: 12px;
     bottom: calc(24px + env(safe-area-inset-bottom));
     left: 12px;
+    width: auto;
     max-width: none;
-    transform: none;
+    margin-inline: 0;
   }
 
   .toast {

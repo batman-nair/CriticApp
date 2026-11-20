@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { Link, Outlet, useMatch, useOutlet } from 'react-router'
+import { Link, useMatch, useOutlet } from 'react-router'
 import {
   useAddToWatchlist,
   useRemoveFromWatchlist,
@@ -127,8 +127,14 @@ export function WatchlistPage() {
   // Not after a click: focus in the toast pauses its timer.
   const focusUndo = useRef(false)
 
-  function showError(text: string) {
-    setNotice({ kind: 'error', id: ++noticeId.current, text })
+  /** Not over a newer title's Undo, which it would take away. */
+  function showError(itemId: string, text: string) {
+    const id = ++noticeId.current
+    setNotice((current) =>
+      current?.kind === 'removed' && current.entry.item.id !== itemId
+        ? current
+        : { kind: 'error', id, text },
+    )
   }
 
   function handleRemove(
@@ -144,7 +150,12 @@ export function WatchlistPage() {
     focusUndo.current = event.detail === 0
     void removal.then((removed) => {
       // The card is back already: the cache was rolled back.
-      if (!removed) showError(`Couldn’t remove ${entry.item.title}. Try again.`)
+      if (!removed) {
+        showError(
+          entry.item.id,
+          `Couldn’t remove ${entry.item.title}. Try again.`,
+        )
+      }
     })
   }
 
@@ -162,7 +173,10 @@ export function WatchlistPage() {
         added_at: entry.added_at,
       })
     } catch {
-      showError(`Couldn’t put ${entry.item.title} back on your watchlist.`)
+      showError(
+        entry.item.id,
+        `Couldn’t put ${entry.item.title} back on your watchlist.`,
+      )
     }
   }
 
@@ -171,15 +185,6 @@ export function WatchlistPage() {
     focusUndo.current = false
     undoRef.current?.focus()
   }, [notice])
-
-  // The boards never show the toast over a sheet. Opening one (the add sheet
-  // or Review it) dismisses it; the removal stays. Adjusted during render.
-  const childOpen = useOutlet() !== null
-  const [wasChildOpen, setWasChildOpen] = useState(childOpen)
-  if (childOpen !== wasChildOpen) {
-    setWasChildOpen(childOpen)
-    if (childOpen) setNotice(null)
-  }
 
   // One object, so the sheets re-render only when the list's data changes,
   // not with every page render.
@@ -193,6 +198,16 @@ export function WatchlistPage() {
     }),
     [entries],
   )
+
+  // The boards never show the toast over a sheet. Opening one (the add sheet
+  // or Review it) dismisses it; the removal stays. Adjusted during render.
+  const child = useOutlet(outlet)
+  const childOpen = child !== null
+  const [wasChildOpen, setWasChildOpen] = useState(childOpen)
+  if (childOpen !== wasChildOpen) {
+    setWasChildOpen(childOpen)
+    if (childOpen) setNotice(null)
+  }
 
   const sentinelRef = useLoadMoreOnScroll({
     // Not during a background refetch either, even one paused offline:
@@ -428,7 +443,7 @@ export function WatchlistPage() {
         {notice?.kind === 'error' && notice.text}
       </Toast>
       {/* The add sheet and Review it, which starts on a loaded card's title. */}
-      <Outlet context={outlet} />
+      {child}
     </>
   )
 }

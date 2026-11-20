@@ -954,6 +954,34 @@ describe('Remove and Undo', () => {
     expect(titles()).toEqual(['Dune', 'Arrival', 'Heat'])
   })
 
+  it('keeps a newer title’s Undo when an older remove fails', async () => {
+    const user = userEvent.setup()
+    const gate = deferred()
+    serveWatchlist([dune, arrival, heat])
+    server.use(
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          if (params.item_id !== arrival.item.id) return response(204).empty()
+          await gate.promise
+          return response.untyped(new HttpResponse(null, { status: 500 }))
+        },
+      ),
+    )
+    renderPage()
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+    await user.click(removeButton('Heat'))
+    gate.resolve()
+
+    await waitFor(() => expect(titles()).toContain('Arrival'))
+    expect(toast()).toHaveTextContent('Removed Heat from your watchlist.')
+    expect(
+      within(toast()).getByRole('button', { name: 'Undo' }),
+    ).toBeInTheDocument()
+  })
+
   it('says so when Undo fails', async () => {
     const user = userEvent.setup()
     serveWatchlist([dune, arrival], { postStatus: 500 })
