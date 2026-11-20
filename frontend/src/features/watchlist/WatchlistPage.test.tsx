@@ -305,6 +305,8 @@ it('shows the empty state, never "no matches", for a category on an empty watchl
   expect(
     screen.queryByRole('heading', { name: /^No .* on your watchlist$/ }),
   ).not.toBeInTheDocument()
+  // Still the first-load skeletons, not chips that go away again.
+  expect(chips()).toBeNull()
 
   gate.resolve()
   expect(
@@ -313,6 +315,45 @@ it('shows the empty state, never "no matches", for a category on an empty watchl
     }),
   ).toBeInTheDocument()
   expect(chips()).toBeNull()
+})
+
+it('shows the empty state for an empty list under All, whatever the counts say', async () => {
+  // Counts from before the last entry was removed elsewhere.
+  serveList(() => makeWatchlistPage([]))
+  serveFacets({ movie: 3 })
+  renderPage()
+
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Nothing on your watchlist yet',
+    }),
+  ).toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Show all' }),
+  ).not.toBeInTheDocument()
+})
+
+it('leaves out a chip the page can’t filter by', async () => {
+  server.use(
+    http.get('/api/v3/watchlist/facets', ({ response }) =>
+      response(200).json(
+        makeWatchlistFacets(
+          {},
+          {
+            total: 2,
+            categories: [
+              { id: 'movie', count: 1 },
+              { id: 'podcast', count: 1 },
+            ],
+          },
+        ),
+      ),
+    ),
+  )
+  renderPage()
+
+  await waitFor(() => expect(chip('Movies')).toHaveAccessibleName('Movies 1'))
+  expect(within(chips()!).getAllByRole('button')).toHaveLength(2)
 })
 
 it('shows "no matches" for an empty category, and the list after "Show all"', async () => {

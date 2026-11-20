@@ -74,12 +74,6 @@ export function WatchlistPage() {
       ? data.pages[0]?.meta.pagination.count
       : undefined)
 
-  // The board's first-load states show until the list has loaded once. After
-  // that a failed or slow chip keeps the chips, so another can be picked.
-  // Adjusted during render rather than in an effect.
-  const [listShown, setListShown] = useState(false)
-  if (data && !listShown) setListShown(true)
-
   // Branch on the data, not isError: a failed next page or background refetch
   // also sets isError, and the list it already has should stay.
   let state: 'error' | 'loading' | 'empty' | 'no-matches' | 'ready'
@@ -93,13 +87,21 @@ export function WatchlistPage() {
       ((category !== '' && facets.isPending) || query.isPlaceholderData))
   ) {
     state = 'loading'
-  } else if (total === 0 && entries.length === 0) {
+  } else if (entries.length === 0 && (total === 0 || category === '')) {
+    // Unfiltered and empty is empty, even when older counts say otherwise.
     state = 'empty'
   } else if (entries.length === 0) {
     state = 'no-matches'
   } else {
     state = 'ready'
   }
+
+  // The board's first-load states show until the list has loaded once. After
+  // that a failed or slow chip keeps the chips, so another can be picked.
+  // Not while the counts are still deciding between empty and no matches.
+  // Adjusted during render rather than in an effect.
+  const [listShown, setListShown] = useState(false)
+  if (data && state !== 'loading' && !listShown) setListShown(true)
 
   const firstLoad = !listShown
   const showChips = !firstLoad && state !== 'empty'
@@ -121,9 +123,10 @@ export function WatchlistPage() {
     subtitle = <p className={styles.subtitle}>{FALLBACK_SUBTITLE}</p>
   }
 
-  // Without the counts, the chips still filter.
+  // Without the counts, the chips still filter. A chip the page can't filter
+  // by isn't shown.
   const categories =
-    facets.data?.categories ??
+    facets.data?.categories.filter(({ id }) => isFilterCategory(id)) ??
     FILTER_CATEGORIES.map((id) => ({ id, count: undefined }))
 
   let body
