@@ -2,8 +2,10 @@ import type { RouteObject } from 'react-router'
 import { LoginPage } from '../auth/LoginPage'
 import { RequireOwner } from '../auth/RequireOwner'
 import { AddReviewPage } from '../features/add-review/AddReviewPage'
+import { AddToWatchlistSheet } from '../features/add-review/AddToWatchlistSheet'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
+import { WatchlistPage } from '../features/watchlist/WatchlistPage'
 import { AppLayout } from '../layout/AppLayout'
 import { DialogErrorPage } from '../layout/DialogErrorPage'
 import { NotFoundPage } from '../layout/NotFoundPage'
@@ -43,6 +45,31 @@ export const routes: RouteObject[] = [
                         <AddReviewPage />
                       </RequireOwner>
                     ),
+                    handle: { title: 'Add review' },
+                  },
+                ],
+              },
+              {
+                path: 'watchlist',
+                element: (
+                  <RequireOwner>
+                    <WatchlistPage />
+                  </RequireOwner>
+                ),
+                handle: { title: 'Watchlist' },
+                children: [
+                  {
+                    path: 'add',
+                    element: <AddToWatchlistSheet />,
+                    // A crash in the sheet leaves the watchlist behind it.
+                    errorElement: <DialogErrorPage />,
+                    handle: { title: 'Add to watchlist' },
+                  },
+                  {
+                    // Review it: the add-review sheet, on Rate with the title.
+                    path: 'review/:itemId',
+                    element: <AddReviewPage fromWatchlist />,
+                    errorElement: <DialogErrorPage />,
                     handle: { title: 'Add review' },
                   },
                 ],

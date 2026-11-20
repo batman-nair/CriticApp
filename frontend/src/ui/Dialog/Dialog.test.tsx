@@ -139,6 +139,27 @@ it('is named by a hidden title, with no heading', async () => {
   expect(screen.queryByRole('heading')).not.toBeInTheDocument()
 })
 
+it('is described by its description, under the title', async () => {
+  await setup({
+    description: 'Tap a title to save it.',
+    descriptionClassName: 'extra',
+  })
+
+  expect(dialog()).toHaveAccessibleDescription('Tap a title to save it.')
+  const description = screen.getByText('Tap a title to save it.')
+  expect(description).toHaveClass(styles.description!, 'extra')
+  expect(
+    screen.getByRole('heading', { name: 'Details' }).nextElementSibling,
+  ).toBe(description)
+})
+
+it('has no description without one', async () => {
+  await setup()
+
+  expect(dialog()).not.toHaveAttribute('aria-describedby')
+  expect(document.querySelector(`.${styles.titles}`)).toBeNull()
+})
+
 it('locks the page scroll only while open', async () => {
   const { user } = await setup()
   expect(document.body).toHaveAttribute('data-scroll-locked')

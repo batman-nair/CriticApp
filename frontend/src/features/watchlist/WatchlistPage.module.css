@@ -1,0 +1,207 @@
+/* From boards 1 and 13. */
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-16) var(--space-24);
+  padding: 40px 0 var(--space-24);
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 48px;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: var(--text-16);
+}
+
+.subtitleSkeleton {
+  --skeleton-width: 260px;
+  --skeleton-height: 14px;
+  --skeleton-radius: 7px;
+
+  margin-top: var(--space-8);
+}
+
+/* Two classes: Button's .lg sets the size at one. */
+.hero .add {
+  flex: none;
+  gap: var(--space-8);
+  padding: 0 var(--space-20);
+}
+
+.chips,
+.ghostChips {
+  display: flex;
+  flex-wrap: wrap;
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+
+.chips {
+  gap: var(--space-4);
+}
+
+/*
+ * The board's selected chips have no shadow, and a selected "All" sits on the
+ * panel colour. More specific than Chip's .selected, which stays as it is.
+ */
+.chips > [aria-pressed='true'] {
+  box-shadow: none;
+}
+
+.chips > .all[aria-pressed='true'] {
+  background: var(--panel);
+}
+
+.ghostChips {
+  gap: var(--space-8);
+}
+
+.countRow {
+  padding: var(--space-18) var(--space-2) var(--space-14);
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
+/* Holds the space below the list, so the load-more status sits above it. */
+.results {
+  padding-bottom: 88px;
+}
+
+/* Focused only from code, when the toast closes with focus in it. */
+.results:focus {
+  outline: none;
+}
+
+.sentinel {
+  height: 1px;
+}
+
+/* Stays mounted while empty, so this padding is always there. */
+.more {
+  padding-top: var(--space-24);
+  color: var(--muted);
+  font-size: var(--text-14);
+  text-align: center;
+}
+
+.moreError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  padding-top: var(--space-12);
+  color: var(--muted);
+  font-size: var(--text-14);
+}
+
+@media (max-width: 639px) {
+  .hero {
+    flex-wrap: nowrap;
+    gap: var(--space-12);
+    padding: var(--space-24) 0 var(--space-16);
+  }
+
+  .heading {
+    gap: var(--space-4);
+  }
+
+  .eyebrow {
+    font-size: var(--text-12);
+  }
+
+  .hero .add {
+    gap: var(--space-6);
+    height: 44px;
+    padding: 0 var(--space-16);
+    border-radius: 13px;
+  }
+
+  .hero .add svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .hero .addNoChips {
+    display: none;
+  }
+
+  /* The phone board says only "Only you can see this". */
+  .desktopOnly {
+    display: none;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  .subtitle {
+    font-size: var(--text-14);
+  }
+
+  .subtitleSkeleton {
+    --skeleton-width: 180px;
+    --skeleton-height: 13px;
+
+    margin-top: var(--space-6);
+  }
+
+  /* One row that scrolls sideways, out to the screen's edges. */
+  .chips,
+  .ghostChips {
+    flex-wrap: nowrap;
+  }
+
+  .chips {
+    margin-inline: calc(-1 * var(--space-20));
+    padding-inline: var(--space-20);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ghostChips {
+    overflow: hidden;
+  }
+
+  .ghostChips > * {
+    flex: none;
+  }
+
+  .countRow {
+    padding: var(--space-14) var(--space-2) var(--space-10);
+    font-size: var(--text-13);
+  }
+
+  .results {
+    padding-bottom: 40px;
+  }
+}

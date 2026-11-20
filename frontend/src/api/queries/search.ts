@@ -34,7 +34,8 @@ const all = ['search'] as const
 
 /**
  * Creating or updating a review should invalidate `all`: each result's
- * `my_review` changes with it.
+ * `my_review` changes with it. Adding to the watchlist marks `all` stale and
+ * patches `on_watchlist` into the cached results instead of refetching.
  */
 export const searchKeys = {
   all,

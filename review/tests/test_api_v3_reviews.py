@@ -3,13 +3,14 @@ from itertools import count
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.db import DatabaseError, connection
 from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
 from review.api_v3 import reviews as reviews_module
-from review.models import Review, ReviewItem
+from review.models import Review, ReviewItem, WatchlistEntry
 from review.providers import InvalidItemId, ItemNotFound, UpstreamError
 from review.tests.factories import create_review_item
 from review.tests.test_api_v3_items import PROVIDER_FOR_ITEM_ID, _anime_details, _StubProvider
@@ -359,6 +360,94 @@ class CreateTest(ReviewsApiTestCase):
 
         self.assertEqual(body['existing_review_id'], existing.pk)
         self.assertEqual(Review.objects.count(), 1)
+
+
+class CreateRemovesWatchlistEntryTest(ReviewsApiTestCase):
+    def post(self, item_id, **fields):
+        return self.client.post(LIST_URL, {'item_id': item_id, 'rating': 8.5, **fields}, format='json')
+
+    def on_watchlist(self, user, item_id):
+        return WatchlistEntry.objects.filter(user=user, review_item_id=item_id).exists()
+
+    def test_removes_only_the_users_entry_for_that_item(self):
+        item, other_item = new_item(), new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        WatchlistEntry.objects.create(user=self.alice, review_item=other_item)
+        WatchlistEntry.objects.create(user=self.bob, review_item=item)
+
+        self.assertEqual(self.post(item.item_id).status_code, 201)
+
+        self.assertFalse(self.on_watchlist(self.alice, item.item_id))
+        self.assertTrue(self.on_watchlist(self.alice, other_item.item_id))
+        self.assertTrue(self.on_watchlist(self.bob, item.item_id))
+
+    def test_removes_the_stored_entry_when_created_under_an_alias(self):
+        WatchlistEntry.objects.create(user=self.alice, review_item=new_item(item_id='mal_anime_52991'))
+        # The provider answers with its own id, which is the stored one.
+        with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=_StubProvider(_anime_details())):
+            response = self.post('mal_anime_052991')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertFalse(self.on_watchlist(self.alice, 'mal_anime_52991'))
+
+    def test_locks_the_item_in_the_create_transaction(self):
+        item = new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        locked = []
+        # The test's own transaction counts too.
+        outer = len(connection.atomic_blocks)
+
+        def lock(locked_item):
+            # Before the review exists, in the transaction that deletes the entry.
+            locked.append((locked_item, len(connection.atomic_blocks) > outer, Review.objects.exists()))
+
+        with mock.patch('review.api_v3.reviews.lock_item', side_effect=lock):
+            self.assertEqual(self.post(item.item_id).status_code, 201)
+        self.assertEqual(locked, [(item, True, False)])
+        self.assertFalse(self.on_watchlist(self.alice, item.item_id))
+
+    def test_duplicate_under_an_alias_keeps_the_entry(self):
+        existing = add_review(self.alice, item_id='mal_anime_52991')
+        # Only a race with watchlist add gets here; nothing in the schema stops it.
+        WatchlistEntry.objects.create(user=self.alice, review_item=existing.review_item)
+        # The unique constraint, inside the transaction, catches this one.
+        with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=_StubProvider(_anime_details())):
+            self.assertProblem(self.post('mal_anime_052991'), 409, 'DUPLICATE_REVIEW')
+
+        self.assertTrue(self.on_watchlist(self.alice, 'mal_anime_52991'))
+
+    def test_invalid_body_keeps_the_entry(self):
+        item = new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        self.assertFieldError(self.post(item.item_id, rating=11), 'rating', 'max_value')
+        self.assertTrue(self.on_watchlist(self.alice, item.item_id))
+
+    def test_provider_error_keeps_the_entry(self):
+        WatchlistEntry.objects.create(user=self.alice, review_item=new_item(item_id='mal_anime_52991'))
+        # An alias isn't stored, so it goes to the provider.
+        with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=_StubProvider(error=ItemNotFound('Anime not found!'))):
+            self.assertProblem(self.post('mal_anime_052991'), 404, 'NOT_FOUND')
+        self.assertTrue(self.on_watchlist(self.alice, 'mal_anime_52991'))
+
+    def test_failed_removal_rolls_the_review_back(self):
+        item = new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        with mock.patch.object(reviews_module, 'WatchlistEntry') as entry_model:
+            entry_model.objects.filter.return_value.delete.side_effect = DatabaseError('x')
+            with self.assertRaises(DatabaseError), self.assertLogs('critic.api.errors', 'ERROR'):
+                self.post(item.item_id)
+
+        self.assertFalse(Review.objects.exists())
+        self.assertTrue(self.on_watchlist(self.alice, item.item_id))
+
+    def test_deleting_the_review_does_not_put_the_entry_back(self):
+        item = new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        review_id = self.post(item.item_id).json()['data']['id']
+
+        self.assertEqual(self.client.delete(detail_url(review_id)).status_code, 204)
+
+        self.assertFalse(self.on_watchlist(self.alice, item.item_id))
 
 
 class ValidationTest(ReviewsApiTestCase):

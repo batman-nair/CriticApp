@@ -1,0 +1,69 @@
+/* From the loading boards (6 and 18). */
+.root {
+  padding-top: 54px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-18);
+  background: var(--surface);
+}
+
+/* Set here rather than as props, so phones can change them. */
+.poster {
+  --skeleton-width: 100%;
+  --skeleton-radius: var(--radius-12);
+}
+
+.meta {
+  --skeleton-height: 11px;
+  --skeleton-radius: var(--radius-6);
+}
+
+.title {
+  --skeleton-height: 16px;
+  --skeleton-radius: 7px;
+}
+
+.action {
+  --skeleton-height: 40px;
+  --skeleton-radius: var(--radius-10);
+}
+
+@media (max-width: 639px) {
+  .root {
+    padding-top: 44px;
+  }
+
+  .card {
+    gap: var(--space-10);
+    padding: 9px;
+    border-radius: var(--radius-16);
+  }
+
+  /* The phone board shows two rows. */
+  .card:nth-child(n + 5) {
+    display: none;
+  }
+
+  .poster {
+    --skeleton-radius: var(--radius-10);
+  }
+
+  .meta {
+    --skeleton-height: 10px;
+    --skeleton-radius: 5px;
+  }
+
+  .title {
+    --skeleton-height: 15px;
+  }
+
+  .action {
+    --skeleton-height: 44px;
+  }
+}

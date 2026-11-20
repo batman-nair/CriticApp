@@ -22,6 +22,10 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | GET | `/api/v3/reviews/{id}` | public | One review |
 | PATCH | `/api/v3/reviews/{id}` | owner | Change a review's rating, text or tags |
 | DELETE | `/api/v3/reviews/{id}` | owner | Delete a review |
+| GET | `/api/v3/watchlist` | logged in | The user's watchlist, newest first, paginated |
+| POST | `/api/v3/watchlist` | logged in | Add an item to the watchlist |
+| GET | `/api/v3/watchlist/facets` | logged in | Watchlist counts per category, for filter chips |
+| DELETE | `/api/v3/watchlist/{item_id}` | logged in | Remove an item from the watchlist |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
 | GET | `/api/auth/csrf` | public | Set the CSRF cookie |
@@ -131,7 +135,8 @@ search results are a shorter form of it (see `/search`):
       "id": "omdb_tt5884052", "category": "movie", "title": "Pokémon Detective Pikachu",
       "image_url": "https://...", "start_year": 2019, "end_year": null,
       "genres": null, "provider_rating": null,
-      "my_review": {"id": 42, "rating": 7.5}
+      "my_review": {"id": 42, "rating": 7.5},
+      "on_watchlist": false
     }
   ],
   "meta": {}
@@ -156,6 +161,7 @@ search results are a shorter form of it (see `/search`):
   | OMDb | `null` | `null` |
 
 - `my_review` is the logged-in user's review of the item, or `null`.
+- `on_watchlist` is whether the item is on the logged-in user's watchlist.
 - Nothing found is `200` with `data: []`. A failing data source is 502
   `UPSTREAM_ERROR`. Search spends the sources' quotas, so it needs a login
   and uses the `search` rate limit.
@@ -278,6 +284,10 @@ and changes only the fields sent.
 | The user already reviewed the item | 409 `DUPLICATE_REVIEW` |
 | The data source fails | 502 `UPSTREAM_ERROR` |
 
+Creating a review removes the item from the user's watchlist, in the same
+transaction: a failed create keeps the entry. Deleting the review later
+doesn't put it back.
+
 The 409 body has the id of the existing review:
 
 ```json
@@ -294,6 +304,46 @@ The 409 body has the id of the existing review:
 `PATCH` returns 200 with the review, and `DELETE` returns 204 with no body.
 Both are 401 when not logged in, 403 for another user's review, and 404 for
 a missing id. There is no `PUT` (405 when logged in, 401 otherwise).
+
+### Watchlist
+
+Titles a user wants to review later. A watchlist is private: every endpoint
+needs a login (401 `UNAUTHENTICATED` otherwise, also on reads) and only sees
+the logged-in user's entries. An entry is the item and when it was added:
+
+```json
+{ "item": { "id": "omdb_tt0113277", "category": "movie", "title": "Heat", ... }, "added_at": "2026-11-19T21:15:00Z" }
+```
+
+`GET /api/v3/watchlist` lists the entries newest `added_at` first (ties newest
+first), paginated with the usual `limit` and `offset`. `category` filters as
+on `GET /api/v3/reviews`.
+
+`GET /api/v3/watchlist/facets` takes no params and returns
+`{"total": 3, "categories": [{"id": "movie", "count": 1}, ...]}`: every chip,
+zero counts included, in the same order as `/reviews/facets`. There's no
+`languages`.
+
+`POST /api/v3/watchlist` takes `item_id` and an optional `added_at`. It fetches
+and stores the item if it isn't stored yet, as `/items/{item_id}` does.
+`added_at` defaults to now; undoing a removal sends the entry's original
+value, so it goes back to its place in the list.
+
+| Case | Response |
+|---|---|
+| Added | 201 with the entry |
+| Already on the watchlist | 200 with the existing entry, unchanged (a sent `added_at` is ignored) |
+| Invalid fields, or `added_at` in the future | 400 `VALIDATION_ERROR` |
+| Not logged in | 401 `UNAUTHENTICATED` |
+| Unknown prefix, or the data source has no such item | 404 `NOT_FOUND` |
+| The user already reviewed the item | 409 `ALREADY_REVIEWED` |
+| The data source fails | 502 `UPSTREAM_ERROR` |
+
+`DELETE /api/v3/watchlist/{item_id}` takes the stored item id (`item.id` of a
+listed entry) and returns 204 with no body, or 404 `NOT_FOUND` when the item
+isn't on the user's watchlist.
+
+Reviewing an item removes its entry (see [Writing reviews](#writing-reviews)).
 
 ### Session auth
 
@@ -375,6 +425,7 @@ sent with `Content-Type: application/problem+json`:
 | `NOT_FOUND` | 404 | No such object, or an unknown `/api/v3/...` path |
 | `METHOD_NOT_ALLOWED` | 405 | Wrong method. Sent with an `Allow` header |
 | `NOT_ACCEPTABLE` | 406 | `Accept` doesn't allow JSON |
+| `ALREADY_REVIEWED` | 409 | Adding an item the user already reviewed to the watchlist |
 | `DUPLICATE_REVIEW` | 409 | The user already reviewed the item. The body has `existing_review_id` |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Body isn't `application/json` |
 | `RATE_LIMITED` | 429 | Throttled. Sent with a `Retry-After` header (seconds) |

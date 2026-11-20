@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { PointerEventsCheckLevel } from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
@@ -21,6 +21,17 @@ afterEach(() => {
   server.events.removeAllListeners()
   delete document.documentElement.dataset.theme
 })
+
+/** Counts the requests for the watchlist counts. */
+function recordFacetRequests() {
+  const requests: string[] = []
+  server.events.on('request:start', ({ request }) => {
+    if (new URL(request.url).pathname === '/api/v3/watchlist/facets') {
+      requests.push(request.url)
+    }
+  })
+  return requests
+}
 
 function renderHeader() {
   return render(
@@ -77,6 +88,14 @@ describe('logged out', () => {
       screen.queryByRole('button', { name: 'Log out' }),
     ).not.toBeInTheDocument()
   })
+
+  it('has no tabs and asks for no watchlist counts', async () => {
+    const requests = recordFacetRequests()
+    renderHeader()
+    await screen.findByRole('link', { name: 'Log in' })
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(requests).toEqual([])
+  })
 })
 
 describe('as the owner', () => {
@@ -115,6 +134,40 @@ describe('as the owner', () => {
       'href',
       '/add',
     )
+  })
+
+  it('shows the tabs and "Add review" on the list', async () => {
+    renderRoute('/')
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(within(nav).getByRole('link', { name: 'Reviews' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: 'Add review' })).toBeInTheDocument()
+  })
+
+  it('leaves out "Add review" on the watchlist and asks for the counts once', async () => {
+    const requests = recordFacetRequests()
+    renderRoute('/watchlist')
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
+    expect(
+      await within(nav).findByRole('link', { name: 'Watchlist 2' }),
+    ).toHaveAttribute('aria-current', 'page')
+    // The page's chips read the same counts.
+    const chips = await screen.findByRole('group', {
+      name: 'Filter by category',
+    })
+    expect(
+      within(chips).getByRole('button', { name: 'All 2' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Switch to (dark|light) theme/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Add review' }),
+    ).not.toBeInTheDocument()
+    expect(requests).toHaveLength(1)
   })
 
   it('logs out with the CSRF header and switches to "Log in"', async () => {
@@ -198,5 +251,13 @@ describe('as someone else', () => {
     expect(
       screen.queryByRole('link', { name: 'Add review' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('has no tabs and asks for no watchlist counts', async () => {
+    const requests = recordFacetRequests()
+    renderHeader()
+    await screen.findByRole('button', { name: 'Log out' })
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(requests).toEqual([])
   })
 })

@@ -1,18 +1,23 @@
 import { useEffect, useId, useState } from 'react'
+import { useParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { useCategories } from '../../api/queries/categories'
 import { useReview } from '../../api/queries/reviews'
 import { Button } from '../../ui/Button/Button'
 import { Dialog } from '../../ui/Dialog/Dialog'
 import { useRouteDialog } from '../../ui/Dialog/useRouteDialog'
+import { Icon } from '../../ui/Icon/Icon'
+import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { Stepper } from '../../ui/Stepper/Stepper'
+import { VisuallyHidden } from '../../ui/VisuallyHidden/VisuallyHidden'
 import styles from './AddReviewPage.module.css'
 import { FindStep } from './FindStep'
-import { readLastCategory } from './lastCategory'
+import { readLastCategory, writeLastCategory } from './lastCategory'
 import { RateStep, UPDATE_NOTICE } from './RateStep'
 import { SavedReview } from './SavedReview'
 import { useAddFlow, type AddFlowAction, type AddStep } from './useAddFlow'
 import { useSaveReview } from './useSaveReview'
+import { useWatchlistStart } from './watchlistStart'
 import { WriteStep } from './WriteStep'
 
 const STEPS = ['Find', 'Rate', 'Write']
@@ -24,10 +29,36 @@ const STEP_INDEX: Record<AddStep, number> = {
   done: 3,
 }
 
-export function AddReviewPage() {
+interface AddReviewPageProps {
+  /**
+   * Review it from a watchlist card (`/watchlist/review/:itemId`): starts on
+   * Rate with that title instead of on Find.
+   */
+  fromWatchlist?: boolean
+}
+
+export function AddReviewPage({ fromWatchlist = false }: AddReviewPageProps) {
   const dialog = useRouteDialog()
+  const params = useParams()
   const [initialCategory] = useState(() => readLastCategory() ?? 'movie')
   const [flow, dispatch] = useAddFlow(initialCategory)
+
+  // Review it starts the flow on the title once, adjusted during render so
+  // Find never paints first. Add another starts over on Find, not on it.
+  const [startedOnce, setStartedOnce] = useState(false)
+  const start = useWatchlistStart(
+    fromWatchlist ? params.itemId : undefined,
+    !startedOnce,
+  )
+  if (!startedOnce && start.status === 'ready' && start.item) {
+    setStartedOnce(true)
+    dispatch({
+      type: 'started',
+      item: start.item,
+      onWatchlist: start.onWatchlist,
+    })
+  }
+  const waiting = fromWatchlist && !startedOnce
   const categories = useCategories()
   const { save, isSaving } = useSaveReview(flow.reviewId, dispatch)
   const rateId = useId()
@@ -68,12 +99,59 @@ export function AddReviewPage() {
       null)
     : null
 
+  const close = () => dialog.onOpenChange(false)
+
   let title
   let body
   let footer
-  if (flow.step === 'done' && flow.saved) {
+  if (waiting) {
+    // Review it's title is still loading, or couldn't be loaded.
+    title = 'Rate it'
+    if (start.status === 'not-found' || start.status === 'error') {
+      const notFound = start.status === 'not-found'
+      body = (
+        <p role="alert" className={styles.startError}>
+          {notFound
+            ? 'Couldn’t find that title. It may have been removed.'
+            : 'Couldn’t load this title.'}
+        </p>
+      )
+      footer = (
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={close}>
+            Close
+          </Button>
+          {!notFound && <Button onClick={start.retry}>Try again</Button>}
+        </div>
+      )
+    } else {
+      body = (
+        <div className={styles.starting} aria-busy="true">
+          <div role="status">
+            <VisuallyHidden>Loading…</VisuallyHidden>
+          </div>
+          <Skeleton className={styles.itemSkeleton} radius={16} />
+          <Skeleton className={styles.ratingSkeleton} radius={16} />
+        </div>
+      )
+    }
+  } else if (flow.step === 'done' && flow.saved) {
     title = update ? 'Review updated' : 'Added to your reviews'
-    body = <SavedReview review={flow.saved} ratingLabel={ratingLabel} />
+    // Only for the title Review it opened on: a create took it off the list.
+    // Not after a 409 turned it into an update, which removed nothing.
+    const removed =
+      flow.mode === 'create' && flow.saved.item.id === flow.startItemId
+    body = (
+      <div className={styles.done}>
+        {removed && (
+          <p className={styles.watchNote}>
+            <Icon name="bookmark-check" size={16} className={styles.noteIcon} />
+            Removed from your watchlist.
+          </p>
+        )}
+        <SavedReview review={flow.saved} ratingLabel={ratingLabel} />
+      </div>
+    )
     footer = (
       <div className={styles.actions}>
         <Button
@@ -82,7 +160,7 @@ export function AddReviewPage() {
         >
           Add another
         </Button>
-        <Button onClick={() => dialog.onOpenChange(false)}>Done</Button>
+        <Button onClick={close}>Done</Button>
       </div>
     )
   } else if (flow.step === 'write' && item) {
@@ -163,9 +241,10 @@ export function AddReviewPage() {
       <FindStep
         category={flow.category}
         query={flow.query}
-        onCategoryChange={(category) =>
+        onCategoryChange={(category) => {
+          writeLastCategory(category)
           dispatch({ type: 'categoryChanged', category })
-        }
+        }}
         onQueryChange={(query) => dispatch({ type: 'queryChanged', query })}
         onSelect={(item) => dispatch({ type: 'itemSelected', item })}
       />
@@ -183,13 +262,13 @@ export function AddReviewPage() {
         <Stepper
           label="Add review steps"
           steps={STEPS}
-          current={STEP_INDEX[flow.step]}
+          current={waiting ? STEP_INDEX.rate : STEP_INDEX[flow.step]}
           category={
             flow.step !== 'find' && item ? item.category : flow.category
           }
         />
       }
-      bodyKey={flow.step}
+      bodyKey={waiting ? `start-${start.status}` : flow.step}
       footer={footer}
     >
       {body}

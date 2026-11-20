@@ -50,6 +50,16 @@ def get_or_fetch_item(item_id: str) -> ReviewItem:
     return item
 
 
+def lock_item(item: ReviewItem) -> None:
+    """Locks the item's row until the transaction ends.
+
+    Creating a review and adding to the watchlist both take it, so one sees
+    the other's commit: a review created meanwhile either deletes the new
+    watchlist entry or makes the add a 409. A no-op on SQLite.
+    """
+    list(ReviewItem.objects.select_for_update().filter(pk=item.pk).values_list('pk', flat=True))
+
+
 def provider_api_error(exc: ProviderError) -> APIException:
     """The v3 error for a failed item lookup: 404 NOT_FOUND when the item
     doesn't exist, otherwise 502 UPSTREAM_ERROR. Provider messages are

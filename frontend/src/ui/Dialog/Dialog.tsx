@@ -25,6 +25,13 @@ interface DialogProps {
   onExited?: () => void
   title: string
   hideTitle?: boolean
+  /**
+   * A line under the visible title, read as the dialog's description. Left
+   * out with `hideTitle`.
+   */
+  description?: ReactNode
+  /** On the description itself, such as to hide it at some widths. */
+  descriptionClassName?: string
   size?: 'detail' | 'add'
   category?: string
   /** A stepper, or ‹ ›. */
@@ -50,6 +57,8 @@ export function Dialog({
   onExited,
   title,
   hideTitle = false,
+  description,
+  descriptionClassName,
   size = 'detail',
   category,
   headerStart,
@@ -131,6 +140,17 @@ export function Dialog({
                     <span>{title}</span>
                   </RadixDialog.Title>
                 </VisuallyHidden>
+              ) : description ? (
+                <div className={styles.titles}>
+                  <RadixDialog.Title className={styles.title}>
+                    {title}
+                  </RadixDialog.Title>
+                  <RadixDialog.Description
+                    className={cx(styles.description, descriptionClassName)}
+                  >
+                    {description}
+                  </RadixDialog.Description>
+                </div>
               ) : (
                 <RadixDialog.Title className={styles.title}>
                   {title}

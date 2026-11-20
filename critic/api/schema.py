@@ -41,6 +41,7 @@ V3_SCHEMA_SETTINGS = {
         {'name': 'search', 'description': "Search a category's data source"},
         {'name': 'items', 'description': 'Items (titles) by id'},
         {'name': 'reviews', 'description': "Users' reviews of items"},
+        {'name': 'watchlist', 'description': "The logged-in user's private watchlist"},
         {'name': 'auth', 'description': 'Browser sessions: CSRF cookie, login, logout, current user'},
     ],
 }

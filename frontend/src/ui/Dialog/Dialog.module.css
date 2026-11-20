@@ -116,6 +116,19 @@
   line-height: var(--leading-110);
 }
 
+/* The title and the line under it, closer than the stepper above. */
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.description {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-15);
+}
+
 /* Two classes, so these beat IconButton's whatever the CSS order. */
 .content .close {
   background: var(--dialog-button-bg, var(--soft));

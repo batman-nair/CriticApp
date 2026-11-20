@@ -32,6 +32,9 @@ const paths = {
       fill="currentColor"
     />
   ),
+  'star-outline': (
+    <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+  ),
   lock: (
     <>
       <rect x="5" y="11" width="14" height="10" rx="2" />
@@ -52,9 +55,36 @@ const paths = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  bookmark: (
+    <path
+      d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z"
+      fill="currentColor"
+    />
+  ),
+  'bookmark-plus': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M12 8v6M9 11h6" />
+    </>
+  ),
+  'bookmark-check': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M9 10.5l2 2 4-4" />
+    </>
+  ),
+  'bookmark-minus': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M9.5 10h5" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths
+
+/** Drawn as solid shapes, so they take no stroke. */
+const FILLED = new Set<IconName>(['star', 'bookmark'])
 
 interface IconProps {
   name: IconName
@@ -77,8 +107,8 @@ export function Icon({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={name === 'star' ? undefined : 'currentColor'}
-      strokeWidth={name === 'star' ? undefined : strokeWidth}
+      stroke={FILLED.has(name) ? undefined : 'currentColor'}
+      strokeWidth={FILLED.has(name) ? undefined : strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
     >

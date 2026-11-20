@@ -1,0 +1,61 @@
+/* From the add sheet boards (1, 2 and 9; below 640px, 13, 14 and 21). */
+
+/* The phone board has no subtitle. */
+@media (max-width: 639px) {
+  .description {
+    display: none;
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.summary {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-14);
+  font-weight: var(--weight-semibold);
+}
+
+.summary[data-tone='added'] {
+  color: var(--fg);
+}
+
+.summary[data-tone='error'] {
+  color: var(--danger-text);
+}
+
+.narrow {
+  display: none;
+}
+
+/* Two classes: Button's .lg sets the size at one, .lg.primary at none. */
+.footer .done {
+  flex: none;
+  padding: 0 26px;
+}
+
+@media (max-width: 639px) {
+  .summary {
+    font-size: var(--text-13);
+  }
+
+  .wide {
+    display: none;
+  }
+
+  .narrow {
+    display: inline;
+  }
+
+  .footer .done {
+    height: 50px;
+    padding: 0 var(--space-28);
+    font-size: var(--text-16);
+  }
+}

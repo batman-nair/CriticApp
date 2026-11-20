@@ -330,7 +330,7 @@ paths:
         from its provider (picked by the id prefix) and stored. 404 when the prefix
         is unknown or the provider has no such item; 502 when the provider fails;
         409 DUPLICATE_REVIEW with `existing_review_id` when the user already reviewed
-        the item.
+        the item. Creating a review removes the item from the user's watchlist.
       summary: Create a review
       tags:
       - reviews
@@ -747,6 +747,217 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+  /api/v3/watchlist:
+    get:
+      operationId: watchlist_list
+      description: The logged-in user's entries, newest `added_at` first. `category`
+        can be repeated or separated with commas.
+      summary: List the user's watchlist
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: array
+          items:
+            enum:
+            - movie
+            - series
+            - game
+            - anime
+            - anime:series
+            - anime:movie
+            - manga
+            - book
+            type: string
+            description: |-
+              * `movie` - movie
+              * `series` - series
+              * `game` - game
+              * `anime` - anime
+              * `anime:series` - anime:series
+              * `anime:movie` - anime:movie
+              * `manga` - manga
+              * `book` - book
+        description: Only these categories. Repeat the param or separate values with
+          commas
+      - in: query
+        name: limit
+        schema:
+          type: integer
+        description: Page size. Default 20; values above 100 are cut down to 100,
+          and invalid values fall back to the default.
+      - in: query
+        name: offset
+        schema:
+          type: integer
+        description: How many entries to skip.
+      tags:
+      - watchlist
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistEntryPageResponse'
+          description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+    post:
+      operationId: watchlist_create
+      description: Add an item by its id. An item that isn't stored yet is fetched
+        from its provider (picked by the id prefix) and stored. 201 with the new entry;
+        200 with the existing entry, unchanged, when the item is already on the watchlist
+        (a sent `added_at` is ignored then). 400 for a future `added_at`; 404 when
+        the prefix is unknown or the provider has no such item; 502 when the provider
+        fails; 409 ALREADY_REVIEWED when the user already reviewed the item.
+      summary: Add an item to the watchlist
+      tags:
+      - watchlist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatchlistEntryCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistEntryResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistEntryResponse'
+          description: ''
+        '400':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+        '502':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
+  /api/v3/watchlist/{item_id}:
+    delete:
+      operationId: watchlist_destroy
+      description: By the stored item id (`item.id` of a listed entry). 404 when the
+        item isn't on the watchlist.
+      summary: Remove an item from the watchlist
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - watchlist
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '404':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '500':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Internal Server Error
+  /api/v3/watchlist/facets:
+    get:
+      operationId: watchlist_facets
+      description: Counts for the logged-in user's watchlist, for the watchlist page's
+        category chips.
+      summary: Count watchlist entries by category
+      tags:
+      - watchlist
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistFacetsResponse'
+          description: ''
         '401':
           content:
             application/problem+json:
@@ -1499,6 +1710,9 @@ components:
           - $ref: '#/components/schemas/MyReview'
           nullable: true
           description: The logged-in user's review of this item, if any
+        on_watchlist:
+          type: boolean
+          description: Whether the item is on the logged-in user's watchlist
       required:
       - category
       - end_year
@@ -1506,6 +1720,7 @@ components:
       - id
       - image_url
       - my_review
+      - on_watchlist
       - provider_rating
       - start_year
       - title
@@ -1666,6 +1881,80 @@ components:
       required:
       - data
       - meta
+    WatchlistEntry:
+      type: object
+      properties:
+        item:
+          $ref: '#/components/schemas/Item'
+        added_at:
+          type: string
+          format: date-time
+      required:
+      - added_at
+      - item
+    WatchlistEntryCreateRequest:
+      type: object
+      properties:
+        item_id:
+          type: string
+          minLength: 1
+        added_at:
+          type: string
+          format: date-time
+          description: When the entry was added. Defaults to now; undoing a removal
+            sends the entry's original value
+      required:
+      - item_id
+    WatchlistEntryPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WatchlistEntry'
+        meta:
+          $ref: '#/components/schemas/PaginatedMeta'
+      required:
+      - data
+      - meta
+    WatchlistEntryResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WatchlistEntry'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
+    WatchlistFacets:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Entries on the watchlist
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryFacet'
+          description: Every chip, in /categories order, zero counts included
+      required:
+      - categories
+      - total
+    WatchlistFacetsResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WatchlistFacets'
+        meta:
+          type: object
+          additionalProperties: false
+          description: Always empty for responses without pagination
+      required:
+      - data
+      - meta
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -1686,5 +1975,7 @@ tags:
   description: Items (titles) by id
 - name: reviews
   description: Users' reviews of items
+- name: watchlist
+  description: The logged-in user's private watchlist
 - name: auth
   description: 'Browser sessions: CSRF cookie, login, logout, current user'

@@ -1,0 +1,154 @@
+/* From boards 1 and 13. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  /* Cards in a row match the tallest. */
+  height: 100%;
+  padding: var(--space-12);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-18);
+  background: var(--surface);
+}
+
+/* Added in the sheet just now. */
+.card[data-fresh] {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 1px var(--fg);
+}
+
+.cover {
+  position: relative;
+}
+
+.poster {
+  --poster-radius: var(--radius-12);
+}
+
+/* The bookmark ribbon over the poster's top right corner. */
+.ribbon {
+  position: absolute;
+  top: -1px;
+  right: var(--space-12);
+  width: 20px;
+  height: 30px;
+  background: var(--fg);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 var(--space-2);
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  color: var(--muted);
+  font-size: var(--text-13);
+  font-weight: var(--weight-semibold);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--cat);
+}
+
+.title {
+  font-size: var(--text-16);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.015em;
+  line-height: var(--leading-125);
+}
+
+/* Under the title, at the card's foot: Review it, then Remove. */
+.actions {
+  display: flex;
+  gap: var(--space-6);
+  margin-top: auto;
+}
+
+.review {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  height: 40px;
+  border-radius: var(--radius-10);
+  /* The board mixes in the poster's hue; the app has the category's. */
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-card-action),
+    var(--surface)
+  );
+  color: var(--fg);
+  font-size: var(--text-14);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.reviewIcon {
+  flex: none;
+}
+
+.remove {
+  border-radius: var(--radius-10);
+}
+
+@media (max-width: 639px) {
+  .card {
+    gap: var(--space-10);
+    padding: 9px;
+    border-radius: var(--radius-16);
+  }
+
+  .poster {
+    --poster-radius: var(--radius-10);
+  }
+
+  .ribbon {
+    right: var(--space-10);
+    width: 16px;
+    height: 24px;
+  }
+
+  .body {
+    gap: var(--space-2);
+  }
+
+  .meta {
+    font-size: var(--text-12);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  .title {
+    font-size: var(--text-15);
+  }
+
+  .review {
+    gap: 5px;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .reviewIcon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .remove {
+    width: 44px;
+    height: 44px;
+  }
+}

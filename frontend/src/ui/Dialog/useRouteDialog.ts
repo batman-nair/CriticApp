@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 /** Link state for a dialog route opened from its parent, so closing goes Back. */
-export const fromParentState = { fromParent: true }
+export const fromParentState = { fromParent: true } as const
 
 function isFromParent(state: unknown) {
   return (state as typeof fromParentState | null)?.fromParent === true
