@@ -94,15 +94,22 @@ export function WatchlistPage() {
     setCategory('', { replace: true })
   }, [sheetOpen, highlighted, setCategory])
 
-  // One object, so the sheet doesn't re-render with every page render.
+  const entries = useMemo(
+    () => (data ? uniqueEntries(data.pages) : []),
+    [data],
+  )
+
+  // One object, so the sheets re-render only when the list's data changes,
+  // not with every page render.
   const outlet = useMemo<WatchlistOutlet>(
     () => ({
       onAdded: (itemId) => {
         resetPending.current = true
         setHighlighted((ids) => new Set(ids).add(itemId))
       },
+      entries,
     }),
-    [],
+    [entries],
   )
 
   const sentinelRef = useLoadMoreOnScroll({
@@ -111,8 +118,6 @@ export function WatchlistPage() {
     enabled: hasNextPage && fetchStatus === 'idle' && !isFetchNextPageError,
     onLoadMore: () => void fetchNextPage(),
   })
-
-  const entries = data ? uniqueEntries(data.pages) : []
 
   // When the counts fail, the list's own count stands in, if it's unfiltered.
   const total =
@@ -314,7 +319,7 @@ export function WatchlistPage() {
           </>
         )}
       </div>
-      {/* The add sheet, and Review it from #132. */}
+      {/* The add sheet and Review it, which starts on a loaded card's title. */}
       <Outlet context={outlet} />
     </>
   )

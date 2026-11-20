@@ -32,6 +32,9 @@ const paths = {
       fill="currentColor"
     />
   ),
+  'star-outline': (
+    <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+  ),
   lock: (
     <>
       <rect x="5" y="11" width="14" height="10" rx="2" />
@@ -62,6 +65,12 @@ const paths = {
     <>
       <path d="M6 4h12v17l-6-4-6 4z" />
       <path d="M12 8v6M9 11h6" />
+    </>
+  ),
+  'bookmark-check': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M9 10.5l2 2 4-4" />
     </>
   ),
 } satisfies Record<string, ReactNode>

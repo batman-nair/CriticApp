@@ -97,7 +97,9 @@ function renderSheet(state?: Partial<WatchlistAddState> | null) {
         element: (
           <>
             <p>The page</p>
-            <Outlet context={{ onAdded } satisfies WatchlistOutlet} />
+            <Outlet
+              context={{ onAdded, entries: [] } satisfies WatchlistOutlet}
+            />
           </>
         ),
         children: [{ path: 'add', element: <AddToWatchlistSheet /> }],

@@ -14,6 +14,7 @@ const names: IconName[] = [
   'pencil',
   'trash',
   'star',
+  'star-outline',
   'lock',
   'cloud-off',
   'refresh',
@@ -21,6 +22,7 @@ const names: IconName[] = [
   'check',
   'bookmark',
   'bookmark-plus',
+  'bookmark-check',
 ]
 
 it.each(names)(
@@ -64,6 +66,18 @@ it('strokes the outline bookmark-plus', () => {
   expect(svg).toHaveAttribute('stroke', 'currentColor')
   expect(svg).toHaveAttribute('stroke-width', '1.8')
 })
+
+it.each<IconName>(['star-outline', 'bookmark-check'])(
+  'strokes the outline %s',
+  (name) => {
+    const { container } = render(<Icon name={name} />)
+
+    const svg = container.querySelector('svg')
+    expect(svg).toHaveAttribute('fill', 'none')
+    expect(svg).toHaveAttribute('stroke', 'currentColor')
+    expect(container.querySelector('path')).not.toHaveAttribute('fill')
+  },
+)
 
 it('strokes the other icons and passes className through', () => {
   const { container } = render(
