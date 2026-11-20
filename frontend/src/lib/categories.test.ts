@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest'
-import { categoryLabel, categoryVars, reviewCategory } from './categories'
+import {
+  categoryLabel,
+  categoryVars,
+  FILTER_CATEGORIES,
+  isFilterCategory,
+  reviewCategory,
+} from './categories'
 
 it.each([
   ['movie', 'movie'],
@@ -56,3 +62,26 @@ it.each([
 it.each(['podcast', 'constructor'])('labels %s with its id', (id) => {
   expect(categoryLabel(id)).toBe(id)
 })
+
+it('lists the filter chips in /categories order', () => {
+  expect(FILTER_CATEGORIES).toEqual([
+    'movie',
+    'series',
+    'game',
+    'anime:series',
+    'anime:movie',
+    'manga',
+    'book',
+  ])
+})
+
+it.each(FILTER_CATEGORIES)('takes %s as a filter category', (id) => {
+  expect(isFilterCategory(id)).toBe(true)
+})
+
+it.each(['', 'anime', 'movie,game', 'podcast', 'constructor'])(
+  'rejects %j as a filter category',
+  (value) => {
+    expect(isFilterCategory(value)).toBe(false)
+  },
+)

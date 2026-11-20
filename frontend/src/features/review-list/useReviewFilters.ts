@@ -4,26 +4,9 @@ import type {
   ReviewListParams,
 } from '../../api/queries/reviews'
 import { OWNER_USERNAME } from '../../config'
+import { isFilterCategory } from '../../lib/categories'
 
 export type ReviewSort = NonNullable<ReviewListParams['sort']>
-
-type CategoryId = NonNullable<ReviewListParams['category']>[number]
-
-/**
- * The chips after "All", in /categories order. The panel labels the chips
- * from this whenever the facets aren't there.
- */
-export const FILTER_CATEGORIES = [
-  'movie',
-  'series',
-  'game',
-  'anime:series',
-  'anime:movie',
-  'manga',
-  'book',
-] as const satisfies readonly CategoryId[]
-
-export type FilterCategory = (typeof FILTER_CATEGORIES)[number]
 
 /** The sort menu's options, the default first. */
 export const SORTS = [
@@ -49,10 +32,6 @@ const DEFAULT_FILTERS: ReviewFilters = {
 }
 
 const FILTER_KEYS = ['q', 'category', 'language', 'sort'] as const
-
-function isFilterCategory(value: string): value is FilterCategory {
-  return (FILTER_CATEGORIES as readonly string[]).includes(value)
-}
 
 function isSort(value: string): value is ReviewSort {
   return SORTS.some((sort) => sort.value === value)

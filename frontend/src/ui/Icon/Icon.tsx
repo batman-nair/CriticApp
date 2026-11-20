@@ -52,9 +52,24 @@ const paths = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  bookmark: (
+    <path
+      d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1z"
+      fill="currentColor"
+    />
+  ),
+  'bookmark-plus': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M12 8v6M9 11h6" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths
+
+/** Drawn as solid shapes, so they take no stroke. */
+const FILLED = new Set<IconName>(['star', 'bookmark'])
 
 interface IconProps {
   name: IconName
@@ -77,8 +92,8 @@ export function Icon({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={name === 'star' ? undefined : 'currentColor'}
-      strokeWidth={name === 'star' ? undefined : strokeWidth}
+      stroke={FILLED.has(name) ? undefined : 'currentColor'}
+      strokeWidth={FILLED.has(name) ? undefined : strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
     >

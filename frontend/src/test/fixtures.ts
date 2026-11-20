@@ -9,6 +9,9 @@ import type {
   SearchResult,
   SessionUser,
   Tag,
+  WatchlistEntry,
+  WatchlistFacets,
+  WatchlistPage,
 } from '../api/types'
 import { OWNER_USERNAME } from '../config'
 
@@ -99,6 +102,63 @@ export function makeReviewFacets(
         'book',
       ].map((id) => ({ id, count: counts[id] ?? 0 })),
       languages: [{ name: 'Japanese', count: 2 }],
+      ...overrides,
+    },
+    meta: {},
+  }
+}
+
+/** An entry for `makeItem()` unless overridden. */
+export function makeWatchlistEntry(
+  overrides: Partial<WatchlistEntry> = {},
+): WatchlistEntry {
+  return {
+    item: makeItem(),
+    added_at: '2025-03-01T12:00:00Z',
+    ...overrides,
+  }
+}
+
+/** A page of `entries`. The count defaults to there being no more pages. */
+export function makeWatchlistPage(
+  entries: WatchlistEntry[],
+  { count, offset = 0 }: { count?: number; offset?: number } = {},
+): WatchlistPage {
+  // Not WATCHLIST_PAGE_SIZE, for the reason in makeReviewPage.
+  return {
+    data: entries,
+    meta: {
+      pagination: {
+        count: count ?? offset + entries.length,
+        limit: 20,
+        offset,
+      },
+    },
+  }
+}
+
+/**
+ * The counts for the default list handler's two entries, a movie and an
+ * anime series, unless `counts` says otherwise. Every chip is listed, in
+ * /categories order. The total is the sum of the counts.
+ */
+export function makeWatchlistFacets(
+  counts: Record<string, number> = { movie: 1, 'anime:series': 1 },
+  overrides: Partial<WatchlistFacets> = {},
+): components['schemas']['WatchlistFacetsResponse'] {
+  const categories = [
+    'movie',
+    'series',
+    'game',
+    'anime:series',
+    'anime:movie',
+    'manga',
+    'book',
+  ].map((id) => ({ id, count: counts[id] ?? 0 }))
+  return {
+    data: {
+      total: categories.reduce((sum, category) => sum + category.count, 0),
+      categories,
       ...overrides,
     },
     meta: {},

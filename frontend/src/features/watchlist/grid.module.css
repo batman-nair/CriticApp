@@ -1,0 +1,16 @@
+/* The watchlist's grid of portrait cards, from boards 1 and 13. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-18);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 639px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-12);
+  }
+}

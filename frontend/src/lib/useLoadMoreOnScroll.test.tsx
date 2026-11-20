@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { stubIntersectionObserver } from '../../test/intersectionObserver'
+import { stubIntersectionObserver } from '../test/intersectionObserver'
 import { useLoadMoreOnScroll } from './useLoadMoreOnScroll'
 
 afterEach(() => {
