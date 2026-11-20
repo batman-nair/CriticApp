@@ -21,6 +21,7 @@ const SECTIONS = [
   'Skeleton',
   'RulerPicker',
   'Dialog',
+  'Toast',
   'Stepper',
 ]
 
@@ -58,6 +59,23 @@ it('flips the theme from the toggle', async () => {
     screen.getByRole('button', { name: 'Switch to light theme' }),
   )
   expect(root.dataset.theme).toBe('light')
+})
+
+it('opens one toast at a time, with or without Undo', async () => {
+  const user = userEvent.setup()
+  renderGallery()
+  const toast = screen.getByRole('status')
+
+  await user.click(screen.getByRole('button', { name: 'With Undo' }))
+  expect(toast).toHaveTextContent('Removed Dune from your watchlist.')
+  await user.click(screen.getByRole('button', { name: 'No action' }))
+  expect(toast).toHaveTextContent('Couldn’t remove Dune. Try again.')
+  expect(within(toast).queryByRole('button')).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'With Undo' }))
+  await user.click(within(toast).getByRole('button', { name: 'Undo' }))
+  expect(toast).toBeEmptyDOMElement()
+  expect(screen.getByText(/undone 1×/)).toBeInTheDocument()
 })
 
 it('has no axe violations', async () => {
