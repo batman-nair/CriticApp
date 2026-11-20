@@ -1,11 +1,12 @@
 import {
   keepPreviousData,
+  type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { client, unwrap } from '../client'
+import { ApiError, client, unwrap } from '../client'
 import type { paths } from '../schema'
 import type {
   SearchResult,
@@ -116,6 +117,91 @@ export function useAddToWatchlist() {
           )
         },
       )
+    },
+  })
+}
+
+const removeKey = [...all, 'remove'] as const
+
+/**
+ * Takes a title off the watchlist. One already gone (404) counts as removed.
+ *
+ * The card leaves every cached list at once, and comes back if the remove
+ * fails. The list, chips and header count refetch once the last remove in
+ * flight has settled, so an earlier one can't bring a later card back. The
+ * cached search results with this title no longer say `on_watchlist`.
+ *
+ * Call `mutateAsync` once per title: TanStack only runs `mutate`'s own
+ * callbacks for the last of overlapping calls.
+ */
+export function useRemoveFromWatchlist() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationKey: removeKey,
+    mutationFn: async (itemId: string) => {
+      try {
+        await unwrap(
+          client.DELETE('/api/v3/watchlist/{item_id}', {
+            params: { path: { item_id: itemId } },
+          }),
+        )
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return
+        throw error
+      }
+    },
+    onMutate: async (itemId) => {
+      // So a refetch already under way can't paint the card back.
+      await queryClient.cancelQueries({ queryKey: watchlistKeys.lists() })
+      const snapshot = queryClient.getQueriesData<InfiniteData<WatchlistPage>>({
+        queryKey: watchlistKeys.lists(),
+      })
+      queryClient.setQueriesData<InfiniteData<WatchlistPage>>(
+        { queryKey: watchlistKeys.lists() },
+        (data) => {
+          if (
+            !data?.pages.some((page) =>
+              page.data.some((entry) => entry.item.id === itemId),
+            )
+          ) {
+            return data
+          }
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              data: page.data.filter((entry) => entry.item.id !== itemId),
+            })),
+          }
+        },
+      )
+      return { snapshot }
+    },
+    onError: (_error, _itemId, context) => {
+      for (const [queryKey, data] of context?.snapshot ?? []) {
+        queryClient.setQueryData(queryKey, data)
+      }
+    },
+    onSuccess: (_data, itemId) => {
+      // Stale first, then the patched ones fresh, as in useAddToWatchlist.
+      void queryClient.invalidateQueries({
+        queryKey: searchKeys.all,
+        refetchType: 'none',
+      })
+      queryClient.setQueriesData<SearchResult[]>(
+        { queryKey: searchKeys.all },
+        (results) => {
+          if (!results?.some((result) => result.id === itemId)) return undefined
+          return results.map((result) =>
+            result.id === itemId ? { ...result, on_watchlist: false } : result,
+          )
+        },
+      )
+    },
+    onSettled: () => {
+      // This one still counts as in flight here.
+      if (queryClient.isMutating({ mutationKey: removeKey }) > 1) return
+      void queryClient.invalidateQueries({ queryKey: watchlistKeys.all })
     },
   })
 }
