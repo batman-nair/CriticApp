@@ -73,6 +73,12 @@ const paths = {
       <path d="M9 10.5l2 2 4-4" />
     </>
   ),
+  'bookmark-minus': (
+    <>
+      <path d="M6 4h12v17l-6-4-6 4z" />
+      <path d="M9.5 10h5" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths

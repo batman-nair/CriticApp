@@ -1,0 +1,79 @@
+/* From the "Removed · Undo" boards. Always in the page; empty when closed. */
+.region {
+  position: fixed;
+  /* Under the dialogs (100). */
+  z-index: 50;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 50%;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  padding: 10px 10px 10px 18px;
+  border-radius: var(--radius-16);
+  background: var(--fg);
+  box-shadow: var(--shadow-toast);
+  color: var(--bg);
+  font-size: var(--text-15);
+  pointer-events: auto;
+  animation: toast-in var(--duration-medium) var(--ease);
+}
+
+.message {
+  min-width: 0;
+}
+
+.action {
+  flex: none;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-10);
+  background: transparent;
+  color: var(--bg);
+  font: inherit;
+  font-size: var(--text-15);
+  font-weight: var(--weight-extrabold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* The page's outline colour is the toast's background. */
+.action:focus-visible {
+  outline-color: var(--bg);
+  outline-offset: -4px;
+}
+
+@media (max-width: 639px) {
+  .region {
+    right: 12px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    left: 12px;
+    max-width: none;
+    transform: none;
+  }
+
+  .toast {
+    justify-content: space-between;
+    gap: var(--space-12);
+    padding: 8px 8px 8px 16px;
+    font-size: var(--text-14);
+  }
+
+  .action {
+    height: 44px;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

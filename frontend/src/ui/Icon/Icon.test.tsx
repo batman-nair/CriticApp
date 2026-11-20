@@ -23,6 +23,7 @@ const names: IconName[] = [
   'bookmark',
   'bookmark-plus',
   'bookmark-check',
+  'bookmark-minus',
 ]
 
 it.each(names)(
@@ -67,7 +68,7 @@ it('strokes the outline bookmark-plus', () => {
   expect(svg).toHaveAttribute('stroke-width', '1.8')
 })
 
-it.each<IconName>(['star-outline', 'bookmark-check'])(
+it.each<IconName>(['star-outline', 'bookmark-check', 'bookmark-minus'])(
   'strokes the outline %s',
   (name) => {
     const { container } = render(<Icon name={name} />)
