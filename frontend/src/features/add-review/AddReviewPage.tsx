@@ -8,7 +8,7 @@ import { useRouteDialog } from '../../ui/Dialog/useRouteDialog'
 import { Stepper } from '../../ui/Stepper/Stepper'
 import styles from './AddReviewPage.module.css'
 import { FindStep } from './FindStep'
-import { readLastCategory } from './lastCategory'
+import { readLastCategory, writeLastCategory } from './lastCategory'
 import { RateStep, UPDATE_NOTICE } from './RateStep'
 import { SavedReview } from './SavedReview'
 import { useAddFlow, type AddFlowAction, type AddStep } from './useAddFlow'
@@ -163,9 +163,10 @@ export function AddReviewPage() {
       <FindStep
         category={flow.category}
         query={flow.query}
-        onCategoryChange={(category) =>
+        onCategoryChange={(category) => {
+          writeLastCategory(category)
           dispatch({ type: 'categoryChanged', category })
-        }
+        }}
         onQueryChange={(query) => dispatch({ type: 'queryChanged', query })}
         onSelect={(item) => dispatch({ type: 'itemSelected', item })}
       />

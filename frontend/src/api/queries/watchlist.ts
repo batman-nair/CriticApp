@@ -1,11 +1,18 @@
 import {
   keepPreviousData,
   useInfiniteQuery,
+  useMutation,
   useQuery,
+  useQueryClient,
 } from '@tanstack/react-query'
 import { client, unwrap } from '../client'
 import type { paths } from '../schema'
-import type { WatchlistPage } from '../types'
+import type {
+  SearchResult,
+  WatchlistEntryCreate,
+  WatchlistPage,
+} from '../types'
+import { searchKeys } from './search'
 
 export const WATCHLIST_PAGE_SIZE = 20
 
@@ -67,6 +74,48 @@ export function useWatchlistFacets() {
         client.GET('/api/v3/watchlist/facets', { signal }),
       )
       return body.data
+    },
+  })
+}
+
+/**
+ * Puts a title on the watchlist; one already there comes back as it is. The
+ * list, chips and header count refetch. Search results aren't refetched:
+ * the cached ones with this title say `on_watchlist`, the rest go stale.
+ *
+ * Call `mutateAsync` once per title when several can be in flight: TanStack
+ * only runs `mutate`'s own callbacks for the last of overlapping calls.
+ */
+export function useAddToWatchlist() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (entry: WatchlistEntryCreate) => {
+      const body = await unwrap(
+        client.POST('/api/v3/watchlist', { body: entry }),
+      )
+      return body.data
+    },
+    onSuccess: (entry, { item_id }) => {
+      // Not awaited, so the add doesn't wait for the refetch.
+      void queryClient.invalidateQueries({ queryKey: watchlistKeys.all })
+      // Every search goes stale first, without a refetch. Writing the patched
+      // ones afterwards makes them fresh again, the one on screen included;
+      // the other way round would leave it stale, to refetch on focus.
+      void queryClient.invalidateQueries({
+        queryKey: searchKeys.all,
+        refetchType: 'none',
+      })
+      // The request's id can be an alias of the stored one.
+      const ids = new Set([item_id, entry.item.id])
+      queryClient.setQueriesData<SearchResult[]>(
+        { queryKey: searchKeys.all },
+        (results) => {
+          if (!results?.some((result) => ids.has(result.id))) return undefined
+          return results.map((result) =>
+            ids.has(result.id) ? { ...result, on_watchlist: true } : result,
+          )
+        },
+      )
     },
   })
 }

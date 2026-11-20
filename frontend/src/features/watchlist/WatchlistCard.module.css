@@ -11,6 +11,12 @@
   background: var(--surface);
 }
 
+/* Added in the sheet just now. */
+.card[data-fresh] {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 1px var(--fg);
+}
+
 .cover {
   position: relative;
 }

@@ -1,10 +1,25 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { expect, it } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import { WatchlistEmpty } from './WatchlistEmpty'
 
+const addLink = {
+  to: { pathname: '/watchlist/add', search: '?category=game' },
+  state: { fromParent: true as const },
+}
+
+/** In a router only for the Link. */
+function renderEmpty() {
+  return render(
+    <MemoryRouter>
+      <WatchlistEmpty addLink={addLink} />
+    </MemoryRouter>,
+  )
+}
+
 it('says the watchlist is empty', () => {
-  render(<WatchlistEmpty />)
+  renderEmpty()
 
   expect(
     screen.getByRole('heading', {
@@ -19,17 +34,24 @@ it('says the watchlist is empty', () => {
   ).toBeInTheDocument()
 })
 
-it('hides the art and has no button yet', () => {
-  const { container } = render(<WatchlistEmpty />)
+it('hides the art', () => {
+  const { container } = renderEmpty()
 
   expect(
     container.querySelector('svg')?.closest('[aria-hidden="true"]'),
   ).not.toBeNull()
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+it('links to the add sheet', () => {
+  renderEmpty()
+
+  expect(
+    screen.getByRole('link', { name: 'Add your first title' }),
+  ).toHaveAttribute('href', '/watchlist/add?category=game')
 })
 
 it('has no axe violations', async () => {
-  const { container } = render(<WatchlistEmpty />)
+  const { container } = renderEmpty()
 
   await expectNoAxeViolations(container)
 })

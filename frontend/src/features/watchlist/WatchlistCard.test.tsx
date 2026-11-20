@@ -68,6 +68,15 @@ it('has no actions yet', () => {
   expect(screen.queryByRole('link')).not.toBeInTheDocument()
 })
 
+it('is marked when just added, and not otherwise', () => {
+  const { rerender } = render(<WatchlistCard entry={makeWatchlistEntry()} />)
+  const card = screen.getByRole('article')
+  expect(card).not.toHaveAttribute('data-fresh')
+
+  rerender(<WatchlistCard entry={makeWatchlistEntry()} fresh />)
+  expect(card).toHaveAttribute('data-fresh')
+})
+
 it('has no axe violations', async () => {
   const { container } = render(<WatchlistCard entry={makeWatchlistEntry()} />)
 

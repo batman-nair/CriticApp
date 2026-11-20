@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Outlet, useMatch } from 'react-router'
 import { useWatchlist, useWatchlistFacets } from '../../api/queries/watchlist'
 import type { WatchlistPage as WatchlistPageData } from '../../api/types'
 import {
@@ -7,12 +7,19 @@ import {
   FILTER_CATEGORIES,
   isFilterCategory,
 } from '../../lib/categories'
+import { cx } from '../../lib/cx'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
+import type { WatchlistOutlet } from '../../lib/watchlistOutlet'
 import { Button } from '../../ui/Button/Button'
+import { buttonClass } from '../../ui/Button/buttonClass'
 import { Chip } from '../../ui/Chip/Chip'
 import { Icon } from '../../ui/Icon/Icon'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import grid from './grid.module.css'
+import {
+  searchCategoryFor,
+  useAddToWatchlistLink,
+} from './useAddToWatchlistLink'
 import { toListParams, useWatchlistCategory } from './useWatchlistCategory'
 import { WatchlistCard } from './WatchlistCard'
 import { WatchlistEmpty } from './WatchlistEmpty'
@@ -50,6 +57,11 @@ export function WatchlistPage() {
   const { category, setCategory } = useWatchlistCategory()
   const query = useWatchlist(toListParams(category))
   const facets = useWatchlistFacets()
+  const addLink = useAddToWatchlistLink()
+  // "Add a <category>" starts the sheet on the chip's category.
+  const addInCategoryLink = useAddToWatchlistLink(
+    category ? searchCategoryFor(category) : undefined,
+  )
   const {
     data,
     hasNextPage,
@@ -58,6 +70,41 @@ export function WatchlistPage() {
     isFetchNextPageError,
     fetchNextPage,
   } = query
+
+  // The cards added in the add sheet's last visit are outlined. Opening it
+  // again clears them, as on the board. Adjusted during render.
+  const sheetOpen = useMatch('/watchlist/add') !== null
+  const [highlighted, setHighlighted] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const [wasSheetOpen, setWasSheetOpen] = useState(sheetOpen)
+  if (sheetOpen !== wasSheetOpen) {
+    setWasSheetOpen(sheetOpen)
+    if (sheetOpen) setHighlighted(new Set())
+  }
+
+  // Something was added: show it under All once the sheet has closed. Not
+  // while it's open, or its closing `navigate(-1)` would undo the write. A
+  // flag, not `highlighted`, so a chip picked later stays picked; and an add
+  // that lands after Done still resets.
+  const resetPending = useRef(false)
+  useEffect(() => {
+    if (sheetOpen || !resetPending.current) return
+    resetPending.current = false
+    setCategory('', { replace: true })
+  }, [sheetOpen, highlighted, setCategory])
+
+  // One object, so the sheet doesn't re-render with every page render.
+  const outlet = useMemo<WatchlistOutlet>(
+    () => ({
+      onAdded: (itemId) => {
+        resetPending.current = true
+        setHighlighted((ids) => new Set(ids).add(itemId))
+      },
+    }),
+    [],
+  )
+
   const sentinelRef = useLoadMoreOnScroll({
     // Not during a background refetch either, even one paused offline:
     // fetchNextPage would cancel it.
@@ -138,12 +185,13 @@ export function WatchlistPage() {
   } else if (state === 'loading') {
     body = <WatchlistSkeleton />
   } else if (state === 'empty') {
-    body = <WatchlistEmpty />
+    body = <WatchlistEmpty addLink={addLink} />
   } else if (state === 'no-matches') {
     body = (
       <WatchlistNoMatches
         category={category}
         total={total}
+        addLink={addInCategoryLink}
         onShowAll={() => setCategory('')}
       />
     )
@@ -158,7 +206,10 @@ export function WatchlistPage() {
         <ul className={grid.grid}>
           {entries.map((entry) => (
             <li key={entry.item.id}>
-              <WatchlistCard entry={entry} />
+              <WatchlistCard
+                entry={entry}
+                fresh={highlighted.has(entry.item.id)}
+              />
             </li>
           ))}
         </ul>
@@ -180,6 +231,21 @@ export function WatchlistPage() {
           <h1 className={styles.title}>Up next.</h1>
           {subtitle}
         </div>
+        <Link
+          {...addLink}
+          preventScrollReset
+          className={buttonClass({
+            variant: 'primary',
+            size: 'lg',
+            // The phone board has it only beside the chips.
+            className: cx(styles.add, !showChips && styles.addNoChips),
+          })}
+        >
+          <Icon name="plus" size={16} strokeWidth={2.2} />
+          <span>
+            Add <span className={styles.desktopOnly}>to watchlist</span>
+          </span>
+        </Link>
       </section>
       {showChips && (
         <div
@@ -248,8 +314,8 @@ export function WatchlistPage() {
           </>
         )}
       </div>
-      {/* #131 and #132 add the add sheet and Review it here. */}
-      <Outlet />
+      {/* The add sheet, and Review it from #132. */}
+      <Outlet context={outlet} />
     </>
   )
 }

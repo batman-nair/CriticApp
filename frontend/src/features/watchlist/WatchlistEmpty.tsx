@@ -1,9 +1,17 @@
+import { Link } from 'react-router'
 import { cx } from '../../lib/cx'
+import { buttonClass } from '../../ui/Button/buttonClass'
 import { Icon } from '../../ui/Icon/Icon'
+import type { AddToWatchlistLink } from './useAddToWatchlistLink'
 import styles from './WatchlistEmpty.module.css'
 
+interface WatchlistEmptyProps {
+  /** Opens the add sheet. */
+  addLink: AddToWatchlistLink
+}
+
 /** Nothing is on the watchlist. */
-export function WatchlistEmpty() {
+export function WatchlistEmpty({ addLink }: WatchlistEmptyProps) {
   return (
     <div className={styles.empty}>
       <div className={styles.art} aria-hidden="true">
@@ -22,6 +30,18 @@ export function WatchlistEmpty() {
         Save the things you mean to watch, play or read. They’ll wait here until
         you get to them.
       </p>
+      <Link
+        {...addLink}
+        preventScrollReset
+        className={buttonClass({
+          variant: 'primary',
+          size: 'lg',
+          className: styles.add,
+        })}
+      >
+        <Icon name="plus" size={17} strokeWidth={2.2} />
+        Add your first title
+      </Link>
     </div>
   )
 }

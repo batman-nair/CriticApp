@@ -141,6 +141,24 @@ describe('routes', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows /watchlist/add over the watchlist to the owner', async () => {
+    renderRoute('/watchlist/add')
+    expect(
+      await screen.findByRole('dialog', { name: 'Add to watchlist' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Up next.', hidden: true }),
+    ).toBeInTheDocument()
+  })
+
+  it('sends someone logged out from /watchlist/add to the login page', async () => {
+    server.use(sessionAs(null))
+    const { router } = renderRoute('/watchlist/add')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe('?next=%2Fwatchlist%2Fadd')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('shows /login without the header or footer', () => {
     server.use(sessionAs(null))
     renderRoute('/login')
@@ -173,6 +191,7 @@ describe('document title', () => {
     ['/reviews/1', 'Review · Critic'],
     ['/add', 'Add review · Critic'],
     ['/watchlist', 'Watchlist · Critic'],
+    ['/watchlist/add', 'Add to watchlist · Critic'],
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
   ])('at %s is %s', (path, title) => {

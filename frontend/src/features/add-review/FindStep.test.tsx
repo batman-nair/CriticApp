@@ -1,8 +1,8 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay } from 'msw'
-import { afterEach, expect, it, vi } from 'vitest'
-import type { SearchResult } from '../../api/types'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { SearchCategory, SearchResult } from '../../api/types'
 import { expectNoAxeViolations } from '../../test/axe'
 import { makeProblem, makeSearchResult } from '../../test/fixtures'
 import { http } from '../../test/handlers'
@@ -10,14 +10,25 @@ import { renderWithClient } from '../../test/render'
 import { server } from '../../test/server'
 import { FindStep } from './FindStep'
 import styles from './FindStep.module.css'
+import type { WatchlistRowStatus } from './SearchResultRow'
 import { useAddFlow } from './useAddFlow'
 
 afterEach(() => {
   localStorage.clear()
 })
 
-function Harness({ onSelect }: { onSelect: (result: SearchResult) => void }) {
-  const [flow, dispatch] = useAddFlow('game')
+interface HarnessProps {
+  onSelect: (result: SearchResult) => void
+  initialCategory?: SearchCategory
+  watchlistStatus?: (result: SearchResult) => WatchlistRowStatus
+}
+
+function Harness({
+  onSelect,
+  initialCategory = 'game',
+  watchlistStatus,
+}: HarnessProps) {
+  const [flow, dispatch] = useAddFlow(initialCategory)
   return (
     <FindStep
       category={flow.category}
@@ -27,12 +38,19 @@ function Harness({ onSelect }: { onSelect: (result: SearchResult) => void }) {
       }
       onQueryChange={(query) => dispatch({ type: 'queryChanged', query })}
       onSelect={onSelect}
+      watchlistStatus={watchlistStatus}
     />
   )
 }
 
-function renderStep(onSelect = vi.fn()) {
-  return { ...renderWithClient(<Harness onSelect={onSelect} />), onSelect }
+function renderStep(
+  onSelect = vi.fn(),
+  props: Omit<HarnessProps, 'onSelect'> = {},
+) {
+  return {
+    ...renderWithClient(<Harness onSelect={onSelect} {...props} />),
+    onSelect,
+  }
 }
 
 const searchbox = () => screen.getByRole('searchbox', { name: 'Search games' })
@@ -236,4 +254,87 @@ it('has no axe violations with results', async () => {
   await screen.findAllByRole('button', { name: /Wild Hunt/ })
 
   await expectNoAxeViolations(container)
+})
+
+it('leaves the remembered category alone when a chip is picked', async () => {
+  const user = userEvent.setup()
+  renderStep()
+
+  await user.click(await screen.findByRole('button', { name: 'Movies' }))
+
+  expect(
+    screen.getByRole('searchbox', { name: 'Search movies' }),
+  ).toBeInTheDocument()
+  expect(localStorage.getItem('critic-add-category')).toBeNull()
+})
+
+describe('in the watchlist sheet', () => {
+  const statuses: Record<string, WatchlistRowStatus> = {
+    tt1: { status: 'add', fresh: false },
+    tt2: { status: 'on', fresh: true },
+  }
+  const watchlistStatus = (result: SearchResult): WatchlistRowStatus =>
+    statuses[result.id] ?? { status: 'add', fresh: false }
+  const movies = () => screen.getByRole('searchbox', { name: 'Search movies' })
+
+  function renderSheetStep(onSelect = vi.fn()) {
+    return renderStep(onSelect, { initialCategory: 'movie', watchlistStatus })
+  }
+
+  it('asks for a title, with the board’s placeholder and no IMDb hint', () => {
+    renderSheetStep()
+
+    expect(movies()).toHaveAttribute('placeholder', 'Search movies…')
+    expect(movies()).not.toHaveAccessibleDescription()
+    expect(
+      screen.queryByText('You can also paste an IMDb link.'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Search for a title to add it.'),
+    ).toBeInTheDocument()
+  })
+
+  it('still says when the query is too short', async () => {
+    const user = userEvent.setup()
+    renderSheetStep()
+
+    await user.type(movies(), 'du')
+
+    expect(movies()).toHaveAccessibleDescription('Type at least 3 characters.')
+    expect(
+      screen.queryByText('Search for a title to add it.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows each row’s status and hands an Add on', async () => {
+    const user = userEvent.setup()
+    const dune = makeSearchResult({
+      id: 'tt1',
+      category: 'movie',
+      title: 'Dune',
+      start_year: 2021,
+    })
+    const arrival = makeSearchResult({
+      id: 'tt2',
+      category: 'movie',
+      title: 'Arrival',
+      start_year: 2016,
+    })
+    serveSearch(() => json([dune, arrival]))
+    const { onSelect } = renderSheetStep()
+
+    await user.type(movies(), 'dune')
+    const add = await screen.findByRole('button', {
+      name: 'Add Dune (2021) to your watchlist',
+    })
+    const on = screen.getByRole('button', {
+      name: 'Arrival (2016) is on your watchlist',
+    })
+    expect(on).toHaveAttribute('data-fresh')
+
+    await user.click(on)
+    expect(onSelect).not.toHaveBeenCalled()
+    await user.click(add)
+    expect(onSelect).toHaveBeenCalledWith(dune)
+  })
 })

@@ -183,6 +183,18 @@ export const handlers = [
   http.get('/api/v3/watchlist/facets', ({ response }) =>
     response(200).json(makeWatchlistFacets()),
   ),
+  // A new entry for the item asked for. Tests that need a 200, 409 or an
+  // error override it with server.use.
+  http.post('/api/v3/watchlist', async ({ request, response }) => {
+    const { item_id, added_at } = await request.json()
+    return response(201).json({
+      data: makeWatchlistEntry({
+        item: makeItem({ id: item_id }),
+        ...(added_at && { added_at }),
+      }),
+      meta: {},
+    })
+  }),
   // The owner's most-used tags.
   http.get('/api/v3/tags', ({ response }) =>
     response(200).json({

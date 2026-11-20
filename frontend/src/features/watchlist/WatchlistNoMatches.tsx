@@ -1,12 +1,28 @@
+import { Link } from 'react-router'
 import { categoryLabel, categoryVars } from '../../lib/categories'
 import { Button } from '../../ui/Button/Button'
+import { buttonClass } from '../../ui/Button/buttonClass'
+import type { AddToWatchlistLink } from './useAddToWatchlistLink'
 import styles from './WatchlistNoMatches.module.css'
+
+// One title of the category, from the board.
+const ADD_LABELS = new Map([
+  ['movie', 'Add a movie'],
+  ['series', 'Add a series'],
+  ['game', 'Add a game'],
+  ['anime:series', 'Add an anime series'],
+  ['anime:movie', 'Add an anime movie'],
+  ['manga', 'Add a manga'],
+  ['book', 'Add a book'],
+])
 
 interface WatchlistNoMatchesProps {
   /** The chip that matches nothing. */
   category: string
   /** Every entry, or undefined when the counts failed. */
   total?: number
+  /** Opens the add sheet on this category. */
+  addLink: AddToWatchlistLink
   onShowAll: () => void
 }
 
@@ -20,6 +36,7 @@ function othersLine(total: number | undefined) {
 export function WatchlistNoMatches({
   category,
   total,
+  addLink,
   onShowAll,
 }: WatchlistNoMatchesProps) {
   const label = categoryLabel(category)
@@ -35,6 +52,17 @@ export function WatchlistNoMatches({
       </h2>
       <p className={styles.text}>{othersLine(total)}</p>
       <div className={styles.actions}>
+        <Link
+          {...addLink}
+          preventScrollReset
+          className={buttonClass({
+            variant: 'primary',
+            size: 'lg',
+            className: styles.add,
+          })}
+        >
+          {ADD_LABELS.get(category) ?? 'Add a title'}
+        </Link>
         <Button
           variant="secondary"
           size="lg"

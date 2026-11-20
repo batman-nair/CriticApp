@@ -11,8 +11,7 @@ import { Chip } from '../../ui/Chip/Chip'
 import { SearchField } from '../../ui/SearchField/SearchField'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import styles from './FindStep.module.css'
-import { writeLastCategory } from './lastCategory'
-import { SearchResultRow } from './SearchResultRow'
+import { SearchResultRow, type WatchlistRowStatus } from './SearchResultRow'
 import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from './useDebouncedValue'
 
 /** Below this, a search would match too much to be useful. */
@@ -28,6 +27,11 @@ interface FindStepProps {
   onCategoryChange: (category: SearchCategory) => void
   onQueryChange: (query: string) => void
   onSelect: (result: SearchResult) => void
+  /**
+   * The add-to-watchlist sheet's search: each row shows this status, and the
+   * placeholder and hints follow its board.
+   */
+  watchlistStatus?: (result: SearchResult) => WatchlistRowStatus
 }
 
 /** The add sheet's first step, from boards 03 and 07. */
@@ -37,6 +41,7 @@ export function FindStep({
   onCategoryChange,
   onQueryChange,
   onSelect,
+  watchlistStatus,
 }: FindStepProps) {
   const queryClient = useQueryClient()
   const categories = useCategories()
@@ -61,7 +66,7 @@ export function FindStep({
     error?.status === 401 && error.code === 'UNAUTHENTICATED'
 
   // The sheet was open when the session ran out: the owner guard then goes to
-  // the login page, which comes back to /add.
+  // the login page, which comes back to the sheet.
   useEffect(() => {
     if (unauthenticated) markSessionExpired(queryClient)
   }, [unauthenticated, queryClient])
@@ -73,7 +78,10 @@ export function FindStep({
       invalid.detail
   } else if (draft.length > 0 && !long) {
     hint = 'Type at least 3 characters.'
-  } else if (category === 'movie' || category === 'series') {
+  } else if (
+    !watchlistStatus &&
+    (category === 'movie' || category === 'series')
+  ) {
     hint = 'You can also paste an IMDb link.'
   }
 
@@ -109,6 +117,7 @@ export function FindStep({
             key={result.id}
             result={result}
             ratingLabel={current?.rating_label ?? null}
+            watchlist={watchlistStatus?.(result)}
             onSelect={onSelect}
           />
         ))}
@@ -118,6 +127,8 @@ export function FindStep({
     message = `No ${noun} found for “${q}”. Try another spelling or category.`
   } else if (long) {
     results = <ResultSkeletons />
+  } else if (watchlistStatus && draft.length === 0) {
+    results = <p className={styles.prompt}>Search for a title to add it.</p>
   }
 
   return (
@@ -125,15 +136,12 @@ export function FindStep({
       <CategoryChips
         categories={categories}
         selected={category}
-        onSelect={(id) => {
-          writeLastCategory(id)
-          onCategoryChange(id)
-        }}
+        onSelect={onCategoryChange}
       />
       <SearchField
         tone="sheet"
         label={label}
-        placeholder={label}
+        placeholder={watchlistStatus ? `${label}…` : label}
         value={query}
         onValueChange={onQueryChange}
         enterKeyHint="search"

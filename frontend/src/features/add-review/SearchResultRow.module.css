@@ -84,6 +84,96 @@
   color: var(--muted);
 }
 
+/*
+ * The add-to-watchlist sheet's row, from the add sheet boards (1, 2 and 9;
+ * below 640px, 13, 14 and 21). Only an Add row can be tapped.
+ */
+.watchlist {
+  grid-template-areas:
+    'poster . status'
+    'poster title status'
+    'poster genres status'
+    'poster . status';
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto auto 1fr;
+  padding: var(--space-8) var(--space-10) var(--space-8) var(--space-8);
+  border-radius: var(--radius-14);
+}
+
+.watchlist[aria-disabled='true'] {
+  cursor: default;
+}
+
+.watchlist[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+/* Added in this sheet. After the hover rules, which it keeps. */
+.watchlist[data-fresh],
+.watchlist[data-fresh]:hover {
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-added-row),
+    var(--surface)
+  );
+}
+
+.watchlist[data-status='reviewed'] .poster {
+  opacity: 0.55;
+}
+
+.status {
+  display: flex;
+  grid-area: status;
+  align-self: center;
+}
+
+.add,
+.on,
+.reviewed {
+  display: inline-flex;
+  align-items: center;
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.add,
+.on {
+  gap: var(--space-6);
+  height: 36px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-14);
+}
+
+.add {
+  padding: 0 var(--space-14);
+  border: 1.5px solid var(--fg);
+}
+
+.on {
+  padding: 0 var(--space-12);
+  color: var(--muted);
+}
+
+.watchlist[data-fresh] .on {
+  background: color-mix(
+    in srgb,
+    var(--cat-base) var(--tint-added),
+    var(--surface)
+  );
+  color: var(--fg);
+}
+
+.reviewed {
+  gap: 5px;
+  height: 30px;
+  padding: 0 var(--space-10);
+  border-radius: var(--radius-8);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: var(--text-13);
+}
+
 @media (max-width: 639px) {
   .row {
     grid-template-areas:
@@ -124,6 +214,78 @@
   }
 
   .provider svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .watchlist {
+    grid-template-areas:
+      'poster . status'
+      'poster title status'
+      'poster genres status'
+      'poster . status';
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-rows: 1fr auto auto 1fr;
+  }
+
+  .watchlist .poster {
+    --poster-width: 40px;
+  }
+
+  .watchlist .title {
+    font-size: var(--text-15);
+  }
+
+  /* One line: a phone row has no room for a second. */
+  .watchlist .genres {
+    overflow: hidden;
+    margin-top: 1px;
+    font-size: var(--text-12);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* A circle with the plus. The button's label says what it does. */
+  .add {
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .add svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .addLabel {
+    display: none;
+  }
+
+  /* "On" over "watchlist", under the bookmark. */
+  .on {
+    flex-direction: column;
+    gap: 0;
+    height: auto;
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-10);
+    font-size: var(--text-11);
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .onSecond {
+    display: block;
+  }
+
+  .reviewed {
+    gap: var(--space-4);
+    height: 28px;
+    padding: 0 var(--space-8);
+    font-size: var(--text-12);
+  }
+
+  .reviewed svg {
     width: 11px;
     height: 11px;
   }

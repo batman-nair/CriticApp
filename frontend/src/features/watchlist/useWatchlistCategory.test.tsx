@@ -98,6 +98,17 @@ describe('useWatchlistCategory', () => {
     expect(hook().category).toBe('')
   })
 
+  it('replaces the history entry when asked', async () => {
+    const { router, hook } = renderUseWatchlistCategory(
+      '/watchlist?category=movie',
+    )
+
+    await act(() => hook().setCategory('', { replace: true }))
+
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(router.state.location.search).toBe('')
+  })
+
   it('does not navigate to the category it already has', async () => {
     const { router, hook } = renderUseWatchlistCategory(
       '/watchlist?category=movie',

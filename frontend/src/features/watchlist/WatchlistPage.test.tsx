@@ -3,18 +3,24 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterEach, expect, it, vi } from 'vitest'
-import type { WatchlistPage as WatchlistPageData } from '../../api/types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type {
+  WatchlistEntry,
+  WatchlistPage as WatchlistPageData,
+} from '../../api/types'
 import { expectNoAxeViolations } from '../../test/axe'
 import {
   makeItem,
+  makeSearchResult,
   makeWatchlistEntry,
   makeWatchlistFacets,
   makeWatchlistPage,
 } from '../../test/fixtures'
-import { http } from '../../test/handlers'
+import { defaultWatchlist, http } from '../../test/handlers'
 import { stubIntersectionObserver } from '../../test/intersectionObserver'
+import { stubSystemTheme } from '../../test/matchMedia'
 import { createTestQueryClient } from '../../test/render'
+import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
 import { WatchlistPage } from './WatchlistPage'
 import styles from './WatchlistPage.module.css'
@@ -569,4 +575,195 @@ it.each([
   await ready()
 
   await expectNoAxeViolations(container)
+})
+
+describe('with the add sheet, on the real routes', () => {
+  beforeEach(() => {
+    // The header's theme toggle reads the system theme.
+    stubSystemTheme('light')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete document.documentElement.dataset.theme
+  })
+
+  const sheet = () => screen.findByRole('dialog', { name: 'Add to watchlist' })
+  const game = makeWatchlistEntry({
+    item: makeItem({ id: 'igdb:1', category: 'game', title: 'Hollow Knight' }),
+  })
+  const dune = makeSearchResult({
+    id: 'tt1160419',
+    category: 'movie',
+    title: 'Dune',
+    start_year: 2021,
+  })
+
+  /**
+   * A watchlist that starts with `entries` (every category gets them all)
+   * and grows with each add; searches find Dune.
+   */
+  function serveWatchlist(entries: WatchlistEntry[]) {
+    const list = [...entries]
+    server.use(
+      http.get('/api/v3/watchlist', ({ response }) =>
+        response(200).json(makeWatchlistPage(list)),
+      ),
+      http.get('/api/v3/watchlist/facets', ({ response }) =>
+        response(200).json(
+          makeWatchlistFacets({ game: 1 }, { total: list.length }),
+        ),
+      ),
+      http.post('/api/v3/watchlist', async ({ request, response }) => {
+        const { item_id } = await request.json()
+        const entry = makeWatchlistEntry({
+          item: makeItem({ id: item_id, category: 'movie', title: 'Dune' }),
+        })
+        list.unshift(entry)
+        return response(201).json({ data: entry, meta: {} })
+      }),
+      http.get('/api/v3/search', ({ response }) =>
+        response(200).json({ data: [dune], meta: {} }),
+      ),
+    )
+  }
+
+  async function addDune(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search movies' }),
+      'dune',
+    )
+    await user.click(await screen.findByRole('button', { name: /^Add Dune/ }))
+    await screen.findByText('Dune added to your watchlist')
+  }
+
+  it('opens the sheet from the hero, over the page and its filter', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([game])
+    const { router } = renderRoute('/watchlist?category=game')
+
+    await user.click(
+      await screen.findByRole('link', { name: 'Add to watchlist' }),
+    )
+
+    expect(await sheet()).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/watchlist/add')
+    expect(router.state.location.search).toBe('?category=game')
+    expect(
+      screen.getByRole('searchbox', { name: 'Search movies' }),
+    ).toBeInTheDocument()
+  })
+
+  it('opens the sheet from the empty state', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([])
+    renderRoute('/watchlist')
+
+    await user.click(
+      await screen.findByRole('link', { name: 'Add your first title' }),
+    )
+
+    expect(await sheet()).toBeInTheDocument()
+  })
+
+  it('opens the sheet on Anime from an empty anime series chip', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.get('/api/v3/watchlist', ({ request, response }) =>
+        response(200).json(
+          makeWatchlistPage(
+            new URL(request.url).searchParams.get('category')
+              ? []
+              : defaultWatchlist,
+          ),
+        ),
+      ),
+      http.get('/api/v3/watchlist/facets', ({ response }) =>
+        response(200).json(makeWatchlistFacets({ movie: 2 })),
+      ),
+    )
+    renderRoute('/watchlist?category=anime:series')
+
+    await user.click(
+      await screen.findByRole('link', { name: 'Add an anime series' }),
+    )
+
+    expect(await sheet()).toBeInTheDocument()
+    expect(
+      await screen.findByRole('searchbox', { name: 'Search anime' }),
+    ).toBeInTheDocument()
+  })
+
+  it('outlines what was added and shows All, in place of the filtered entry, after Done', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([game])
+    const { router } = renderRoute('/watchlist?category=game')
+    await user.click(
+      await screen.findByRole('link', { name: 'Add to watchlist' }),
+    )
+    await sheet()
+
+    await addDune(user)
+    // Not while the sheet is open.
+    expect(router.state.location.search).toBe('?category=game')
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+    expect(router.state.location.pathname).toBe('/watchlist')
+    // The page's entry was written over, not added to.
+    expect(router.state.historyAction).toBe('REPLACE')
+    const added = await screen.findByRole('article', { name: 'Dune' })
+    expect(added).toHaveAttribute('data-fresh')
+    expect(
+      screen.getByRole('article', { name: 'Hollow Knight' }),
+    ).not.toHaveAttribute('data-fresh')
+
+    // A chip picked now stays picked.
+    await user.click(chip('Games'))
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?category=game'),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(router.state.location.search).toBe('?category=game')
+  })
+
+  it('clears the outlines when the sheet opens again', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([game])
+    renderRoute('/watchlist')
+    await user.click(
+      await screen.findByRole('link', { name: 'Add to watchlist' }),
+    )
+    await sheet()
+    await addDune(user)
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(
+      await screen.findByRole('article', { name: 'Dune' }),
+    ).toHaveAttribute('data-fresh')
+
+    await user.click(screen.getByRole('link', { name: 'Add to watchlist' }))
+    await sheet()
+
+    expect(
+      screen.getByRole('article', { name: 'Dune', hidden: true }),
+    ).not.toHaveAttribute('data-fresh')
+  })
+
+  it('leaves the filter alone when nothing was added', async () => {
+    const user = userEvent.setup()
+    serveWatchlist([game])
+    const { router } = renderRoute('/watchlist?category=game')
+    await user.click(
+      await screen.findByRole('link', { name: 'Add to watchlist' }),
+    )
+    await sheet()
+
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/watchlist'),
+    )
+    expect(router.state.location.search).toBe('?category=game')
+    expect(router.state.historyAction).toBe('POP')
+  })
 })

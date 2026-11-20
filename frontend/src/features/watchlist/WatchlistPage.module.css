@@ -46,6 +46,13 @@
   margin-top: var(--space-8);
 }
 
+/* Two classes: Button's .lg sets the size at one. */
+.hero .add {
+  flex: none;
+  gap: var(--space-8);
+  padding: 0 var(--space-20);
+}
+
 .chips,
 .ghostChips {
   display: flex;
@@ -121,6 +128,22 @@
 
   .eyebrow {
     font-size: var(--text-12);
+  }
+
+  .hero .add {
+    gap: var(--space-6);
+    height: 44px;
+    padding: 0 var(--space-16);
+    border-radius: 13px;
+  }
+
+  .hero .add svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .hero .addNoChips {
+    display: none;
   }
 
   /* The phone board says only "Only you can see this". */

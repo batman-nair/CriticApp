@@ -27,14 +27,18 @@ export function useWatchlistCategory() {
   const [searchParams, setSearchParams] = useSearchParams()
   const category = parseWatchlistCategory(searchParams)
 
-  function setCategory(next: WatchlistCategory) {
+  /** `replace` writes over the current history entry instead of adding one. */
+  function setCategory(
+    next: WatchlistCategory,
+    { replace = false }: { replace?: boolean } = {},
+  ) {
     // Picking what's already picked doesn't add a history entry.
     if (next === category) return
     const params = new URLSearchParams(searchParams)
     if (next) params.set('category', next)
     else params.delete('category')
     // Root's ScrollRestoration would scroll to the top on every pick.
-    setSearchParams(params, { preventScrollReset: true })
+    setSearchParams(params, { preventScrollReset: true, replace })
   }
 
   return { category, setCategory }
