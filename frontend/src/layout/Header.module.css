@@ -38,10 +38,12 @@
   margin-inline: var(--space-12) auto;
 }
 
+/* The start margin keeps them right when they wrap onto a line of their own. */
 .actions {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  margin-inline-start: auto;
 }
 
 .addLabel {
