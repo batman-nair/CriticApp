@@ -313,8 +313,9 @@ describe('useAddToWatchlist', () => {
     // The one on screen is fresh; the other search is only marked stale.
     expect(isInvalidated(queryClient, searchKeys.list(onScreen))).toBe(false)
     expect(isInvalidated(queryClient, searchKeys.list(elsewhere))).toBe(true)
-    expect(queryClient.getQueryState(searchKeys.list(elsewhere))?.fetchStatus)
-      .toBe('idle')
+    expect(
+      queryClient.getQueryState(searchKeys.list(elsewhere))?.fetchStatus,
+    ).toBe('idle')
     expect(searches).toHaveLength(1)
   })
 

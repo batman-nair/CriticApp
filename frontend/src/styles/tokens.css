@@ -13,6 +13,8 @@
  *   dialog button       color-mix(in srgb, var(--cat-base) var(--tint-dialog-button), var(--surface))
  *   badge background    color-mix(in srgb, var(--cat-base) var(--tint-badge), var(--surface))
  *   badge text          color-mix(in srgb, var(--cat-base), var(--badge-ink) var(--badge-ink-mix))
+ *   just added (row)    color-mix(in srgb, var(--cat-base) var(--tint-added-row), var(--surface))
+ *   just added (pill)   color-mix(in srgb, var(--cat-base) var(--tint-added), var(--surface))
  *
  * Write these in the component's CSS. A custom property on :root that refers
  * to --cat would resolve here, where --cat isn't set.
@@ -72,6 +74,8 @@
   --tint-dialog-line: 20%;
   --tint-dialog-button: 10%;
   --tint-chip: 14%;
+  --tint-added: 20%;
+  --tint-added-row: 10%;
   --badge-ink: #15110d;
   --badge-ink-mix: 42%;
 
@@ -205,6 +209,8 @@
   --tint-dialog-line: 30%;
   --tint-dialog-button: 20%;
   --tint-chip: 22%;
+  --tint-added: 32%;
+  --tint-added-row: 18%;
   --badge-ink: #ffffff;
   --badge-ink-mix: 62%;
 }
