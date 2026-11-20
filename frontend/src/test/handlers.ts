@@ -10,6 +10,9 @@ import {
   makeReviewPage,
   makeSessionUser,
   makeTag,
+  makeWatchlistEntry,
+  makeWatchlistFacets,
+  makeWatchlistPage,
 } from './fixtures'
 
 // jsdom's URL under Vitest. Not read from window, because setup.ts also loads
@@ -37,6 +40,36 @@ export const defaultReviews = [
     }),
     rating: 8,
     text: null,
+  }),
+]
+
+/**
+ * The default watchlist, newest first: a movie added after an anime series.
+ */
+export const defaultWatchlist = [
+  makeWatchlistEntry({
+    item: makeItem({
+      id: 'tt15239678',
+      category: 'movie',
+      title: 'Dune: Part Two',
+      image_url: 'https://cdn.example.com/dune-part-two.jpg',
+      start_year: 2024,
+      end_year: null,
+      genres: ['Sci-Fi', 'Adventure'],
+      details: { media_type: 'movie' },
+    }),
+    added_at: '2025-04-02T12:00:00Z',
+  }),
+  makeWatchlistEntry({
+    item: makeItem({
+      id: 'mal:52991',
+      title: 'Frieren: Beyond Journey’s End',
+      image_url: 'https://cdn.example.com/frieren.jpg',
+      start_year: 2023,
+      end_year: 2024,
+      genres: ['Adventure', 'Fantasy', 'Drama'],
+    }),
+    added_at: '2025-04-01T12:00:00Z',
   }),
 ]
 
@@ -140,6 +173,15 @@ export const handlers = [
   // Nothing found. Tests that search override it with server.use.
   http.get('/api/v3/search', ({ response }) =>
     response(200).json({ data: [], meta: {} }),
+  ),
+  // One page of two, so the watchlist renders. Tests that care about the
+  // list override it with server.use.
+  http.get('/api/v3/watchlist', ({ response }) =>
+    response(200).json(makeWatchlistPage(defaultWatchlist)),
+  ),
+  // The counts for the two entries above.
+  http.get('/api/v3/watchlist/facets', ({ response }) =>
+    response(200).json(makeWatchlistFacets()),
   ),
   // The owner's most-used tags.
   http.get('/api/v3/tags', ({ response }) =>
