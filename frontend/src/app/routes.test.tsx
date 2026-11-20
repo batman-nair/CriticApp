@@ -159,6 +159,34 @@ describe('routes', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('shows /watchlist/review/:itemId over the watchlist, on Rate', async () => {
+    renderRoute('/watchlist/review/tt15239678')
+    const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
+    expect(
+      await within(dialog).findByRole('slider', { name: 'Your rating' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Up next.', hidden: true }),
+    ).toBeInTheDocument()
+  })
+
+  it('sends someone logged out from /watchlist/review/:itemId to the login page', async () => {
+    server.use(sessionAs(null))
+    const { router } = renderRoute('/watchlist/review/mal%3A1')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe(
+      '?next=%2Fwatchlist%2Freview%2Fmal%253A1',
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('sends another user from /watchlist/review/:itemId home', async () => {
+    server.use(sessionAs(makeSessionUser({ id: 2, username: 'someone' })))
+    const { router } = renderRoute('/watchlist/review/mal%3A1')
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('shows /login without the header or footer', () => {
     server.use(sessionAs(null))
     renderRoute('/login')
@@ -192,6 +220,7 @@ describe('document title', () => {
     ['/add', 'Add review · Critic'],
     ['/watchlist', 'Watchlist · Critic'],
     ['/watchlist/add', 'Add to watchlist · Critic'],
+    ['/watchlist/review/mal%3A1', 'Add review · Critic'],
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
   ])('at %s is %s', (path, title) => {

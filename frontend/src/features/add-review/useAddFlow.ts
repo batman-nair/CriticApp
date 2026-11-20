@@ -39,12 +39,18 @@ export interface AddFlow {
   errors: AddFlowErrors
   /** A message for the whole save, when the server's isn't about a field. */
   formError: string | null
+  /**
+   * The title the sheet was opened for from a watchlist card, whose entry a
+   * create removes. Cleared by Add another.
+   */
+  startItemId: string | null
 }
 
 export type AddFlowAction =
   | { type: 'categoryChanged'; category: SearchCategory }
   | { type: 'queryChanged'; query: string }
   | { type: 'itemSelected'; item: SearchResult }
+  | { type: 'started'; item: SearchResult; onWatchlist: boolean }
   | { type: 'reviewLoaded'; review: Review }
   | { type: 'reviewMissing' }
   | { type: 'reviewGone' }
@@ -75,6 +81,7 @@ export function initialAddFlow(category: SearchCategory): AddFlow {
     saved: null,
     errors: {},
     formError: null,
+    startItemId: null,
   }
 }
 
@@ -135,6 +142,17 @@ export function addFlowReducer(state: AddFlow, action: AddFlowAction): AddFlow {
       return { ...state, query: action.query }
     case 'itemSelected':
       return selectItem(state, action.item)
+    // Opened for a title: Rate with it, and Back shows Find in its category.
+    // The remembered category stays as it is.
+    case 'started':
+      return selectItem(
+        {
+          ...state,
+          category: action.item.category,
+          startItemId: action.onWatchlist ? action.item.id : null,
+        },
+        action.item,
+      )
     // Once only, so a refetch never overwrites what was changed since.
     case 'reviewLoaded':
       if (state.prefill !== 'loading' || action.review.id !== state.reviewId)

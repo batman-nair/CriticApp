@@ -6,14 +6,22 @@ import { reviewKeys } from '../../api/queries/reviews'
 import { searchKeys } from '../../api/queries/search'
 import { tagKeys } from '../../api/queries/tags'
 import type { SearchResult } from '../../api/types'
+import { watchlistKeys } from '../../api/queries/watchlist'
 import {
   makeItem,
   makeProblem,
   makeReview,
   makeReviewFacets,
   makeSearchResult,
+  makeWatchlistFacets,
+  makeWatchlistPage,
 } from '../../test/fixtures'
-import { CREATED_REVIEW_ID, http, sessionAs } from '../../test/handlers'
+import {
+  CREATED_REVIEW_ID,
+  defaultWatchlist,
+  http,
+  sessionAs,
+} from '../../test/handlers'
 import { stubSystemTheme } from '../../test/matchMedia'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
@@ -865,7 +873,7 @@ describe('saving', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('refreshes the list, counts, tags and search after a save', async () => {
+  it('refreshes the list, counts, tags, search and watchlist after a save', async () => {
     const { queryClient, user } = await pick()
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     await fillIn(user)
@@ -874,9 +882,306 @@ describe('saving', () => {
     await screen.findByRole('dialog', { name: 'Added to your reviews' })
 
     const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey)
-    // reviewKeys.all covers the lists and the facets.
+    // reviewKeys.all covers the lists and the facets; watchlistKeys.all the
+    // watchlist and its count, which the server took the title off.
     expect(keys).toEqual(
-      expect.arrayContaining([reviewKeys.all, tagKeys.all, searchKeys.all]),
+      expect.arrayContaining([
+        reviewKeys.all,
+        tagKeys.all,
+        searchKeys.all,
+        watchlistKeys.all,
+      ]),
     )
+  })
+})
+
+describe('Review it from the watchlist', () => {
+  const frieren = defaultWatchlist[1]!.item
+  const frierenName = frieren.title
+
+  afterEach(() => server.events.removeAllListeners())
+
+  /** Records each request's method and path, and each write's body. */
+  function recordRequests() {
+    const requests: string[] = []
+    const bodies: Promise<unknown>[] = []
+    server.events.on('request:start', ({ request }) => {
+      const { pathname } = new URL(request.url)
+      requests.push(`${request.method} ${pathname}`)
+      if (request.method !== 'GET') bodies.push(request.clone().json())
+    })
+    return { requests, bodies: () => Promise.all(bodies) }
+  }
+
+  /**
+   * The watchlist as the server has it: a review create takes the title off,
+   * as the API does.
+   */
+  function serveWatchlist() {
+    let entries = [...defaultWatchlist]
+    server.use(
+      http.get('/api/v3/watchlist', ({ response }) =>
+        response(200).json(makeWatchlistPage(entries)),
+      ),
+      http.get('/api/v3/watchlist/facets', ({ response }) => {
+        const counts: Record<string, number> = {}
+        for (const { item } of entries) {
+          const id = item.category === 'anime' ? 'anime:series' : item.category
+          counts[id] = (counts[id] ?? 0) + 1
+        }
+        return response(200).json(makeWatchlistFacets(counts))
+      }),
+      http.post('/api/v3/reviews', async ({ request, response }) => {
+        const { item_id, rating, text, tags } = await request.json()
+        entries = entries.filter((entry) => entry.item.id !== item_id)
+        return response(201).json({
+          data: makeReview({
+            id: CREATED_REVIEW_ID,
+            item: makeItem({ id: item_id }),
+            rating,
+            text: text || null,
+            tags: tags ?? [],
+          }),
+          meta: {},
+        })
+      }),
+    )
+  }
+
+  /** The watchlist page, then Review it on Frieren's card. */
+  async function reviewFromCard() {
+    const user = userEvent.setup()
+    serveWatchlist()
+    const view = renderRoute('/watchlist')
+    await user.click(
+      await screen.findByRole('link', { name: `Review ${frierenName}` }),
+    )
+    // At once: Find never shows first.
+    const dialog = screen.getByRole('dialog', { name: 'Rate it' })
+    return { ...view, user, dialog }
+  }
+
+  /** From Rate: Next, then Add review, landing on the done step. */
+  async function save(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(button('Next'))
+    await user.click(button('Add review'))
+    return screen.findByRole('dialog', { name: 'Added to your reviews' })
+  }
+
+  const removedNote = () => screen.queryByText('Removed from your watchlist.')
+
+  it('opens on Rate with the card’s title, without fetching it', async () => {
+    const { requests } = recordRequests()
+    const { router, dialog } = await reviewFromCard()
+
+    expect(router.state.location.pathname).toBe(
+      `/watchlist/review/${encodeURIComponent(frieren.id)}`,
+    )
+    expect(currentStep()).toHaveTextContent('Rate')
+    expect(dialog).toHaveTextContent(frierenName)
+    expect(slider()).toHaveAttribute('aria-valuenow', '5')
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Up next.', hidden: true }),
+    ).toBeInTheDocument()
+    expect(requests.filter((r) => r.includes('/api/v3/items/'))).toEqual([])
+  })
+
+  it('goes Back to Find in the title’s category', async () => {
+    const { user, dialog } = await reviewFromCard()
+
+    await user.click(button('Back'))
+
+    expect(screen.getByRole('dialog', { name: 'What are you adding?' })).toBe(
+      dialog,
+    )
+    expect(currentStep()).toHaveTextContent('Find')
+    expect(chip('Anime')).toHaveAttribute('aria-pressed', 'true')
+    expect(searchbox('Search anime')).toHaveValue('')
+  })
+
+  it('closes back to the watchlist, leaving the entry', async () => {
+    const { requests } = recordRequests()
+    const { router, user } = await reviewFromCard()
+
+    await user.click(button('Close'))
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/watchlist'),
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('article', { name: frierenName }),
+    ).toBeInTheDocument()
+    expect(requests.filter((r) => !r.startsWith('GET'))).toEqual([])
+  })
+
+  it('saves the review, says it left the watchlist, and the card goes', async () => {
+    const { requests, bodies } = recordRequests()
+    const { router, user, dialog } = await reviewFromCard()
+
+    expect(await save(user)).toBe(dialog)
+
+    expect(requests.filter((r) => !r.startsWith('GET'))).toEqual([
+      'POST /api/v3/reviews',
+    ])
+    expect(await bodies()).toEqual([
+      { item_id: frieren.id, rating: 5, text: '', tags: [] },
+    ])
+    expect(removedNote()).toBeVisible()
+    // Above the saved review.
+    expect(
+      removedNote()!.compareDocumentPosition(
+        within(dialog).getByRole('article'),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(button('Add another')).toBeVisible()
+
+    // The list and the header count refetch behind the sheet.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('article', { name: frierenName, hidden: true }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(
+      screen.getByRole('link', { name: 'Watchlist 1', hidden: true }),
+    ).toBeInTheDocument()
+
+    await user.click(button('Done'))
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/watchlist'),
+    )
+    expect(
+      screen.getByRole('article', { name: 'Dune: Part Two' }),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about the watchlist for another title picked via Change', async () => {
+    serveSearch({ 'anime/witcher': [witcher] })
+    const { user } = await reviewFromCard()
+
+    await user.click(button('Change'))
+    await user.type(searchbox('Search anime'), 'witcher')
+    await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+    await save(user)
+
+    expect(removedNote()).not.toBeInTheDocument()
+  })
+
+  it('says nothing about the watchlist after Add another', async () => {
+    serveSearch({ 'anime/witcher': [witcher] })
+    const { user } = await reviewFromCard()
+    await save(user)
+    expect(removedNote()).toBeVisible()
+
+    await user.click(button('Add another'))
+    expect(chip('Anime')).toHaveAttribute('aria-pressed', 'true')
+    await user.type(searchbox('Search anime'), 'witcher')
+    await user.click(await screen.findByRole('button', { name: /Wild Hunt/ }))
+    await save(user)
+
+    expect(removedNote()).not.toBeInTheDocument()
+  })
+
+  it('says nothing about the watchlist when a 409 turns it into an update', async () => {
+    const { user } = await reviewFromCard()
+    server.use(
+      http.post('/api/v3/reviews', () =>
+        problem(409, 'DUPLICATE_REVIEW', { existing_review_id: 7 }),
+      ),
+      http.patch('/api/v3/reviews/{id}', async ({ params, request }) =>
+        Response.json({
+          data: makeReview({
+            id: Number(params.id),
+            item: frieren,
+            ...(await request.json()),
+          }),
+          meta: {},
+        }),
+      ),
+    )
+
+    await user.click(button('Next'))
+    await user.click(button('Add review'))
+    await user.click(
+      await screen.findByRole('button', { name: 'Update review' }),
+    )
+
+    await screen.findByRole('dialog', { name: 'Review updated' })
+    expect(removedNote()).not.toBeInTheDocument()
+  })
+
+  describe('from a direct link', () => {
+    it('fetches a title the page hasn’t loaded, and saves it without the note', async () => {
+      const { requests } = recordRequests()
+      const user = userEvent.setup()
+      serveWatchlist()
+      renderRoute('/watchlist/review/igdb%3A1942')
+
+      const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
+      await within(dialog).findByRole('slider', { name: 'Your rating' })
+      expect(currentStep()).toHaveTextContent('Rate')
+      // The default handler's item for the id.
+      expect(dialog).toHaveTextContent('Cowboy Bebop')
+      expect(requests).toContain('GET /api/v3/items/igdb%3A1942')
+
+      await save(user)
+      expect(removedNote()).not.toBeInTheDocument()
+    })
+
+    it('says so when the title isn’t found, and closes', async () => {
+      server.use(
+        http.get('/api/v3/items/{item_id}', ({ response }) =>
+          response(404).json(makeProblem()),
+        ),
+      )
+      const user = userEvent.setup()
+      const { router } = renderRoute('/watchlist/review/mal%3A404')
+
+      const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Couldn’t find that title. It may have been removed.',
+      )
+      expect(currentStep()).toHaveTextContent('Rate')
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument()
+
+      await user.click(
+        within(dialog).getAllByRole('button', { name: 'Close' })[1]!,
+      )
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe('/watchlist'),
+      )
+    })
+
+    it('says so when the title couldn’t load, and Try again recovers', async () => {
+      let fail = true
+      server.use(
+        http.get('/api/v3/items/{item_id}', ({ params, response }) =>
+          fail
+            ? response(500).json(makeProblem({ status: 500 }))
+            : response(200).json({
+                data: makeItem({ id: params.item_id }),
+                meta: {},
+              }),
+        ),
+      )
+      const user = userEvent.setup()
+      renderRoute('/watchlist/review/mal%3A500')
+
+      const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Couldn’t load this title.',
+      )
+
+      fail = false
+      await user.click(button('Try again'))
+
+      expect(
+        await within(dialog).findByRole('slider', { name: 'Your rating' }),
+      ).toBeInTheDocument()
+      expect(dialog).toHaveTextContent('Cowboy Bebop')
+    })
   })
 })

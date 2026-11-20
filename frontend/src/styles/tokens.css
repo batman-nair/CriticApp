@@ -11,6 +11,7 @@
  *   dialog              color-mix(in srgb, var(--cat-base) var(--tint-dialog), var(--surface))
  *   dialog border       color-mix(in srgb, var(--cat-base) var(--tint-dialog-line), var(--line))
  *   dialog button       color-mix(in srgb, var(--cat-base) var(--tint-dialog-button), var(--surface))
+ *   card action         color-mix(in srgb, var(--cat-base) var(--tint-card-action), var(--surface))
  *   badge background    color-mix(in srgb, var(--cat-base) var(--tint-badge), var(--surface))
  *   badge text          color-mix(in srgb, var(--cat-base), var(--badge-ink) var(--badge-ink-mix))
  *   just added (row)    color-mix(in srgb, var(--cat-base) var(--tint-added-row), var(--surface))
@@ -74,6 +75,7 @@
   --tint-dialog-line: 20%;
   --tint-dialog-button: 10%;
   --tint-chip: 14%;
+  --tint-card-action: 14%;
   --tint-added: 20%;
   --tint-added-row: 10%;
   --badge-ink: #15110d;
@@ -209,6 +211,7 @@
   --tint-dialog-line: 30%;
   --tint-dialog-button: 20%;
   --tint-chip: 22%;
+  --tint-card-action: 26%;
   --tint-added: 32%;
   --tint-added-row: 18%;
   --badge-ink: #ffffff;

@@ -57,7 +57,6 @@ export const routes: RouteObject[] = [
                   </RequireOwner>
                 ),
                 handle: { title: 'Watchlist' },
-                // Review it (`review/:itemId`) joins `add` here (#132).
                 children: [
                   {
                     path: 'add',
@@ -65,6 +64,13 @@ export const routes: RouteObject[] = [
                     // A crash in the sheet leaves the watchlist behind it.
                     errorElement: <DialogErrorPage />,
                     handle: { title: 'Add to watchlist' },
+                  },
+                  {
+                    // Review it: the add-review sheet, on Rate with the title.
+                    path: 'review/:itemId',
+                    element: <AddReviewPage fromWatchlist />,
+                    errorElement: <DialogErrorPage />,
+                    handle: { title: 'Add review' },
                   },
                 ],
               },

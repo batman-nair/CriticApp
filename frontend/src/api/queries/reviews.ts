@@ -12,6 +12,7 @@ import type { paths } from '../schema'
 import type { Review, ReviewCreate, ReviewPage, ReviewUpdate } from '../types'
 import { searchKeys } from './search'
 import { tagKeys } from './tags'
+import { watchlistKeys } from './watchlist'
 
 export const REVIEW_PAGE_SIZE = 20
 
@@ -132,9 +133,10 @@ export function useReview(id: number) {
 }
 
 /**
- * Reviews an item. The new review is cached at once; the lists, counts, tags
- * and search results (whose `my_review` changes) refetch behind it. A review
- * the owner already has rejects with a 409: see `duplicateReviewId`.
+ * Reviews an item. The new review is cached at once; the lists, counts, tags,
+ * search results (whose `my_review` changes) and the watchlist (the server
+ * takes the title off it) refetch behind it. A review the owner already has
+ * rejects with a 409: see `duplicateReviewId`.
  */
 export function useCreateReview() {
   const queryClient = useQueryClient()
@@ -151,6 +153,7 @@ export function useCreateReview() {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
       void queryClient.invalidateQueries({ queryKey: tagKeys.all })
       void queryClient.invalidateQueries({ queryKey: searchKeys.all })
+      void queryClient.invalidateQueries({ queryKey: watchlistKeys.all })
     },
   })
 }

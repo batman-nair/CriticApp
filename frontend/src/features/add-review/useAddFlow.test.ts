@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { makeReview, makeSearchResult } from '../../test/fixtures'
 import {
   addFlowReducer,
@@ -35,6 +35,7 @@ it('starts on Find in the given category with nothing picked', () => {
     saved: null,
     errors: {},
     formError: null,
+    startItemId: null,
   })
 })
 
@@ -376,6 +377,91 @@ it('starts again on an empty Find in the same category with Add another', () => 
   expect(addFlowReducer(done, { type: 'addAnother' })).toEqual(
     initialAddFlow('game'),
   )
+})
+
+describe('started for a title', () => {
+  const frieren = makeSearchResult({
+    id: 'mal:52991',
+    category: 'anime',
+    title: 'Frieren',
+    on_watchlist: true,
+  })
+
+  it('lands on Rate with the item, in its category, remembering its id', () => {
+    const state = addFlowReducer(initialAddFlow('movie'), {
+      type: 'started',
+      item: frieren,
+      onWatchlist: true,
+    })
+
+    expect(state).toMatchObject({
+      step: 'rate',
+      item: frieren,
+      category: 'anime',
+      query: '',
+      rating: DEFAULT_RATING,
+      mode: 'create',
+      startItemId: 'mal:52991',
+    })
+  })
+
+  it('remembers no id for a title not known to be on the watchlist', () => {
+    const state = addFlowReducer(initialAddFlow('movie'), {
+      type: 'started',
+      item: frieren,
+      onWatchlist: false,
+    })
+
+    expect(state).toMatchObject({ step: 'rate', startItemId: null })
+  })
+
+  it('goes back to Find in the title’s category', () => {
+    const started = addFlowReducer(initialAddFlow('movie'), {
+      type: 'started',
+      item: frieren,
+      onWatchlist: true,
+    })
+
+    expect(addFlowReducer(started, { type: 'back' })).toMatchObject({
+      step: 'find',
+      category: 'anime',
+      query: '',
+    })
+  })
+
+  it('forgets the id with Add another', () => {
+    const started = addFlowReducer(initialAddFlow('movie'), {
+      type: 'started',
+      item: frieren,
+      onWatchlist: true,
+    })
+    const saved = addFlowReducer(started, {
+      type: 'saved',
+      review: makeReview(),
+    })
+
+    expect(addFlowReducer(saved, { type: 'addAnother' })).toEqual(
+      initialAddFlow('anime'),
+    )
+  })
+
+  it('updates an already-reviewed title, as a pick does', () => {
+    const reviewed = makeSearchResult({ my_review: { id: 4, rating: 8 } })
+    const state = addFlowReducer(initialAddFlow('movie'), {
+      type: 'started',
+      item: reviewed,
+      onWatchlist: false,
+    })
+
+    expect(state).toMatchObject({
+      step: 'rate',
+      category: 'game',
+      mode: 'update',
+      reviewId: 4,
+      rating: 8,
+      prefill: 'loading',
+    })
+  })
 })
 
 it('wraps the reducer in a hook', () => {

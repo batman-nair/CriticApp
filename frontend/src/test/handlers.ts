@@ -170,6 +170,11 @@ export const handlers = [
     return response(200).json({ data: { ...review, ...update }, meta: {} })
   }),
   http.delete('/api/v3/reviews/{id}', ({ response }) => response(204).empty()),
+  // Any stored item, by the id asked for. Tests for a 404 or an error
+  // override it with server.use.
+  http.get('/api/v3/items/{item_id}', ({ params, response }) =>
+    response(200).json({ data: makeItem({ id: params.item_id }), meta: {} }),
+  ),
   // Nothing found. Tests that search override it with server.use.
   http.get('/api/v3/search', ({ response }) =>
     response(200).json({ data: [], meta: {} }),
