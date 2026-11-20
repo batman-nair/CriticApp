@@ -67,7 +67,7 @@
   line-height: var(--leading-125);
 }
 
-/* Under the title, at the card's foot. Remove joins Review it here (#133). */
+/* Under the title, at the card's foot: Review it, then Remove. */
 .actions {
   display: flex;
   gap: var(--space-6);
@@ -96,6 +96,10 @@
 
 .reviewIcon {
   flex: none;
+}
+
+.remove {
+  border-radius: var(--radius-10);
 }
 
 @media (max-width: 639px) {
@@ -141,5 +145,10 @@
   .reviewIcon {
     width: 13px;
     height: 13px;
+  }
+
+  .remove {
+    width: 44px;
+    height: 44px;
   }
 }
