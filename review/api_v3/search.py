@@ -8,7 +8,7 @@ from critic.api.errors import ApiError
 from critic.api.responses import api_response
 from critic.api.schema import problem_responses, wrapped
 from critic.api.views import V3APIView
-from review.models import Review
+from review.models import Review, WatchlistEntry
 from review.providers import CATEGORIES, ItemNotFound, ProviderError, WrongCategory, get_provider
 from review.providers.omdb import normalize_imdb_title_url_to_item_id
 
@@ -40,9 +40,10 @@ class SearchResultSerializer(serializers.Serializer):
         allow_null=True, help_text="The source's rating, 0-10. Null when the provider's search doesn't give it",
     )
     my_review = MyReviewSerializer(allow_null=True, help_text="The logged-in user's review of this item, if any")
+    on_watchlist = serializers.BooleanField(help_text="Whether the item is on the logged-in user's watchlist")
 
 
-def _search_result(summary, my_reviews):
+def _search_result(summary, my_reviews, watchlist_ids):
     start_year, end_year = parse_years(summary.year)
     return {
         'id': summary.item_id,
@@ -54,6 +55,7 @@ def _search_result(summary, my_reviews):
         'genres': summary.genres,
         'provider_rating': summary.provider_rating,
         'my_review': my_reviews.get(summary.item_id),
+        'on_watchlist': summary.item_id in watchlist_ids,
     }
 
 
@@ -97,11 +99,16 @@ class SearchView(V3APIView):
             raise ApiError(502, 'UPSTREAM_ERROR', ex.message) from ex
 
         my_reviews = {}
+        watchlist_ids = set()
         if summaries:
+            item_ids = [summary.item_id for summary in summaries]
             rows = Review.objects.filter(
-                user=request.user, review_item_id__in=[summary.item_id for summary in summaries],
+                user=request.user, review_item_id__in=item_ids,
             ).values_list('review_item_id', 'id', 'review_rating')
             my_reviews = {item_id: {'id': review_id, 'rating': rating} for item_id, review_id, rating in rows}
+            watchlist_ids = set(WatchlistEntry.objects.filter(
+                user=request.user, review_item_id__in=item_ids,
+            ).values_list('review_item_id', flat=True))
 
-        results = [_search_result(summary, my_reviews) for summary in summaries]
+        results = [_search_result(summary, my_reviews, watchlist_ids) for summary in summaries]
         return api_response(SearchResultSerializer(results, many=True).data)

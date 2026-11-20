@@ -6,7 +6,7 @@ from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 
-from review.models import Review, ReviewItem
+from review.models import Review, ReviewItem, WatchlistEntry
 from review.providers import ItemNotFound, ItemSummary, UpstreamError
 from review.tests.test_api_utils import (
     IGDB_ENV,
@@ -85,6 +85,7 @@ class V3SearchTest(APITestCase):
             'genres': ['Role-playing (RPG)', 'Adventure'],
             'provider_rating': 9.3,
             'my_review': None,
+            'on_watchlist': False,
         }], 'meta': {}})
 
     def test_mal_genres_and_rating(self):
@@ -161,6 +162,23 @@ class V3SearchTest(APITestCase):
 
         self.assertEqual(response.json(), {'data': [], 'meta': {}})
         self.assertFalse([query for query in queries.captured_queries if 'review_review' in query['sql']])
+        self.assertFalse([query for query in queries.captured_queries if 'review_watchlistentry' in query['sql']])
+
+    # on_watchlist
+
+    def test_on_watchlist(self):
+        WatchlistEntry.objects.create(user=self.user, review_item=_store_item('omdb_tt1'))
+        WatchlistEntry.objects.create(user=self.other, review_item=_store_item('omdb_tt2'))
+        provider = _StubProvider([_summary('omdb_tt1'), _summary('omdb_tt2'), _summary('omdb_tt3')])
+        with mock.patch(GET_PROVIDER, return_value=provider):
+            with CaptureQueriesContext(connection) as queries:
+                response = self.search('movie', 'anything')
+
+        self.assertEqual(response.status_code, 200)
+        # Someone else's entry isn't on my watchlist.
+        self.assertEqual([result['on_watchlist'] for result in response.json()['data']], [True, False, False])
+        watchlist_queries = [query for query in queries.captured_queries if 'review_watchlistentry' in query['sql']]
+        self.assertEqual(len(watchlist_queries), 1)
 
     # IMDb title URLs
 
