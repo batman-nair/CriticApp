@@ -114,7 +114,10 @@ export function WatchlistPage() {
     setCategory('', { replace: true })
   }, [sheetOpen, highlighted, setCategory])
 
-  const entries = useMemo(() => (data ? uniqueEntries(data.pages) : []), [data])
+  const entries = useMemo(
+    () => (data ? uniqueEntries(data.pages) : []),
+    [data],
+  )
 
   // Remove, with Undo in a toast.
   const remove = useRemoveFromWatchlist()
