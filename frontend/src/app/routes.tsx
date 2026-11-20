@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router'
 import { LoginPage } from '../auth/LoginPage'
 import { RequireOwner } from '../auth/RequireOwner'
 import { AddReviewPage } from '../features/add-review/AddReviewPage'
+import { AddToWatchlistSheet } from '../features/add-review/AddToWatchlistSheet'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
 import { WatchlistPage } from '../features/watchlist/WatchlistPage'
@@ -56,8 +57,16 @@ export const routes: RouteObject[] = [
                   </RequireOwner>
                 ),
                 handle: { title: 'Watchlist' },
-                // The add sheet (`add`) and Review it (`review/:itemId`)
-                // become its children, like `/` has `add` (#131, #132).
+                // Review it (`review/:itemId`) joins `add` here (#132).
+                children: [
+                  {
+                    path: 'add',
+                    element: <AddToWatchlistSheet />,
+                    // A crash in the sheet leaves the watchlist behind it.
+                    errorElement: <DialogErrorPage />,
+                    handle: { title: 'Add to watchlist' },
+                  },
+                ],
               },
               {
                 path: '*',
