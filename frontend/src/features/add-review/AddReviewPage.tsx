@@ -141,16 +141,16 @@ export function AddReviewPage({ fromWatchlist = false }: AddReviewPageProps) {
     // Not after a 409 turned it into an update, which removed nothing.
     const removed =
       flow.mode === 'create' && flow.saved.item.id === flow.startItemId
-    body = removed ? (
+    body = (
       <div className={styles.done}>
-        <p className={styles.watchNote}>
-          <Icon name="bookmark-check" size={16} className={styles.noteIcon} />
-          Removed from your watchlist.
-        </p>
+        {removed && (
+          <p className={styles.watchNote}>
+            <Icon name="bookmark-check" size={16} className={styles.noteIcon} />
+            Removed from your watchlist.
+          </p>
+        )}
         <SavedReview review={flow.saved} ratingLabel={ratingLabel} />
       </div>
-    ) : (
-      <SavedReview review={flow.saved} ratingLabel={ratingLabel} />
     )
     footer = (
       <div className={styles.actions}>
