@@ -392,7 +392,7 @@ class CreateRemovesWatchlistEntryTest(ReviewsApiTestCase):
 
     def test_duplicate_under_an_alias_keeps_the_entry(self):
         existing = add_review(self.alice, item_id='mal_anime_52991')
-        # Not possible through the API, but nothing in the schema stops it.
+        # Only a race with watchlist add gets here; nothing in the schema stops it.
         WatchlistEntry.objects.create(user=self.alice, review_item=existing.review_item)
         # The unique constraint, inside the transaction, catches this one.
         with mock.patch(PROVIDER_FOR_ITEM_ID, return_value=_StubProvider(_anime_details())):
