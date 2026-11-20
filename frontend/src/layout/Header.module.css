@@ -1,5 +1,6 @@
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-16);
@@ -32,6 +33,11 @@
   font-size: var(--text-16);
 }
 
+/* 28px from the logo with the header's gap, and the actions pushed right. */
+.tabs {
+  margin-inline: var(--space-12) auto;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -62,7 +68,7 @@
 /* Below 640px. A media query can't read a custom property. */
 @media (max-width: 639px) {
   .header {
-    gap: var(--space-8);
+    gap: var(--space-12) var(--space-8);
     padding: var(--space-18) var(--space-16) 0 var(--space-20);
   }
 
@@ -93,5 +99,15 @@
 
   .addSuffix {
     display: none;
+  }
+
+  /*
+   * A row of its own under the logo row. The end margin lines it up with
+   * the page's 20px gutter.
+   */
+  .tabs {
+    order: 1;
+    flex: 1 1 100%;
+    margin-inline: 0 var(--space-4);
   }
 }

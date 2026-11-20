@@ -1,15 +1,18 @@
-import { Link } from 'react-router'
+import { Link, useMatch } from 'react-router'
 import { LogoutButton } from '../auth/LogoutButton'
 import { useAddReviewLink } from '../auth/useAddReviewLink'
 import { useSession } from '../auth/useSession'
 import { buttonClass } from '../ui/Button/buttonClass'
 import { Icon } from '../ui/Icon/Icon'
 import styles from './Header.module.css'
+import { HeaderTabs } from './HeaderTabs'
 import { ThemeToggle } from './ThemeToggle'
 
 export function Header() {
   const addLink = useAddReviewLink()
   const { user, isPending } = useSession()
+  // No "Add review" on the watchlist pages, as on the board.
+  const onWatchlist = useMatch('/watchlist/*') !== null
 
   return (
     <header className={styles.header}>
@@ -19,9 +22,10 @@ export function Header() {
         </span>
         Critic
       </Link>
+      <HeaderTabs className={styles.tabs} />
       <div className={styles.actions}>
         <ThemeToggle />
-        {addLink !== null && (
+        {addLink !== null && !onWatchlist && (
           <Link
             {...addLink}
             preventScrollReset
