@@ -19,6 +19,8 @@ const names: IconName[] = [
   'refresh',
   'alert-circle',
   'check',
+  'bookmark',
+  'bookmark-plus',
 ]
 
 it.each(names)(
@@ -42,6 +44,25 @@ it('fills the star without a stroke', () => {
     'fill',
     'currentColor',
   )
+})
+
+it('fills the bookmark without a stroke', () => {
+  const { container } = render(<Icon name="bookmark" />)
+
+  expect(container.querySelector('svg')).not.toHaveAttribute('stroke')
+  expect(container.querySelector('path')).toHaveAttribute(
+    'fill',
+    'currentColor',
+  )
+})
+
+it('strokes the outline bookmark-plus', () => {
+  const { container } = render(<Icon name="bookmark-plus" strokeWidth={1.8} />)
+
+  const svg = container.querySelector('svg')
+  expect(svg).toHaveAttribute('fill', 'none')
+  expect(svg).toHaveAttribute('stroke', 'currentColor')
+  expect(svg).toHaveAttribute('stroke-width', '1.8')
 })
 
 it('strokes the other icons and passes className through', () => {

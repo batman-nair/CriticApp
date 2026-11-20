@@ -62,6 +62,8 @@ const ICON_NAMES: IconName[] = [
   'refresh',
   'alert-circle',
   'check',
+  'bookmark',
+  'bookmark-plus',
 ]
 
 const SORT_OPTIONS = [
