@@ -48,6 +48,7 @@
 }
 
 /* Two classes: Button's .lg.secondary sets the size at two. */
+.actions .add,
 .actions .showAll {
   height: 46px;
   padding: 0 var(--space-18);
@@ -75,6 +76,7 @@
     width: 100%;
   }
 
+  .actions .add,
   .actions .showAll {
     height: 48px;
   }

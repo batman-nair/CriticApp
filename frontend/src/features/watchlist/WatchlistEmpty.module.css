@@ -73,6 +73,15 @@
   text-wrap: pretty;
 }
 
+/* Two classes: Button's .lg sets the size at one. */
+.empty .add {
+  gap: var(--space-8);
+  height: 50px;
+  margin-top: var(--space-8);
+  padding: 0 22px;
+  font-size: var(--text-16);
+}
+
 @media (max-width: 639px) {
   .empty {
     gap: var(--space-12);
@@ -122,5 +131,9 @@
 
   .text {
     font-size: var(--text-15);
+  }
+
+  .empty .add {
+    width: 100%;
   }
 }

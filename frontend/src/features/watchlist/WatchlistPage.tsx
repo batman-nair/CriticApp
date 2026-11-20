@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { Link, Outlet } from 'react-router'
 import { useWatchlist, useWatchlistFacets } from '../../api/queries/watchlist'
 import type { WatchlistPage as WatchlistPageData } from '../../api/types'
 import {
@@ -7,12 +7,18 @@ import {
   FILTER_CATEGORIES,
   isFilterCategory,
 } from '../../lib/categories'
+import { cx } from '../../lib/cx'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
 import { Button } from '../../ui/Button/Button'
+import { buttonClass } from '../../ui/Button/buttonClass'
 import { Chip } from '../../ui/Chip/Chip'
 import { Icon } from '../../ui/Icon/Icon'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import grid from './grid.module.css'
+import {
+  searchCategoryFor,
+  useAddToWatchlistLink,
+} from './useAddToWatchlistLink'
 import { toListParams, useWatchlistCategory } from './useWatchlistCategory'
 import { WatchlistCard } from './WatchlistCard'
 import { WatchlistEmpty } from './WatchlistEmpty'
@@ -50,6 +56,11 @@ export function WatchlistPage() {
   const { category, setCategory } = useWatchlistCategory()
   const query = useWatchlist(toListParams(category))
   const facets = useWatchlistFacets()
+  const addLink = useAddToWatchlistLink()
+  // "Add a <category>" starts the sheet on the chip's category.
+  const addInCategoryLink = useAddToWatchlistLink(
+    category ? searchCategoryFor(category) : undefined,
+  )
   const {
     data,
     hasNextPage,
@@ -138,12 +149,13 @@ export function WatchlistPage() {
   } else if (state === 'loading') {
     body = <WatchlistSkeleton />
   } else if (state === 'empty') {
-    body = <WatchlistEmpty />
+    body = <WatchlistEmpty addLink={addLink} />
   } else if (state === 'no-matches') {
     body = (
       <WatchlistNoMatches
         category={category}
         total={total}
+        addLink={addInCategoryLink}
         onShowAll={() => setCategory('')}
       />
     )
@@ -180,6 +192,21 @@ export function WatchlistPage() {
           <h1 className={styles.title}>Up next.</h1>
           {subtitle}
         </div>
+        <Link
+          {...addLink}
+          preventScrollReset
+          className={buttonClass({
+            variant: 'primary',
+            size: 'lg',
+            // The phone board has it only beside the chips.
+            className: cx(styles.add, !showChips && styles.addNoChips),
+          })}
+        >
+          <Icon name="plus" size={16} strokeWidth={2.2} />
+          <span>
+            Add<span className={styles.desktopOnly}> to watchlist</span>
+          </span>
+        </Link>
       </section>
       {showChips && (
         <div

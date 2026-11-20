@@ -1,13 +1,29 @@
 import { render, screen } from '@testing-library/react'
+import type { ComponentProps } from 'react'
+import { MemoryRouter } from 'react-router'
 import userEvent from '@testing-library/user-event'
 import { expect, it, vi } from 'vitest'
 import { expectNoAxeViolations } from '../../test/axe'
 import { WatchlistNoMatches } from './WatchlistNoMatches'
 
-it('names the category that matches nothing', () => {
-  render(
-    <WatchlistNoMatches category="series" total={7} onShowAll={() => {}} />,
+const addLink = {
+  to: { pathname: '/watchlist/add', search: '?category=book' },
+  state: { fromParent: true as const, category: 'book' as const },
+}
+
+/** In a router only for the Link. */
+function renderNoMatches(
+  props: Omit<ComponentProps<typeof WatchlistNoMatches>, 'addLink'>,
+) {
+  return render(
+    <MemoryRouter>
+      <WatchlistNoMatches addLink={addLink} {...props} />
+    </MemoryRouter>,
   )
+}
+
+it('names the category that matches nothing', () => {
+  renderNoMatches({ category: 'series', total: 7, onShowAll: () => {} })
 
   expect(screen.getByText('Series')).toBeInTheDocument()
   expect(
@@ -22,13 +38,7 @@ it('names the category that matches nothing', () => {
 })
 
 it('lower-cases the chip label in the title', () => {
-  render(
-    <WatchlistNoMatches
-      category="anime:movie"
-      total={2}
-      onShowAll={() => {}}
-    />,
-  )
+  renderNoMatches({ category: 'anime:movie', total: 2, onShowAll: () => {} })
 
   expect(
     screen.getByRole('heading', { name: 'No anime movies on your watchlist' }),
@@ -36,23 +46,41 @@ it('lower-cases the chip label in the title', () => {
 })
 
 it('says "title" for one other entry', () => {
-  render(<WatchlistNoMatches category="game" total={1} onShowAll={() => {}} />)
+  renderNoMatches({ category: 'game', total: 1, onShowAll: () => {} })
 
   expect(screen.getByText('Your other title is under All.')).toBeInTheDocument()
 })
 
 it('leaves out the number when the total is unknown', () => {
-  render(<WatchlistNoMatches category="game" onShowAll={() => {}} />)
+  renderNoMatches({ category: 'game', onShowAll: () => {} })
 
   expect(
     screen.getByText('Your other titles are under All.'),
   ).toBeInTheDocument()
 })
 
+it.each([
+  ['movie', 'Add a movie'],
+  ['series', 'Add a series'],
+  ['game', 'Add a game'],
+  ['anime:series', 'Add an anime series'],
+  ['anime:movie', 'Add an anime movie'],
+  ['manga', 'Add a manga'],
+  ['book', 'Add a book'],
+])('offers to add to %s with "%s", first', (category, name) => {
+  renderNoMatches({ category, total: 3, onShowAll: () => {} })
+
+  const add = screen.getByRole('link', { name })
+  expect(add).toHaveAttribute('href', '/watchlist/add?category=book')
+  expect(add.nextElementSibling).toBe(
+    screen.getByRole('button', { name: 'Show all' }),
+  )
+})
+
 it('calls onShowAll from "Show all"', async () => {
   const user = userEvent.setup()
   const onShowAll = vi.fn()
-  render(<WatchlistNoMatches category="book" total={3} onShowAll={onShowAll} />)
+  renderNoMatches({ category: 'book', total: 3, onShowAll })
 
   await user.click(screen.getByRole('button', { name: 'Show all' }))
 
@@ -60,9 +88,11 @@ it('calls onShowAll from "Show all"', async () => {
 })
 
 it('has no axe violations', async () => {
-  const { container } = render(
-    <WatchlistNoMatches category="book" total={3} onShowAll={() => {}} />,
-  )
+  const { container } = renderNoMatches({
+    category: 'book',
+    total: 3,
+    onShowAll: () => {},
+  })
 
   await expectNoAxeViolations(container)
 })
