@@ -376,6 +376,12 @@ describe('useAddToWatchlist', () => {
   })
 })
 
+function deferredGate() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => (resolve = done))
+  return { promise, resolve }
+}
+
 describe('useRemoveFromWatchlist', () => {
   const dune = makeWatchlistEntry({
     item: makeItem({ id: 'tt15239678', category: 'movie', title: 'Dune' }),
@@ -563,6 +569,92 @@ describe('useRemoveFromWatchlist', () => {
     ])
     expect(isInvalidated(queryClient, searchKeys.list(onScreen))).toBe(false)
     expect(searches).toHaveLength(1)
+    expect(isInvalidated(queryClient, all)).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+  })
+
+  it('puts back only its own card when one of two removes fails', async () => {
+    const gates = new Map<string, () => void>()
+    server.use(
+      http.delete(
+        '/api/v3/watchlist/{item_id}',
+        async ({ params, response }) => {
+          await new Promise<void>((resolve) =>
+            gates.set(params.item_id, resolve),
+          )
+          return params.item_id === dune.item.id
+            ? response.untyped(new HttpResponse(null, { status: 500 }))
+            : response(204).empty()
+        },
+      ),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderRemove(queryClient)
+
+    let first!: Promise<unknown>
+    act(() => {
+      first = result.current.mutateAsync(dune.item.id).catch((e) => e)
+      void result.current.mutateAsync(arrival.item.id)
+    })
+    await waitFor(() => expect(gates.size).toBe(2))
+
+    gates.get(dune.item.id)!()
+    await act(() => first)
+
+    expect(cachedIds(queryClient, all)).toEqual([dune.item.id, frieren.item.id])
+    expect(cachedIds(queryClient, movies)).toEqual([dune.item.id])
+    gates.get(arrival.item.id)!()
+  })
+
+  it('doesn’t hold up a list loading for the first time', async () => {
+    const { release, gates } = holdDeletes()
+    const games = deferredGate()
+    server.use(
+      http.get('/api/v3/watchlist', async ({ response }) => {
+        await games.promise
+        return response(200).json(makeWatchlistPage([]))
+      }),
+    )
+    const queryClient = seededQueryClient()
+    const { result } = renderHook(
+      () => ({
+        list: useWatchlist({ category: ['game'] }),
+        remove: useRemoveFromWatchlist(),
+      }),
+      { wrapper: queryWrapper(queryClient) },
+    )
+    await waitFor(() => expect(result.current.list.isFetching).toBe(true))
+
+    act(() => void result.current.remove.mutateAsync(dune.item.id))
+    await waitFor(() => expect(gates.size).toBe(1))
+    games.resolve()
+
+    // While the remove is still in flight.
+    await waitFor(() => expect(result.current.list.isSuccess).toBe(true))
+    release(dune.item.id)
+  })
+
+  it('makes an add wait for the removes in flight before refetching', async () => {
+    const { release, gates } = holdDeletes()
+    const queryClient = seededQueryClient()
+    const { result } = renderHook(
+      () => ({ remove: useRemoveFromWatchlist(), add: useAddToWatchlist() }),
+      { wrapper: queryWrapper(queryClient) },
+    )
+
+    let removal!: Promise<void>
+    act(() => {
+      removal = result.current.remove.mutateAsync(arrival.item.id)
+    })
+    await waitFor(() => expect(gates.size).toBe(1))
+    await act(() =>
+      result.current.add.mutateAsync({ item_id: frieren.item.id }),
+    )
+    expect(isInvalidated(queryClient, all)).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+
+    release(arrival.item.id)
+    await act(() => removal)
     expect(isInvalidated(queryClient, all)).toBe(true)
     expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
   })
