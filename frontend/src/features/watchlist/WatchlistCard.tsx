@@ -18,9 +18,11 @@ const SINGULAR_LABELS = new Map([
 
 interface WatchlistCardProps {
   entry: WatchlistEntry
+  /** Just added in the add sheet: outlined until the sheet opens again. */
+  fresh?: boolean
 }
 
-export function WatchlistCard({ entry }: WatchlistCardProps) {
+export function WatchlistCard({ entry, fresh = false }: WatchlistCardProps) {
   const titleId = useId()
   const { item } = entry
   const category =
@@ -34,6 +36,7 @@ export function WatchlistCard({ entry }: WatchlistCardProps) {
       className={styles.card}
       style={categoryVars(category)}
       aria-labelledby={titleId}
+      data-fresh={fresh || undefined}
     >
       {/* Poster clips its root, so the ribbon sits beside it. */}
       <div className={styles.cover}>
