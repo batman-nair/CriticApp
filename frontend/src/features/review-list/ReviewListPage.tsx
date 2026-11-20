@@ -5,6 +5,7 @@ import type { ReviewPage } from '../../api/types'
 import { OWNER_USERNAME } from '../../config'
 import { cx } from '../../lib/cx'
 import type { ReviewListOutlet } from '../../lib/reviewListOutlet'
+import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
 import { Button } from '../../ui/Button/Button'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { EmptyShelf } from './EmptyShelf'
@@ -15,7 +16,6 @@ import { NoMatches } from './NoMatches'
 import { ReviewCard } from './ReviewCard'
 import { ReviewListSkeleton } from './ReviewListSkeleton'
 import styles from './ReviewListPage.module.css'
-import { useLoadMoreOnScroll } from './useLoadMoreOnScroll'
 import {
   toFacetParams,
   toListParams,

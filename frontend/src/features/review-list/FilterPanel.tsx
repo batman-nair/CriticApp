@@ -1,12 +1,15 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 import type { ReviewFacets } from '../../api/types'
-import { categoryLabel, categoryVars } from '../../lib/categories'
+import {
+  categoryLabel,
+  categoryVars,
+  FILTER_CATEGORIES,
+} from '../../lib/categories'
 import { Chip } from '../../ui/Chip/Chip'
 import { SearchField } from '../../ui/SearchField/SearchField'
 import { Select } from '../../ui/Select/Select'
 import styles from './FilterPanel.module.css'
 import {
-  FILTER_CATEGORIES,
   SORTS,
   type ReviewFilters,
   type useReviewFilters,
