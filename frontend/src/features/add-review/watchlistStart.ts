@@ -41,7 +41,9 @@ export interface WatchlistStart {
  * The title Review it starts on: a loaded card's entry from the watchlist
  * page, without a request, or else the stored item (a direct link or a
  * reload). `none` without an id. Nothing is fetched while `active` is false,
- * so the list dropping the entry after the save never asks for it.
+ * so the list dropping the entry after the save never asks for it, nor
+ * while the page's list first loads: on a reload the entry is usually on it,
+ * and only it says the title is on the watchlist.
  */
 export function useWatchlistStart(
   itemId: string | undefined,
@@ -53,7 +55,8 @@ export function useWatchlistStart(
       ? undefined
       : outlet?.entries.find((e) => e.item.id === itemId)
   const fetched = useItem(itemId ?? '', {
-    enabled: itemId !== undefined && active && !entry,
+    enabled:
+      itemId !== undefined && active && !entry && !outlet?.entriesPending,
   })
   const retry = () => void fetched.refetch()
 

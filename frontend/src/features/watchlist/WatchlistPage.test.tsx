@@ -11,12 +11,13 @@ import type {
 import { expectNoAxeViolations } from '../../test/axe'
 import {
   makeItem,
+  makeProblem,
   makeSearchResult,
   makeWatchlistEntry,
   makeWatchlistFacets,
   makeWatchlistPage,
 } from '../../test/fixtures'
-import { defaultWatchlist, http } from '../../test/handlers'
+import { defaultWatchlist, http, sessionAs } from '../../test/handlers'
 import { stubIntersectionObserver } from '../../test/intersectionObserver'
 import { stubSystemTheme } from '../../test/matchMedia'
 import { createTestQueryClient } from '../../test/render'
@@ -769,6 +770,24 @@ describe('with the add sheet, on the real routes', () => {
     )
     expect(router.state.location.search).toBe('?category=game')
     expect(router.state.historyAction).toBe('POP')
+  })
+
+  it('goes to the login page, coming back here, when the session has run out', async () => {
+    server.use(
+      http.get('/api/v3/watchlist', ({ response }) => {
+        // The server's session ended before the page's first request.
+        server.use(sessionAs(null))
+        return response(401).json(
+          makeProblem({ status: 401, code: 'UNAUTHENTICATED' }),
+        )
+      }),
+    )
+    const { router } = renderRoute('/watchlist?category=game')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe(
+      `?next=${encodeURIComponent('/watchlist?category=game')}`,
+    )
   })
 })
 

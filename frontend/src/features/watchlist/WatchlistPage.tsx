@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link, useMatch, useOutlet } from 'react-router'
+import { ApiError } from '../../api/client'
 import {
   useAddToWatchlist,
   useRemoveFromWatchlist,
@@ -10,6 +12,7 @@ import type {
   WatchlistEntry,
   WatchlistPage as WatchlistPageData,
 } from '../../api/types'
+import { markSessionExpired } from '../../auth/markSessionExpired'
 import {
   categoryLabel,
   FILTER_CATEGORIES,
@@ -91,6 +94,19 @@ export function WatchlistPage() {
     fetchNextPage,
   } = query
 
+  // The session ran out while the page was open: the owner guard then goes
+  // to the login page, which comes back here. Retrying would only 401 again.
+  const queryClient = useQueryClient()
+  const unauthenticated = [query.error, facets.error].some(
+    (error) =>
+      error instanceof ApiError &&
+      error.status === 401 &&
+      error.code === 'UNAUTHENTICATED',
+  )
+  useEffect(() => {
+    if (unauthenticated) markSessionExpired(queryClient)
+  }, [unauthenticated, queryClient])
+
   // The cards added in the add sheet's last visit are outlined. Opening it
   // again clears them, as on the board. Adjusted during render.
   const sheetOpen = useMatch('/watchlist/add') !== null
@@ -114,10 +130,7 @@ export function WatchlistPage() {
     setCategory('', { replace: true })
   }, [sheetOpen, highlighted, setCategory])
 
-  const entries = useMemo(
-    () => (data ? uniqueEntries(data.pages) : []),
-    [data],
-  )
+  const entries = useMemo(() => (data ? uniqueEntries(data.pages) : []), [data])
 
   // Remove, with Undo in a toast.
   const remove = useRemoveFromWatchlist()
@@ -198,8 +211,9 @@ export function WatchlistPage() {
         setHighlighted((ids) => new Set(ids).add(itemId))
       },
       entries,
+      entriesPending: !data && query.isPending,
     }),
-    [entries],
+    [entries, data, query.isPending],
   )
 
   // The boards never show the toast over a sheet. Opening one (the add sheet

@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest import mock
 
+from django.db import connection
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -258,6 +259,22 @@ class AddTest(WatchlistApiTestCase):
         self.assertEqual(missed, [True])
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(WatchlistEntry.objects.get(), entry)
+
+
+    def test_locks_the_item_before_checking_for_a_review(self):
+        item = add_review(self.alice).review_item
+        locked = []
+        # The test's own transaction counts too.
+        outer = len(connection.atomic_blocks)
+
+        def lock(locked_item):
+            # In the transaction that checks, so a review committed while the
+            # lock waits is seen.
+            locked.append((locked_item, len(connection.atomic_blocks) > outer))
+
+        with mock.patch('review.api_v3.watchlist.lock_item', side_effect=lock):
+            self.assertProblem(self.post(item.item_id), 409, 'ALREADY_REVIEWED')
+        self.assertEqual(locked, [(item, True)])
 
 
 class RemoveTest(WatchlistApiTestCase):

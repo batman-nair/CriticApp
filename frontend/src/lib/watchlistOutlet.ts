@@ -13,6 +13,11 @@ export interface WatchlistOutlet {
    * card's title without fetching it.
    */
   entries: readonly WatchlistEntry[]
+  /**
+   * The list's first load is under way, so `entries` can't say yet whether a
+   * title is on the watchlist.
+   */
+  entriesPending: boolean
 }
 
 /**

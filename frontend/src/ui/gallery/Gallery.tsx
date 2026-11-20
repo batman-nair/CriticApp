@@ -58,6 +58,7 @@ const ICON_NAMES: IconName[] = [
   'pencil',
   'trash',
   'star',
+  'star-outline',
   'lock',
   'cloud-off',
   'refresh',
@@ -65,6 +66,7 @@ const ICON_NAMES: IconName[] = [
   'check',
   'bookmark',
   'bookmark-plus',
+  'bookmark-check',
   'bookmark-minus',
 ]
 

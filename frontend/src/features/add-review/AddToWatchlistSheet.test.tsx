@@ -98,7 +98,13 @@ function renderSheet(state?: Partial<WatchlistAddState> | null) {
           <>
             <p>The page</p>
             <Outlet
-              context={{ onAdded, entries: [] } satisfies WatchlistOutlet}
+              context={
+                {
+                  onAdded,
+                  entries: [],
+                  entriesPending: false,
+                } satisfies WatchlistOutlet
+              }
             />
           </>
         ),

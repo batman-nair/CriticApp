@@ -22,7 +22,7 @@ from review.providers import ProviderError
 
 from .filters import ReviewListParamsSerializer, filter_reviews, sort_reviews
 from .items import ItemSerializer
-from .services import get_or_fetch_item, provider_api_error
+from .services import get_or_fetch_item, lock_item, provider_api_error
 
 _TAGS_MAX_LENGTH = Review._meta.get_field('review_tags').max_length
 
@@ -199,6 +199,7 @@ class ReviewListCreateView(PublicReadMixin, V3GenericAPIView):
 
         try:
             with transaction.atomic():
+                lock_item(item)
                 review = serializer.save(user=request.user, review_item=item)
                 # Same transaction: a failed create keeps the entry.
                 WatchlistEntry.objects.filter(user=request.user, review_item=item).delete()

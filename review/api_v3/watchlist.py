@@ -4,6 +4,7 @@ A user's watchlist is private: every endpoint needs a login and only sees
 the requesting user's entries.
 """
 
+from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -24,7 +25,7 @@ from review.utils.review_utils import categories_to_q, count_reviews_by_category
 from .facets import CATEGORY_CHIP_IDS, CategoryFacetSerializer
 from .filters import CATEGORY_FILTER_CHOICES, CommaSeparatedListField
 from .items import ItemSerializer
-from .services import get_or_fetch_item, provider_api_error
+from .services import get_or_fetch_item, lock_item, provider_api_error
 
 
 class WatchlistEntrySerializer(serializers.Serializer):
@@ -131,13 +132,18 @@ class WatchlistView(V3GenericAPIView):
         except ProviderError as ex:
             raise provider_api_error(ex) from ex
 
-        if Review.objects.filter(user=request.user, review_item=item).exists():
-            raise _already_reviewed()
-
         defaults = {'added_at': validated['added_at']} if 'added_at' in validated else {}
-        # get_or_create re-reads on an IntegrityError, so a concurrent add of
-        # the same item returns the other request's entry.
-        entry, created = WatchlistEntry.objects.get_or_create(user=request.user, review_item=item, defaults=defaults)
+        with transaction.atomic():
+            # So a review of the item created meanwhile can't be missed here
+            # and miss this entry in turn.
+            lock_item(item)
+            if Review.objects.filter(user=request.user, review_item=item).exists():
+                raise _already_reviewed()
+            # get_or_create re-reads on an IntegrityError, so a concurrent add
+            # of the same item returns the other request's entry.
+            entry, created = WatchlistEntry.objects.get_or_create(
+                user=request.user, review_item=item, defaults=defaults,
+            )
         return api_response(WatchlistEntrySerializer(entry).data, status=201 if created else 200)
 
 

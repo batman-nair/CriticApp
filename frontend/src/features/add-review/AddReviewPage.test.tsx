@@ -1112,6 +1112,27 @@ describe('Review it from the watchlist', () => {
   })
 
   describe('from a direct link', () => {
+    it('waits for the list, and saves a loaded entry with the note', async () => {
+      const { requests } = recordRequests()
+      const user = userEvent.setup()
+      serveWatchlist()
+      // Slower than the item would be: the outcome mustn't depend on it.
+      server.use(
+        http.get('/api/v3/watchlist', async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50))
+        }),
+      )
+      renderRoute(`/watchlist/review/${encodeURIComponent(frieren.id)}`)
+
+      const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
+      await within(dialog).findByRole('slider', { name: 'Your rating' })
+      expect(dialog).toHaveTextContent(frierenName)
+      expect(requests.filter((r) => r.includes('/api/v3/items/'))).toEqual([])
+
+      await save(user)
+      expect(removedNote()).toBeInTheDocument()
+    })
+
     it('fetches a title the page hasn’t loaded, and saves it without the note', async () => {
       const { requests } = recordRequests()
       const user = userEvent.setup()

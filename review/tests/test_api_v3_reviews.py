@@ -3,7 +3,7 @@ from itertools import count
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.db import DatabaseError
+from django.db import DatabaseError, connection
 from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -389,6 +389,22 @@ class CreateRemovesWatchlistEntryTest(ReviewsApiTestCase):
 
         self.assertEqual(response.status_code, 201, response.content)
         self.assertFalse(self.on_watchlist(self.alice, 'mal_anime_52991'))
+
+    def test_locks_the_item_in_the_create_transaction(self):
+        item = new_item()
+        WatchlistEntry.objects.create(user=self.alice, review_item=item)
+        locked = []
+        # The test's own transaction counts too.
+        outer = len(connection.atomic_blocks)
+
+        def lock(locked_item):
+            # Before the review exists, in the transaction that deletes the entry.
+            locked.append((locked_item, len(connection.atomic_blocks) > outer, Review.objects.exists()))
+
+        with mock.patch('review.api_v3.reviews.lock_item', side_effect=lock):
+            self.assertEqual(self.post(item.item_id).status_code, 201)
+        self.assertEqual(locked, [(item, True, False)])
+        self.assertFalse(self.on_watchlist(self.alice, item.item_id))
 
     def test_duplicate_under_an_alias_keeps_the_entry(self):
         existing = add_review(self.alice, item_id='mal_anime_52991')

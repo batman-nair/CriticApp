@@ -35,8 +35,13 @@ function renderStart(
   itemId: string | undefined,
   {
     entries = [],
+    entriesPending = false,
     active = true,
-  }: { entries?: WatchlistEntry[]; active?: boolean } = {},
+  }: {
+    entries?: WatchlistEntry[]
+    entriesPending?: boolean
+    active?: boolean
+  } = {},
 ) {
   const queryClient = createTestQueryClient()
   function Wrapper({ children }: { children: ReactNode }) {
@@ -44,7 +49,13 @@ function renderStart(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <Routes>
-            <Route element={<Outlet context={{ onAdded: vi.fn(), entries }} />}>
+            <Route
+              element={
+                <Outlet
+                  context={{ onAdded: vi.fn(), entries, entriesPending }}
+                />
+              }
+            >
               <Route index element={children} />
             </Route>
           </Routes>
@@ -150,5 +161,17 @@ it('asks for nothing while inactive', async () => {
 
   await settle()
   expect(result.current.status).toBe('loading')
+  expect(requests).toEqual([])
+})
+
+it('waits for the page’s first load instead of fetching the title', async () => {
+  const requests = recordItemRequests()
+  const { result } = renderStart('mal:52991', { entriesPending: true })
+
+  await settle()
+  expect(result.current).toMatchObject({
+    status: 'loading',
+    onWatchlist: false,
+  })
   expect(requests).toEqual([])
 })
