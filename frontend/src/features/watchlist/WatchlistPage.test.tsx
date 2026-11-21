@@ -63,11 +63,15 @@ function deferred() {
 type Served = WatchlistPageData | 'error'
 
 /**
- * Serves each request what `respond` gives for its category and offset, after
- * `gate` when there is one, and records each request.
+ * Serves each request what `respond` gives for its category, offset and
+ * params, after `gate` when there is one, and records each request.
  */
 function serveList(
-  respond: (category: string | null, offset: number) => Served,
+  respond: (
+    category: string | null,
+    offset: number,
+    params: URLSearchParams,
+  ) => Served,
   gate?: Promise<void>,
 ) {
   const requests: URLSearchParams[] = []
@@ -79,6 +83,7 @@ function serveList(
       const served = respond(
         params.get('category'),
         Number(params.get('offset')),
+        params,
       )
       if (served === 'error') {
         return response.untyped(new HttpResponse(null, { status: 500 }))
@@ -510,6 +515,226 @@ it('uses the list’s count when the counts fail, and the chips still filter', a
   expect(
     screen.getByText('Things to watch, play and read later.'),
   ).toBeInTheDocument()
+})
+
+describe('search, language and sort', () => {
+  it('searches after a pause in typing, in the list and the panel’s counts', async () => {
+    const user = userEvent.setup()
+    const list = serveList(() => makeWatchlistPage(entries(2)))
+    const facets = serveFacets({ movie: 2 })
+    const { router } = renderPage()
+    await waitForCards(2)
+
+    await user.type(searchBox(), 'dune')
+    // Not before the pause.
+    expect(router.state.location.search).toBe('')
+
+    await waitFor(() => expect(router.state.location.search).toBe('?q=dune'))
+    // Written over the entry, not one per pause.
+    expect(router.state.historyAction).toBe('REPLACE')
+    await waitFor(() => expect(list.requests.at(-1)?.get('q')).toBe('dune'))
+    // The hero's counts stay the whole watchlist's.
+    await waitFor(() =>
+      expect(facets.requests.map((params) => params.toString())).toEqual([
+        '',
+        'q=dune',
+      ]),
+    )
+    expect(
+      screen.getByText('2 titles to watch, play or read later.'),
+    ).toBeInTheDocument()
+  })
+
+  it('sends a picked chip to the list and the panel’s counts', async () => {
+    const user = userEvent.setup()
+    const list = serveList(() => makeWatchlistPage(entries(1)))
+    const facets = serveFacets({ movie: 1, game: 1 })
+    renderPage()
+    await waitForCards(1)
+
+    await user.click(chip('Games'))
+
+    await waitFor(() =>
+      expect(facets.requests.map((params) => params.toString())).toEqual([
+        '',
+        'category=game',
+      ]),
+    )
+    expect(list.requests.at(-1)?.get('category')).toBe('game')
+  })
+
+  it('filters by a language from the menu', async () => {
+    const user = userEvent.setup()
+    const list = serveList(() => makeWatchlistPage(entries(2)))
+    const { router } = renderPage()
+    await waitForCards(2)
+
+    await user.click(screen.getByRole('combobox', { name: 'Language' }))
+    const options = await screen.findAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Any language',
+      'English',
+      'Japanese',
+    ])
+    await user.click(screen.getByRole('option', { name: 'Japanese' }))
+
+    expect(router.state.historyAction).toBe('PUSH')
+    expect(router.state.location.search).toBe('?language=Japanese')
+    await waitFor(() =>
+      expect(list.requests.at(-1)?.get('language')).toBe('Japanese'),
+    )
+  })
+
+  it('offers the watchlist’s sorts, and sends the one picked to the list only', async () => {
+    const user = userEvent.setup()
+    const list = serveList(() => makeWatchlistPage(entries(2)))
+    const facets = serveFacets({ movie: 2 })
+    const { router } = renderPage()
+    await waitForCards(2)
+    const sort = screen.getByRole('combobox', { name: 'Sort' })
+    expect(sort).toHaveTextContent(/^Recently added$/)
+
+    await user.click(sort)
+    const options = await screen.findAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Recently added',
+      'A–Z',
+      'Rating: high to low',
+      'Rating: low to high',
+      'Release year: newest first',
+    ])
+    await user.click(
+      screen.getByRole('option', { name: 'Release year: newest first' }),
+    )
+
+    expect(router.state.historyAction).toBe('PUSH')
+    expect(router.state.location.search).toBe('?sort=-year')
+    await waitFor(() => expect(list.requests.at(-1)?.get('sort')).toBe('-year'))
+    expect(facets.requests.some((params) => params.has('sort'))).toBe(false)
+    // A sort alone isn't a filter.
+    expect(
+      screen.queryByRole('button', { name: 'Clear filters' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('clears all but the sort on "Clear filters", and focuses the search', async () => {
+    const user = userEvent.setup()
+    const list = serveList(() => makeWatchlistPage(entries(2)))
+    const { router } = renderPage(
+      '/watchlist?q=dune&category=movie&language=English&sort=title',
+    )
+    await waitForCards(2)
+    expect(searchBox()).toHaveValue('dune')
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?sort=title'),
+    )
+    expect(searchBox()).toHaveValue('')
+    expect(searchBox()).toHaveFocus()
+    expect(chip('All')).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.queryByRole('button', { name: 'Clear filters' }),
+    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(Object.fromEntries(list.requests.at(-1)!)).toEqual({
+        sort: 'title',
+        limit: '20',
+        offset: '0',
+      }),
+    )
+  })
+
+  it('shows "nothing matches" for a search, then the list after the count row’s "Clear filters"', async () => {
+    const user = userEvent.setup()
+    serveList((_category, _offset, params) =>
+      params.has('q') ? makeWatchlistPage([]) : makeWatchlistPage(entries(3)),
+    )
+    serveFacets({ movie: 3 })
+    const { router } = renderPage('/watchlist?q=zzz')
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nothing on your watchlist matches',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Try another word, or widen the category or language.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('0 titles')).toHaveAttribute('aria-live', 'polite')
+    expect(
+      screen.queryByRole('heading', { name: 'Nothing on your watchlist yet' }),
+    ).not.toBeInTheDocument()
+    expect(searchBox()).toHaveValue('zzz')
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    await waitForCards(3)
+    expect(router.state.location.search).toBe('')
+    expect(screen.getByText('3 titles')).toBeInTheDocument()
+  })
+
+  it.each(['language=Korean', 'q=zzz&category=movie'])(
+    'shows "nothing matches", not the category’s state, for ?%s',
+    async (search) => {
+      serveList(() => makeWatchlistPage([]))
+      serveFacets({ movie: 3 })
+      renderPage(`/watchlist?${search}`)
+
+      expect(
+        await screen.findByRole('heading', {
+          name: 'Nothing on your watchlist matches',
+        }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Show all' }),
+      ).not.toBeInTheDocument()
+    },
+  )
+
+  it('shows the category’s own state for an empty category, with a sort', async () => {
+    serveList(() => makeWatchlistPage([]))
+    serveFacets({ game: 3 })
+    renderPage('/watchlist?category=movie&sort=title')
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No movies on your watchlist',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Add a movie' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('0 titles')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    ).toBeInTheDocument()
+  })
+
+  it.each(['q=dune', 'language=English', 'q=dune&category=movie'])(
+    'shows the empty state, without the panel, for ?%s on an empty watchlist',
+    async (search) => {
+      serveList(() => makeWatchlistPage([]))
+      serveFacets({})
+      renderPage(`/watchlist?${search}`)
+
+      expect(
+        await screen.findByRole('heading', {
+          name: 'Nothing on your watchlist yet',
+        }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('searchbox', { name: 'Search your watchlist' }),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByText('0 titles')).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('heading', {
+          name: 'Nothing on your watchlist matches',
+        }),
+      ).not.toBeInTheDocument()
+    },
+  )
 })
 
 it('loads the next page when the end of the list comes near', async () => {
@@ -1047,6 +1272,27 @@ describe('Remove and Undo', () => {
       ),
     )
     expect(titles()).toEqual(['Dune'])
+  })
+
+  it('removes and undoes under a search', async () => {
+    const user = userEvent.setup()
+    const { posts } = serveWatchlist([dune, arrival, heat])
+    const { router } = renderPage('/watchlist?q=a')
+    await waitForCards(3)
+
+    await user.click(removeButton('Arrival'))
+
+    await waitFor(() => expect(titles()).toEqual(['Dune', 'Heat']))
+    expect(toast()).toHaveTextContent('Removed Arrival from your watchlist.')
+    await screen.findByText('2 titles to watch, play or read later.')
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
+
+    await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival', 'Heat']))
+    expect(posts).toEqual([
+      { item_id: arrival.item.id, added_at: arrival.added_at },
+    ])
+    expect(router.state.location.search).toBe('?q=a')
+    expect(searchBox()).toHaveValue('a')
   })
 
   it('shows the empty state after the last card, with the toast still up', async () => {
