@@ -14,8 +14,8 @@ class MALProvider(Provider):
     # Genres come with search results at no extra cost; details ask for them below.
     _SEARCH_FIELDS = _COMMON_FIELDS + ',genres'
     _DETAIL_FIELDS = {
-        'anime': 'genres,studios,media_type,synopsis',
-        'manga': 'genres,authors{first_name,last_name},media_type,synopsis',
+        'anime': 'genres,studios,media_type,synopsis,alternative_titles',
+        'manga': 'genres,authors{first_name,last_name},media_type,synopsis,alternative_titles',
     }
 
     def __init__(self, category: str):
@@ -74,14 +74,41 @@ class MALProvider(Provider):
                 creators.append(' '.join(name for name in names if name))
         else:
             creators = self._names(mal_json.get("studios"))
+        summary = self._summary(mal_json)
         return ItemDetails.from_summary(
-            self._summary(mal_json),
+            summary,
             genres=self._names(mal_json.get("genres")),
             creators=unique(creators),
             media_type=self._optional(mal_json.get("media_type"), str),
             description=self._optional(mal_json.get("synopsis"), str) or None,
             provider_rating=self._optional_rating(mal_json.get("mean")),
+            alternative_titles=self._alternative_titles(mal_json.get("alternative_titles"), summary.title),
         )
+
+    @staticmethod
+    def _alternative_titles(alternative, title: str) -> list[str]:
+        """English title, synonyms, then Japanese title, without blanks, the
+        main title or repeats (ignoring case).
+
+        `alternative` is MAL's {"synonyms": [...], "en": "...", "ja": "..."};
+        MAL sends "" for a missing English or Japanese title. The titles are
+        only searched, so a malformed value is dropped rather than failing the
+        whole item.
+        """
+        if not isinstance(alternative, dict):
+            return []
+        synonyms = alternative.get("synonyms")
+        candidates = [alternative.get("en"), *(synonyms if isinstance(synonyms, list) else []), alternative.get("ja")]
+        seen = {title.strip().casefold()}
+        titles = []
+        for candidate in candidates:
+            if not isinstance(candidate, str) or not candidate.strip():
+                continue
+            key = candidate.strip().casefold()
+            if key not in seen:
+                seen.add(key)
+                titles.append(candidate.strip())
+        return titles
 
     def _summary(self, mal_json: dict) -> ItemSummary:
         mal_id = mal_json["id"]

@@ -156,6 +156,7 @@ class Command(BaseCommand):
                 item.attr2 = fields.get('attr2', item.attr2)
                 item.attr3 = fields.get('attr3', item.attr3)
                 item.language = fields.get('language', item.language)
+                item.alternative_titles = fields.get('alternative_titles', item.alternative_titles)
                 item.description = fields.get('description', item.description)
                 item.rating = fields.get('rating', item.rating)
                 item.last_refreshed_at = now

@@ -216,6 +216,32 @@ class RefreshReviewItemsCommandTest(TestCase):
         item.refresh_from_db()
         self.assertEqual(item.language, 'English')
 
+    def test_refresh_fills_alternative_titles(self):
+        item = self._create_item('mal_anime_16498', category='anime')
+        provider = _ProviderStub({
+            'mal_anime_16498': _details(
+                'mal_anime_16498', category='anime', title='Shingeki no Kyojin',
+                alternative_titles=['Attack on Titan', '進撃の巨人'],
+            ),
+        })
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        item.refresh_from_db()
+        self.assertEqual(item.alternative_titles, 'Attack on Titan\n進撃の巨人')
+
+    def test_refresh_keeps_alternative_titles_for_other_categories(self):
+        # Only MAL gives them; other providers leave the column alone.
+        item = self._create_item('omdb_alt', alternative_titles='Kept')
+        provider = _ProviderStub({'omdb_alt': _details('omdb_alt', title='Old Title')})
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider', return_value=provider):
+            call_command('refresh_review_items', max_items=10, stale_days=14, min_retry_hours=0, request_delay_ms=0)
+
+        item.refresh_from_db()
+        self.assertEqual(item.alternative_titles, 'Kept')
+
     def test_refreshed_fields_are_stored_as_the_columns_expect(self):
         item = self._create_item('omdb_fields')
         provider = _ProviderStub({

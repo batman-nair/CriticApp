@@ -145,12 +145,13 @@ def fit_joined(values: list, max_length: int) -> list:
 # What each ReviewItem column has always held when the provider gave nothing,
 # per category. The language column is only written for the categories listed
 # under 'language'; the others never had a language from their provider.
+# Likewise alternative_titles, which only MAL gives.
 _EMPTY_VALUES = {
     'movie': {'attr1': 'N/A', 'attr2': '', 'attr3': 'N/A', 'description': 'N/A', 'language': ''},
     'series': {'attr1': 'N/A', 'attr2': '', 'attr3': 'N/A', 'description': 'N/A', 'language': ''},
     'game': {'attr1': '', 'attr2': '', 'attr3': '', 'description': ''},
-    'anime': {'attr1': '', 'attr2': '', 'attr3': 'N/A', 'description': ''},
-    'manga': {'attr1': '', 'attr2': '', 'attr3': 'N/A', 'description': ''},
+    'anime': {'attr1': '', 'attr2': '', 'attr3': 'N/A', 'description': '', 'alternative_titles': ''},
+    'manga': {'attr1': '', 'attr2': '', 'attr3': 'N/A', 'description': '', 'alternative_titles': ''},
     'book': {'attr1': 'N/A', 'attr2': 'N/A', 'attr3': 'N/A', 'description': 'N/A', 'language': ''},
 }
 
@@ -192,6 +193,8 @@ class ItemDetails(ItemSummary):
     media_type: Optional[str] = None
     platforms: list[str] = field(default_factory=list)
     pages: Optional[int] = None
+    # Other names for the item, e.g. its English and Japanese titles.
+    alternative_titles: list[str] = field(default_factory=list)
 
     @classmethod
     def from_summary(cls, summary: ItemSummary, **fields) -> 'ItemDetails':
@@ -227,6 +230,9 @@ class ItemDetails(ItemSummary):
         }
         if 'language' in empty:
             fields['language'] = ', '.join(self.languages) or empty['language']
+        if 'alternative_titles' in empty:
+            # One per line: titles can hold commas.
+            fields['alternative_titles'] = '\n'.join(self.alternative_titles) or empty['alternative_titles']
         return fields
 
 

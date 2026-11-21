@@ -56,6 +56,7 @@ def languages_to_q(languages: list) -> Q:
 def item_word_q(word: str) -> Q:
     """Matches rows with a `review_item` FK whose item has `word` in any searched field."""
     word_query_obj = Q(review_item__title__icontains=word)
+    word_query_obj |= Q(review_item__alternative_titles__icontains=word)
     word_query_obj |= Q(review_item__description__icontains=word)
     word_query_obj |= Q(review_item__attr1__icontains=word)
     word_query_obj |= Q(review_item__attr2__icontains=word)

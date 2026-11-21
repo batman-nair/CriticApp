@@ -126,6 +126,14 @@ class ListFilterTest(ReviewsApiTestCase):
         self.assertEqual(self.list_ids('username=alice'), [mine.pk])
         self.assertEqual(self.list_ids('username=nobody'), [])
 
+    def test_q_matches_alternative_titles(self):
+        match = add_review(self.alice, category='anime', title='Shingeki no Kyojin',
+                           alternative_titles='Attack on Titan\n進撃の巨人')
+        add_review(self.alice, category='anime', title='Sousou no Frieren')
+        for query in ('q=attack titan', 'q=進撃', 'q=shingeki'):
+            with self.subTest(query=query):
+                self.assertEqual(self.list_ids(query), [match.pk])
+
     def test_q_matches_every_word(self):
         both = add_review(self.alice, title='Blue Planet')
         add_review(self.alice, title='Blue Velvet')
