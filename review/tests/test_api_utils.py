@@ -455,13 +455,14 @@ class MALProviderTest(SimpleTestCase):
 
     def test_alternative_titles_drop_blanks_repeats_and_the_main_title(self):
         node = _mal_node(5, title='Shingeki no Kyojin', alternative_titles={
-            'synonyms': ['AoT', '', '  ', 'shingeki no kyojin', 'AoT', ' SnK '],
+            'synonyms': ['AoT', '', '  ', 'shingeki no kyojin', 'AOT', ' SnK ', 'attack ON titan'],
             'en': 'Attack on Titan',
             'ja': '',
         })
         with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
             details = MALProvider('anime').get_details('mal_anime_5')
 
+        # Repeats are found ignoring case; the first spelling is kept.
         self.assertEqual(details.alternative_titles, ['Attack on Titan', 'AoT', 'SnK'])
 
     def test_alternative_titles_missing_parts(self):
@@ -473,13 +474,22 @@ class MALProviderTest(SimpleTestCase):
 
                 self.assertEqual(details.alternative_titles, [])
 
-    def test_malformed_alternative_titles_are_an_upstream_error(self):
-        for alternative_titles in ('Attack on Titan', {'en': 5}, {'synonyms': 'AoT'}, {'synonyms': [5]}):
+    def test_malformed_alternative_titles_are_dropped(self):
+        # Only searched, so a bad value mustn't fail the whole item.
+        cases = [
+            ('Attack on Titan', []),
+            (['Attack on Titan'], []),
+            ({'en': 5, 'ja': '進撃の巨人'}, ['進撃の巨人']),
+            ({'synonyms': 'AoT', 'en': 'Attack on Titan'}, ['Attack on Titan']),
+            ({'synonyms': [5, None, {'x': 1}, 'SnK']}, ['SnK']),
+        ]
+        for alternative_titles, expected in cases:
             with self.subTest(alternative_titles=alternative_titles):
                 node = _mal_node(5, alternative_titles=alternative_titles)
                 with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
-                    with self.assertRaises(UpstreamError):
-                        MALProvider('anime').get_details('mal_anime_5')
+                    details = MALProvider('anime').get_details('mal_anime_5')
+
+                self.assertEqual(details.alternative_titles, expected)
 
     def test_entries_without_a_name_are_dropped(self):
         genres = [{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'Action'}]

@@ -127,8 +127,9 @@ class WatchlistView(V3GenericAPIView):
         operation_id='watchlist_list',
         summary="List the user's watchlist",
         description=(
-            'The logged-in user\'s entries. `q` searches the items\' titles, descriptions, people, genres, '
-            'years and languages; every word has to match. `category` and `language` can be repeated or '
+            'The logged-in user\'s entries. `q` searches the items\' titles (other titles too, such as an '
+            'anime\'s English and Japanese ones), descriptions, people, genres, years and languages; every '
+            'word has to match. `category` and `language` can be repeated or '
             'separated with commas. `sort`: `-added` (newest `added_at` first, the default), `title`, '
             '`-rating` and `rating` (the provider rating), `-year` (newest release first). Missing or '
             'unparseable ratings and years go last in both directions; ties go to the newest `added_at`.'
