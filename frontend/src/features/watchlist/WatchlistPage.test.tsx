@@ -122,8 +122,11 @@ function pageStatus() {
 }
 
 function chips() {
-  return screen.queryByRole('group', { name: 'Filter by category' })
+  return screen.queryByRole('group', { name: 'Categories' })
 }
+
+const searchBox = () =>
+  screen.getByRole('searchbox', { name: 'Search your watchlist' })
 
 /** A chip by its label, with or without a count. */
 const chip = (label: string) =>
@@ -142,7 +145,10 @@ it('shows the entries in the server’s order, with the category and years', asy
   expect(
     within(second!).getByText('Anime series · 2023–2024'),
   ).toBeInTheDocument()
-  expect(screen.getByText('Newest first')).toBeInTheDocument()
+  expect(screen.getByText('2 titles')).toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Clear filters' }),
+  ).not.toBeInTheDocument()
 })
 
 it('shows the hero', async () => {
@@ -194,7 +200,7 @@ it('filters by the chip picked, in the URL', async () => {
       : makeWatchlistPage(entries(2)),
   )
   serveFacets({ game: 1, movie: 1 })
-  const { router } = renderPage('/watchlist?sort=x')
+  const { router } = renderPage('/watchlist?page=2')
   await waitForCards(2)
 
   await user.click(chip('Games'))
@@ -203,10 +209,10 @@ it('filters by the chip picked, in the URL', async () => {
   expect(cards()[0]).toHaveAccessibleName('Hades')
   expect(chip('Games')).toHaveAttribute('aria-pressed', 'true')
   expect(chip('All')).toHaveAttribute('aria-pressed', 'false')
-  expect(screen.getByText('Games · newest first')).toBeInTheDocument()
+  expect(screen.getByText('1 title')).toBeInTheDocument()
   expect(
     Object.fromEntries(new URLSearchParams(router.state.location.search)),
-  ).toEqual({ sort: 'x', category: 'game' })
+  ).toEqual({ page: '2', category: 'game' })
   expect(requests.map((params) => params.get('category'))).toEqual([
     null,
     'game',
@@ -219,7 +225,7 @@ it('selects the URL’s category on the first load', async () => {
 
   await waitForCards(1)
   expect(chip('Anime movies')).toHaveAttribute('aria-pressed', 'true')
-  expect(screen.getByText('Anime movies · newest first')).toBeInTheDocument()
+  expect(screen.getByText('1 title')).toBeInTheDocument()
   expect(requests[0]?.get('category')).toBe('anime:movie')
 })
 
@@ -235,7 +241,7 @@ it.each(['bogus', 'anime', 'movie,game'])(
   },
 )
 
-it('shows skeletons in the hero, the chips and the grid until the first page', async () => {
+it('shows skeletons in the hero and the grid, and the ghost panel, until the first page', async () => {
   const gate = deferred()
   serveList(() => makeWatchlistPage(entries(2)), gate.promise)
   serveFacets({ movie: 2 }, gate.promise)
@@ -245,16 +251,21 @@ it('shows skeletons in the hero, the chips and the grid until the first page', a
   expect(
     container.querySelector(`.${styles.subtitleSkeleton}`),
   ).toBeInTheDocument()
-  expect(
-    container.querySelector(`.${styles.ghostChips}`)?.childElementCount,
-  ).toBe(8)
+  expect(searchBox()).toBeDisabled()
+  expect(searchBox()).toHaveAttribute('placeholder', 'Loading your watchlist…')
   expect(chips()).toBeNull()
+  expect(screen.queryByText(/^\d+ titles?$/)).not.toBeInTheDocument()
 
   gate.resolve()
   await waitForCards(2)
   expect(screen.queryByText('Loading your watchlist')).not.toBeInTheDocument()
   expect(container.querySelector(`.${styles.subtitleSkeleton}`)).toBeNull()
-  expect(container.querySelector(`.${styles.ghostChips}`)).toBeNull()
+  expect(searchBox()).toBeEnabled()
+  expect(searchBox()).toHaveAttribute(
+    'placeholder',
+    'Search your watchlist — a title, a genre, a name',
+  )
+  expect(chips()).toBeInTheDocument()
 })
 
 it('shows the error, then the list after "Try again"', async () => {
@@ -268,7 +279,13 @@ it('shows the error, then the list after "Try again"', async () => {
   expect(
     screen.getByText('Things to watch, play and read later.'),
   ).toBeInTheDocument()
+  // The ghost panel, unavailable, in place of the chips.
   expect(chips()).toBeNull()
+  expect(searchBox()).toBeDisabled()
+  expect(searchBox()).toHaveAttribute(
+    'placeholder',
+    'Search is unavailable right now',
+  )
 
   // Hold the retry, to see what shows while it runs.
   const gate = deferred()
@@ -299,7 +316,10 @@ it('shows the empty state without chips', async () => {
   ).toBeInTheDocument()
   expect(screen.getByText('Nothing saved yet.')).toBeInTheDocument()
   expect(chips()).toBeNull()
-  expect(screen.queryByText('Newest first')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('searchbox', { name: 'Search your watchlist' }),
+  ).not.toBeInTheDocument()
+  expect(screen.queryByText('0 titles')).not.toBeInTheDocument()
 })
 
 it('shows the empty state, never "no matches", for a category on an empty watchlist', async () => {
@@ -316,8 +336,9 @@ it('shows the empty state, never "no matches", for a category on an empty watchl
   expect(
     screen.queryByRole('heading', { name: /^No .* on your watchlist$/ }),
   ).not.toBeInTheDocument()
-  // Still the first-load skeletons, not chips that go away again.
+  // Still the ghost panel, not chips that go away again.
   expect(chips()).toBeNull()
+  expect(searchBox()).toBeDisabled()
 
   gate.resolve()
   expect(
@@ -476,8 +497,11 @@ it('uses the list’s count when the counts fail, and the chips still filter', a
   expect(
     await screen.findByText('3 titles to watch, play or read later.'),
   ).toBeInTheDocument()
-  expect(chip('All')).toHaveAccessibleName('All 3')
+  // The panel's chips go without counts, as on the main page; the count row
+  // has the list's.
+  expect(chip('All')).toHaveAccessibleName('All')
   expect(chip('Movies')).toHaveAccessibleName('Movies')
+  expect(screen.getByText('3 titles')).toBeInTheDocument()
 
   await user.click(chip('Movies'))
 
@@ -699,10 +723,12 @@ describe('with the add sheet, on the real routes', () => {
     ).toBeInTheDocument()
   })
 
-  it('outlines what was added and shows All, in place of the filtered entry, after Done', async () => {
+  it('outlines what was added and clears the filters but not the sort, in place of the filtered entry, after Done', async () => {
     const user = userEvent.setup()
     serveWatchlist([game])
-    const { router } = renderRoute('/watchlist?category=game')
+    const { router } = renderRoute(
+      '/watchlist?q=hollow&category=game&language=English&sort=title',
+    )
     await user.click(
       await screen.findByRole('link', { name: 'Add to watchlist' }),
     )
@@ -710,11 +736,16 @@ describe('with the add sheet, on the real routes', () => {
 
     await addDune(user)
     // Not while the sheet is open.
-    expect(router.state.location.search).toBe('?category=game')
+    expect(router.state.location.search).toBe(
+      '?q=hollow&category=game&language=English&sort=title',
+    )
     await user.click(screen.getByRole('button', { name: 'Done' }))
 
-    await waitFor(() => expect(router.state.location.search).toBe(''))
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?sort=title'),
+    )
     expect(router.state.location.pathname).toBe('/watchlist')
+    await waitFor(() => expect(searchBox()).toHaveValue(''))
     // The page's entry was written over, not added to.
     expect(router.state.historyAction).toBe('REPLACE')
     const added = await screen.findByRole('article', { name: 'Dune' })
@@ -726,10 +757,10 @@ describe('with the add sheet, on the real routes', () => {
     // A chip picked now stays picked.
     await user.click(chip('Games'))
     await waitFor(() =>
-      expect(router.state.location.search).toBe('?category=game'),
+      expect(router.state.location.search).toBe('?category=game&sort=title'),
     )
     await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(router.state.location.search).toBe('?category=game')
+    expect(router.state.location.search).toBe('?category=game&sort=title')
   })
 
   it('clears the outlines when the sheet opens again', async () => {

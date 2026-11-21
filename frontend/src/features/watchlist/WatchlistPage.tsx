@@ -13,17 +13,13 @@ import type {
   WatchlistPage as WatchlistPageData,
 } from '../../api/types'
 import { markSessionExpired } from '../../auth/markSessionExpired'
-import {
-  categoryLabel,
-  FILTER_CATEGORIES,
-  isFilterCategory,
-} from '../../lib/categories'
+import { isFilterCategory } from '../../lib/categories'
 import { cx } from '../../lib/cx'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
 import type { WatchlistOutlet } from '../../lib/watchlistOutlet'
 import { Button } from '../../ui/Button/Button'
 import { buttonClass } from '../../ui/Button/buttonClass'
-import { Chip } from '../../ui/Chip/Chip'
+import { FilterPanel } from '../../ui/FilterPanel/FilterPanel'
 import { Icon } from '../../ui/Icon/Icon'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { Toast } from '../../ui/Toast/Toast'
@@ -32,16 +28,24 @@ import {
   searchCategoryFor,
   useAddToWatchlistLink,
 } from './useAddToWatchlistLink'
-import { toListParams, useWatchlistCategory } from './useWatchlistCategory'
+import {
+  toFacetParams,
+  toListParams,
+  useWatchlistFilters,
+  WATCHLIST_SORTS,
+} from './useWatchlistFilters'
 import { WatchlistCard } from './WatchlistCard'
 import { WatchlistEmpty } from './WatchlistEmpty'
 import { WatchlistLoadError } from './WatchlistLoadError'
 import { WatchlistNoMatches } from './WatchlistNoMatches'
+import { WatchlistNoResults } from './WatchlistNoResults'
 import styles from './WatchlistPage.module.css'
 import { WatchlistSkeleton } from './WatchlistSkeleton'
 
-// From the loading board.
-const GHOST_CHIP_WIDTHS = [64, 96, 84, 86, 128, 132, 86, 84]
+const GHOST_PLACEHOLDERS = {
+  loading: 'Loading your watchlist…',
+  unavailable: 'Search is unavailable right now',
+}
 
 const FALLBACK_SUBTITLE = 'Things to watch, play and read later.'
 
@@ -76,14 +80,24 @@ function countLabel(total: number) {
   return `${total} ${total === 1 ? 'title' : 'titles'} to watch, play or read later.`
 }
 
+function resultsLabel(count: number) {
+  return count === 1 ? '1 title' : `${count} titles`
+}
+
 export function WatchlistPage() {
-  const { category, setCategory } = useWatchlistCategory()
-  const query = useWatchlist(toListParams(category))
-  const facets = useWatchlistFacets()
+  const { filters, isFiltered, setFilters, clearFilters } =
+    useWatchlistFilters()
+  const query = useWatchlist(toListParams(filters))
+  // The chips' counts and the language menu, for the filters as they are.
+  const facets = useWatchlistFacets(toFacetParams(filters))
+  // The hero counts every entry: the header tab's query.
+  const heroFacets = useWatchlistFacets()
   const addLink = useAddToWatchlistLink()
   // "Add a <category>" starts the sheet on the chip's category.
   const addInCategoryLink = useAddToWatchlistLink(
-    category ? searchCategoryFor(category) : undefined,
+    isFilterCategory(filters.category)
+      ? searchCategoryFor(filters.category)
+      : undefined,
   )
   const {
     data,
@@ -97,7 +111,7 @@ export function WatchlistPage() {
   // The session ran out while the page was open: the owner guard then goes
   // to the login page, which comes back here. Retrying would only 401 again.
   const queryClient = useQueryClient()
-  const unauthenticated = [query.error, facets.error].some(
+  const unauthenticated = [query.error, facets.error, heroFacets.error].some(
     (error) =>
       error instanceof ApiError &&
       error.status === 401 &&
@@ -119,16 +133,17 @@ export function WatchlistPage() {
     if (sheetOpen) setHighlighted(new Set())
   }
 
-  // Something was added: show it under All once the sheet has closed. Not
-  // while it's open, or its closing `navigate(-1)` would undo the write. A
-  // flag, not `highlighted`, so a chip picked later stays picked; and an add
-  // that lands after Done still resets.
+  // Something was added: clear the filters, so it shows, once the sheet has
+  // closed. The sort stays. Not while it's open, or its closing
+  // `navigate(-1)` would undo the write. A flag, not `highlighted`, so a
+  // filter picked later stays picked; and an add that lands after Done still
+  // resets.
   const resetPending = useRef(false)
   useEffect(() => {
     if (sheetOpen || !resetPending.current) return
     resetPending.current = false
-    setCategory('', { replace: true })
-  }, [sheetOpen, highlighted, setCategory])
+    clearFilters({ replace: true })
+  }, [sheetOpen, highlighted, clearFilters])
 
   const entries = useMemo(() => (data ? uniqueEntries(data.pages) : []), [data])
 
@@ -233,12 +248,12 @@ export function WatchlistPage() {
     onLoadMore: () => void fetchNextPage(),
   })
 
+  const count = data?.pages[0]?.meta.pagination.count
+
   // When the counts fail, the list's own count stands in, if it's unfiltered.
   const total =
-    facets.data?.total ??
-    (category === '' && data && !query.isPlaceholderData
-      ? data.pages[0]?.meta.pagination.count
-      : undefined)
+    heroFacets.data?.total ??
+    (!isFiltered && data && !query.isPlaceholderData ? count : undefined)
 
   // Branch on the data, not isError: a failed next page or background refetch
   // also sets isError, and the list it already has should stay.
@@ -247,13 +262,13 @@ export function WatchlistPage() {
     state = 'error'
   } else if (
     !data ||
-    // An empty category page is "no matches" only once the counts say the
-    // watchlist has something, and only for the category it was asked for.
+    // An empty filtered page is "no matches" only once the counts say the
+    // watchlist has something, and only for the filters it was asked for.
     (entries.length === 0 &&
-      ((category !== '' && facets.isPending) || query.isPlaceholderData))
+      ((isFiltered && heroFacets.isPending) || query.isPlaceholderData))
   ) {
     state = 'loading'
-  } else if (entries.length === 0 && (total === 0 || category === '')) {
+  } else if (entries.length === 0 && (total === 0 || !isFiltered)) {
     // Unfiltered and empty is empty, even when older counts say otherwise.
     state = 'empty'
   } else if (entries.length === 0) {
@@ -262,20 +277,38 @@ export function WatchlistPage() {
     state = 'ready'
   }
 
-  // The board's first-load states show until the list has loaded once. After
-  // that a failed or slow chip keeps the chips, so another can be picked.
-  // Not while the counts are still deciding between empty and no matches.
-  // Adjusted during render rather than in an effect.
+  // The board's first-load states and the ghost panel show until the list
+  // has loaded once. After that a failed or slow filter keeps the live panel,
+  // so typing is never cut off. Not while the counts are still deciding
+  // between empty and no matches. Adjusted during render rather than in an
+  // effect.
   const [listShown, setListShown] = useState(false)
   if (data && state !== 'loading' && !listShown) setListShown(true)
 
   const firstLoad = !listShown
-  const showChips = !firstLoad && state !== 'empty'
+  const ghost = !firstLoad
+    ? null
+    : state === 'error'
+      ? 'unavailable'
+      : 'loading'
+  // The empty state has no filters.
+  const showPanel = state !== 'empty'
+  const showLivePanel = showPanel && !firstLoad
+
+  // "Clear filters" starts the panel afresh: a search still being typed is
+  // dropped rather than written after the clear, and the search box takes the
+  // focus from the button, which goes away.
+  const [clears, setClears] = useState(0)
+  function clearAll() {
+    clearFilters()
+    setClears((n) => n + 1)
+  }
 
   function retry() {
     void query.refetch()
     // So the chips and the hero get their counts back too.
     if (facets.isError) void facets.refetch()
+    if (heroFacets.isError) void heroFacets.refetch()
   }
 
   let subtitle
@@ -286,17 +319,18 @@ export function WatchlistPage() {
     subtitle = <p className={styles.subtitle}>{countLabel(0)}</p>
   } else if (total !== undefined) {
     subtitle = <p className={styles.subtitle}>{countLabel(total)}</p>
-  } else if (facets.isPending || query.isPending) {
+  } else if (heroFacets.isPending || query.isPending) {
     subtitle = <Skeleton className={styles.subtitleSkeleton} />
   } else {
     subtitle = <p className={styles.subtitle}>{FALLBACK_SUBTITLE}</p>
   }
 
-  // Without the counts, the chips still filter. A chip the page can't filter
-  // by isn't shown.
-  const categories =
-    facets.data?.categories.filter(({ id }) => isFilterCategory(id)) ??
-    FILTER_CATEGORIES.map((id) => ({ id, count: undefined }))
+  // A chip the page can't filter by isn't shown. Without the counts, the
+  // panel's chips still filter.
+  const panelFacets = facets.data && {
+    ...facets.data,
+    categories: facets.data.categories.filter(({ id }) => isFilterCategory(id)),
+  }
 
   let body
   if (state === 'error') {
@@ -306,34 +340,31 @@ export function WatchlistPage() {
   } else if (state === 'empty') {
     body = <WatchlistEmpty addLink={addLink} />
   } else if (state === 'no-matches') {
-    body = (
-      <WatchlistNoMatches
-        category={category}
-        total={total}
-        addLink={addInCategoryLink}
-        onShowAll={() => setCategory('')}
-      />
-    )
+    // Only a category: the board's own state, which offers to add one.
+    body =
+      filters.category && !filters.q && !filters.language ? (
+        <WatchlistNoMatches
+          category={filters.category}
+          total={total}
+          addLink={addInCategoryLink}
+          onShowAll={() => setFilters({ category: '' })}
+        />
+      ) : (
+        <WatchlistNoResults />
+      )
   } else {
     body = (
-      <>
-        <p className={styles.countRow}>
-          {category
-            ? `${categoryLabel(category)} · newest first`
-            : 'Newest first'}
-        </p>
-        <ul className={grid.grid}>
-          {entries.map((entry) => (
-            <li key={entry.item.id}>
-              <WatchlistCard
-                entry={entry}
-                fresh={highlighted.has(entry.item.id)}
-                onRemove={(event) => handleRemove(entry, event)}
-              />
-            </li>
-          ))}
-        </ul>
-      </>
+      <ul className={grid.grid}>
+        {entries.map((entry) => (
+          <li key={entry.item.id}>
+            <WatchlistCard
+              entry={entry}
+              fresh={highlighted.has(entry.item.id)}
+              onRemove={(event) => handleRemove(entry, event)}
+            />
+          </li>
+        ))}
+      </ul>
     )
   }
 
@@ -358,7 +389,7 @@ export function WatchlistPage() {
             variant: 'primary',
             size: 'lg',
             // The phone board has it only beside the chips.
-            className: cx(styles.add, !showChips && styles.addNoChips),
+            className: cx(styles.add, !showLivePanel && styles.addNoPanel),
           })}
         >
           <Icon name="plus" size={16} strokeWidth={2.2} />
@@ -367,40 +398,30 @@ export function WatchlistPage() {
           </span>
         </Link>
       </section>
-      {showChips && (
-        <div
-          role="group"
-          aria-label="Filter by category"
-          className={styles.chips}
-        >
-          <Chip
-            className={styles.all}
-            count={total}
-            selected={category === ''}
-            onClick={() => setCategory('')}
-          >
-            All
-          </Chip>
-          {categories.map(({ id, count }) => (
-            <Chip
-              key={id}
-              category={id}
-              count={count}
-              selected={category === id}
-              onClick={() => {
-                if (isFilterCategory(id)) setCategory(id)
-              }}
-            >
-              {categoryLabel(id)}
-            </Chip>
-          ))}
-        </div>
+      {showPanel && (
+        <FilterPanel
+          key={clears}
+          focusSearch={clears > 0}
+          filters={filters}
+          setFilters={setFilters}
+          facets={panelFacets}
+          ghost={ghost}
+          searchLabel="Search your watchlist"
+          searchPlaceholder="Search your watchlist — a title, a genre, a name"
+          ghostPlaceholders={GHOST_PLACEHOLDERS}
+          sorts={WATCHLIST_SORTS}
+        />
       )}
-      {firstLoad && state === 'loading' && (
-        <div className={styles.ghostChips} aria-hidden="true">
-          {GHOST_CHIP_WIDTHS.map((width, i) => (
-            <Skeleton key={i} width={width} height={40} radius={12} />
-          ))}
+      {listShown && state !== 'empty' && (
+        <div className={styles.countRow}>
+          <span aria-live="polite">
+            {count !== undefined ? resultsLabel(count) : ''}
+          </span>
+          {isFiltered && (
+            <button type="button" className={styles.clear} onClick={clearAll}>
+              Clear filters
+            </button>
+          )}
         </div>
       )}
       <div
@@ -408,7 +429,7 @@ export function WatchlistPage() {
         // Where focus goes when the toast closes with focus in it.
         tabIndex={-1}
         className={styles.results}
-        // The last category's cards stay on screen while the next ones load.
+        // The last filter's cards stay on screen while the next ones load.
         aria-busy={query.isPlaceholderData || undefined}
       >
         {body}
