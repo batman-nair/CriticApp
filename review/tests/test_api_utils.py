@@ -326,6 +326,7 @@ class MALProviderTest(SimpleTestCase):
             studios=[{'id': 569, 'name': 'ufotable'}],
             media_type='tv',
             synopsis='Demons.',
+            alternative_titles={'synonyms': ['KnY'], 'en': 'Demon Slayer', 'ja': '鬼滅の刃'},
         )
         with mock.patch(REQUESTS_GET, return_value=_ResponseStub(200, json_data=node)) as get_mock:
             details = MALProvider('anime').get_details('mal_anime_38000')
@@ -333,6 +334,8 @@ class MALProviderTest(SimpleTestCase):
         url = get_mock.call_args.args[0]
         self.assertTrue(url.startswith('https://api.myanimelist.net/v2/anime/38000?fields='))
         self.assertIn('studios', url)
+        self.assertIn('alternative_titles', url)
+        self.assertEqual(details.alternative_titles, ['Demon Slayer', 'KnY', '鬼滅の刃'])
         self.assertIsInstance(details, ItemDetails)
         self.assertEqual(details.genres, ['Action'])
         self.assertEqual(details.creators, ['ufotable'])
@@ -349,6 +352,7 @@ class MALProviderTest(SimpleTestCase):
             'attr3': 'tv',
             'description': 'Demons.',
             'rating': '8.5',
+            'alternative_titles': 'Demon Slayer\nKnY\n鬼滅の刃',
         })
 
     def test_manga_details_use_author_names(self):
@@ -366,6 +370,7 @@ class MALProviderTest(SimpleTestCase):
             details = MALProvider('manga').get_details('mal_manga_2')
 
         self.assertIn('authors{first_name,last_name}', get_mock.call_args.args[0])
+        self.assertIn('alternative_titles', get_mock.call_args.args[0])
         fields = details.to_review_item_fields()
         self.assertEqual(fields['item_id'], 'mal_manga_2')
         self.assertEqual(fields['category'], 'manga')
@@ -392,6 +397,7 @@ class MALProviderTest(SimpleTestCase):
             'attr3': 'N/A',
             'description': '',
             'rating': 'N/A',
+            'alternative_titles': '',
         })
 
     def test_details_for_unknown_id_is_not_found(self):
@@ -422,7 +428,10 @@ class MALProviderTest(SimpleTestCase):
                 get_mock.assert_not_called()
 
     def test_optional_fields_null_or_missing(self):
-        optional = ['main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis']
+        optional = [
+            'main_picture', 'start_date', 'end_date', 'mean', 'genres', 'studios', 'authors', 'media_type', 'synopsis',
+            'alternative_titles',
+        ]
         for missing in (_DROP, None):
             for category in ('anime', 'manga'):
                 with self.subTest(missing='absent' if missing is _DROP else 'null', category=category):
@@ -441,7 +450,36 @@ class MALProviderTest(SimpleTestCase):
                         'attr3': 'N/A',
                         'description': '',
                         'rating': 'N/A',
+                        'alternative_titles': '',
                     })
+
+    def test_alternative_titles_drop_blanks_repeats_and_the_main_title(self):
+        node = _mal_node(5, title='Shingeki no Kyojin', alternative_titles={
+            'synonyms': ['AoT', '', '  ', 'shingeki no kyojin', 'AoT', ' SnK '],
+            'en': 'Attack on Titan',
+            'ja': '',
+        })
+        with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+            details = MALProvider('anime').get_details('mal_anime_5')
+
+        self.assertEqual(details.alternative_titles, ['Attack on Titan', 'AoT', 'SnK'])
+
+    def test_alternative_titles_missing_parts(self):
+        for alternative_titles in ({}, {'synonyms': None, 'en': None, 'ja': None}, {'synonyms': []}):
+            with self.subTest(alternative_titles=alternative_titles):
+                node = _mal_node(5, alternative_titles=alternative_titles)
+                with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                    details = MALProvider('anime').get_details('mal_anime_5')
+
+                self.assertEqual(details.alternative_titles, [])
+
+    def test_malformed_alternative_titles_are_an_upstream_error(self):
+        for alternative_titles in ('Attack on Titan', {'en': 5}, {'synonyms': 'AoT'}, {'synonyms': [5]}):
+            with self.subTest(alternative_titles=alternative_titles):
+                node = _mal_node(5, alternative_titles=alternative_titles)
+                with mock.patch(REQUESTS_GET, return_value=_json_response(node)):
+                    with self.assertRaises(UpstreamError):
+                        MALProvider('anime').get_details('mal_anime_5')
 
     def test_entries_without_a_name_are_dropped(self):
         genres = [{'id': 1}, {'id': 2, 'name': None}, {'id': 3, 'name': 'Action'}]

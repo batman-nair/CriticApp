@@ -16,6 +16,9 @@ class ReviewItem(models.Model):
     attr2 = models.CharField(max_length=300)
     attr3 = models.CharField(max_length=300)
     language = models.CharField(max_length=300, blank=True, default='')
+    # Other names the provider knows the item by (MAL's English and Japanese
+    # titles and synonyms), one per line. Only searched, not shown.
+    alternative_titles = models.TextField(blank=True, default='')
     description = models.TextField()
     rating = models.CharField(max_length=5)
     last_refreshed_at = models.DateTimeField(null=True, blank=True, db_index=True)

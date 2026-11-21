@@ -112,6 +112,14 @@ class ListTest(WatchlistApiTestCase):
             with self.subTest(query=query):
                 self.assertEqual(self.list_item_ids(query), expected)
 
+    def test_q_matches_alternative_titles(self):
+        match = add_entry(self.alice, category='anime', title='Shingeki no Kyojin',
+                          alternative_titles='Attack on Titan\n進撃の巨人').review_item_id
+        add_entry(self.alice, category='anime', title='Sousou no Frieren')
+        for query in ('q=attack titan', 'q=進撃', 'q=shingeki'):
+            with self.subTest(query=query):
+                self.assertEqual(self.list_item_ids(query), [match])
+
     def test_q_matches_every_word(self):
         both = add_entry(self.alice, title='Blue Planet').review_item_id
         add_entry(self.alice, title='Blue Velvet')

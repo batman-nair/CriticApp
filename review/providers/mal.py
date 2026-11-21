@@ -14,8 +14,8 @@ class MALProvider(Provider):
     # Genres come with search results at no extra cost; details ask for them below.
     _SEARCH_FIELDS = _COMMON_FIELDS + ',genres'
     _DETAIL_FIELDS = {
-        'anime': 'genres,studios,media_type,synopsis',
-        'manga': 'genres,authors{first_name,last_name},media_type,synopsis',
+        'anime': 'genres,studios,media_type,synopsis,alternative_titles',
+        'manga': 'genres,authors{first_name,last_name},media_type,synopsis,alternative_titles',
     }
 
     def __init__(self, category: str):
@@ -81,7 +81,18 @@ class MALProvider(Provider):
             media_type=self._optional(mal_json.get("media_type"), str),
             description=self._optional(mal_json.get("synopsis"), str) or None,
             provider_rating=self._optional_rating(mal_json.get("mean")),
+            alternative_titles=self._alternative_titles(mal_json),
         )
+
+    def _alternative_titles(self, mal_json: dict) -> list[str]:
+        # {"synonyms": [...], "en": "...", "ja": "..."}; MAL sends "" for a
+        # missing English or Japanese title.
+        alternative = self._optional(mal_json.get("alternative_titles"), dict) or {}
+        titles = [self._optional(alternative.get("en"), str)]
+        titles += [self._optional(synonym, str) for synonym in self._optional(alternative.get("synonyms"), list) or []]
+        titles.append(self._optional(alternative.get("ja"), str))
+        main_title = mal_json["title"].strip().casefold()
+        return unique(title.strip() for title in titles if title and title.strip().casefold() != main_title)
 
     def _summary(self, mal_json: dict) -> ItemSummary:
         mal_id = mal_json["id"]

@@ -210,7 +210,7 @@ def _anime_details(**overrides):
         'item_id': 'mal_anime_52991', 'category': 'anime', 'title': 'Sousou no Frieren',
         'image_url': 'https://img/frieren.jpg', 'year': '2023-2024', 'genres': ['Adventure', 'Drama'],
         'creators': ['Madhouse'], 'media_type': 'tv', 'description': 'After the adventure.',
-        'provider_rating': 9.3, **overrides,
+        'provider_rating': 9.3, 'alternative_titles': ['Frieren: Beyond Journey\'s End', '葬送のフリーレン'], **overrides,
     })
 
 
@@ -232,6 +232,7 @@ class GetOrFetchItemTest(TestCase):
         self.assertEqual(provider.calls, ['mal_anime_52991'])
         item = ReviewItem.objects.get(item_id='mal_anime_52991')
         self.assertEqual((item.attr1, item.attr2, item.attr3, item.rating), ('Adventure, Drama', 'Madhouse', 'tv', '9.3'))
+        self.assertEqual(item.alternative_titles, "Frieren: Beyond Journey's End\n葬送のフリーレン")
         self.assertIsNotNone(item.last_refreshed_at)
         self.assertEqual(item.last_refresh_attempt_at, item.last_refreshed_at)
         self.assertEqual(item.refresh_error_count, 0)
