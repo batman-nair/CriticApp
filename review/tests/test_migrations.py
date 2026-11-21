@@ -1,18 +1,23 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from importlib import import_module
+from io import StringIO
+from unittest import mock
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase
 
 from review.models import Review, ReviewItem
+from review.providers import ProviderError
 
 
 series_migration = import_module('review.migrations.0008_move_omdb_series_to_series_category')
 mal_prefix_migration = import_module('review.migrations.0011_rename_jikan_item_ids_to_mal')
+alt_titles_backfill_migration = import_module('review.migrations.0016_queue_alternative_titles_backfill')
 
 
 class MoveSeriesToSeriesCategoryTest(TestCase):
@@ -42,6 +47,59 @@ class MoveSeriesToSeriesCategoryTest(TestCase):
         series_migration.move_series_back_to_movie_category(apps, None)
 
         self.assertEqual(ReviewItem.objects.get(item_id='omdb_series').category, 'movie')
+
+
+class QueueAlternativeTitlesBackfillTest(TestCase):
+    REFRESHED_AT = datetime(2026, 11, 20, 3, 4, 5, tzinfo=timezone.utc)
+
+    def _create_item(self, item_id, category, alternative_titles=''):
+        return ReviewItem.objects.create(
+            item_id=item_id, category=category, title=item_id, image_url='https://example.com/i.png',
+            year='2000', attr1='a', attr2='b', attr3='c', description='d', rating='5',
+            alternative_titles=alternative_titles,
+            last_refreshed_at=self.REFRESHED_AT, last_refresh_attempt_at=self.REFRESHED_AT,
+        )
+
+    def _refreshed_at(self):
+        return dict(ReviewItem.objects.values_list('item_id', 'last_refreshed_at'))
+
+    def test_queues_only_anime_and_manga_without_alternative_titles(self):
+        self._create_item('mal_anime_1', 'anime')
+        self._create_item('mal_manga_2', 'manga')
+        self._create_item('mal_anime_3', 'anime', alternative_titles='Already There')
+        self._create_item('omdb_tt1', 'movie')
+        self._create_item('igdb_5', 'game')
+
+        alt_titles_backfill_migration.queue_alternative_titles_backfill(apps, None)
+
+        queued = alt_titles_backfill_migration.BACKFILL_QUEUED_AT
+        self.assertEqual(self._refreshed_at(), {
+            'mal_anime_1': queued,
+            'mal_manga_2': queued,
+            'mal_anime_3': self.REFRESHED_AT,
+            'omdb_tt1': self.REFRESHED_AT,
+            'igdb_5': self.REFRESHED_AT,
+        })
+        # The retry spacing is left alone.
+        self.assertEqual(
+            set(ReviewItem.objects.values_list('last_refresh_attempt_at', flat=True)), {self.REFRESHED_AT},
+        )
+
+    @mock.patch('review.management.commands.refresh_review_items.push_refresh_run_metrics')
+    def test_queued_items_are_refreshed_first(self, _metrics):
+        old_refresh = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        self._create_item('omdb_stale', 'movie')
+        self._create_item('mal_anime_1', 'anime')
+        ReviewItem.objects.update(last_refreshed_at=old_refresh, last_refresh_attempt_at=old_refresh)
+        alt_titles_backfill_migration.queue_alternative_titles_backfill(apps, None)
+        provider = mock.Mock()
+        provider.get_details.side_effect = ProviderError('stop here')
+
+        with mock.patch('review.management.commands.refresh_review_items.Command._build_provider',
+                        return_value=provider):
+            call_command('refresh_review_items', max_items=1, request_delay_ms=0, stderr=StringIO())
+
+        provider.get_details.assert_called_once_with('mal_anime_1')
 
 
 class RenameJikanItemIdsToMalTest(TestCase):
