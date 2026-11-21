@@ -155,7 +155,7 @@ describe('as the owner', () => {
     ).toHaveAttribute('aria-current', 'page')
     // The page's chips read the same counts.
     const chips = await screen.findByRole('group', {
-      name: 'Filter by category',
+      name: 'Categories',
     })
     expect(
       within(chips).getByRole('button', { name: 'All 2' }),

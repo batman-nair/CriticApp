@@ -53,38 +53,27 @@
   padding: 0 var(--space-20);
 }
 
-.chips,
-.ghostChips {
-  display: flex;
-  flex-wrap: wrap;
-  padding-bottom: var(--space-6);
-  border-bottom: 1px solid var(--line);
-}
-
-.chips {
-  gap: var(--space-4);
-}
-
-/*
- * The board's selected chips have no shadow, and a selected "All" sits on the
- * panel colour. More specific than Chip's .selected, which stays as it is.
- */
-.chips > [aria-pressed='true'] {
-  box-shadow: none;
-}
-
-.chips > .all[aria-pressed='true'] {
-  background: var(--panel);
-}
-
-.ghostChips {
-  gap: var(--space-8);
-}
-
 .countRow {
-  padding: var(--space-18) var(--space-2) var(--space-14);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-18) var(--space-2) var(--space-8);
   color: var(--muted);
   font-size: var(--text-14);
+}
+
+/* As on the main page. */
+.clear {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 /* Holds the space below the list, so the load-more status sits above it. */
@@ -147,7 +136,7 @@
     height: 15px;
   }
 
-  .hero .addNoChips {
+  .hero .addNoPanel {
     display: none;
   }
 
@@ -171,33 +160,8 @@
     margin-top: var(--space-6);
   }
 
-  /* One row that scrolls sideways, out to the screen's edges. */
-  .chips,
-  .ghostChips {
-    flex-wrap: nowrap;
-  }
-
-  .chips {
-    margin-inline: calc(-1 * var(--space-20));
-    padding-inline: var(--space-20);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .chips::-webkit-scrollbar {
-    display: none;
-  }
-
-  .ghostChips {
-    overflow: hidden;
-  }
-
-  .ghostChips > * {
-    flex: none;
-  }
-
   .countRow {
-    padding: var(--space-14) var(--space-2) var(--space-10);
+    padding: var(--space-14) var(--space-2) var(--space-4);
     font-size: var(--text-13);
   }
 

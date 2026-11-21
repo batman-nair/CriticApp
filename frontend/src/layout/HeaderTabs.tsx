@@ -18,7 +18,7 @@ function useCurrentTab(): 'reviews' | 'watchlist' | null {
 }
 
 function WatchlistTab({ current }: { current: boolean }) {
-  // The same query as the page's chips, so one request serves both.
+  // The same query as the page's hero count, so one request serves both.
   const { data } = useWatchlistFacets()
   return (
     <Link

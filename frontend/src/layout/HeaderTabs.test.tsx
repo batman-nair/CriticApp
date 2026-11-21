@@ -116,7 +116,7 @@ describe('as the owner', () => {
     renderTabs('/', queryClient)
     await findTabs()
     await waitFor(() =>
-      expect(queryClient.getQueryState(watchlistKeys.facets())?.status).toBe(
+      expect(queryClient.getQueryState(watchlistKeys.facets({}))?.status).toBe(
         'success',
       ),
     )
@@ -129,7 +129,7 @@ describe('as the owner', () => {
     renderTabs('/', queryClient)
     await findTabs()
     await waitFor(() =>
-      expect(queryClient.getQueryState(watchlistKeys.facets())?.status).toBe(
+      expect(queryClient.getQueryState(watchlistKeys.facets({}))?.status).toBe(
         'error',
       ),
     )

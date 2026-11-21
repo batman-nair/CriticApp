@@ -22,9 +22,9 @@ The shared base is in `critic/api/`, and the review-domain endpoints are in
 | GET | `/api/v3/reviews/{id}` | public | One review |
 | PATCH | `/api/v3/reviews/{id}` | owner | Change a review's rating, text or tags |
 | DELETE | `/api/v3/reviews/{id}` | owner | Delete a review |
-| GET | `/api/v3/watchlist` | logged in | The user's watchlist, newest first, paginated |
+| GET | `/api/v3/watchlist` | logged in | The user's watchlist, searchable, filterable and sortable, paginated |
 | POST | `/api/v3/watchlist` | logged in | Add an item to the watchlist |
-| GET | `/api/v3/watchlist/facets` | logged in | Watchlist counts per category, for filter chips |
+| GET | `/api/v3/watchlist/facets` | logged in | Watchlist counts per category and language, for filter chips |
 | DELETE | `/api/v3/watchlist/{item_id}` | logged in | Remove an item from the watchlist |
 | GET | `/api/v3/schema` | public | OpenAPI schema for v3 (YAML; `?format=json` for JSON) |
 | GET | `/api/v3/docs` | public | Swagger UI for v3 |
@@ -315,14 +315,27 @@ the logged-in user's entries. An entry is the item and when it was added:
 { "item": { "id": "omdb_tt0113277", "category": "movie", "title": "Heat", ... }, "added_at": "2026-11-19T21:15:00Z" }
 ```
 
-`GET /api/v3/watchlist` lists the entries newest `added_at` first (ties newest
-first), paginated with the usual `limit` and `offset`. `category` filters as
-on `GET /api/v3/reviews`.
+`GET /api/v3/watchlist` is paginated with the usual `limit` and `offset`. All
+params are optional:
 
-`GET /api/v3/watchlist/facets` takes no params and returns
-`{"total": 3, "categories": [{"id": "movie", "count": 1}, ...]}`: every chip,
-zero counts included, in the same order as `/reviews/facets`. There's no
-`languages`.
+- `q`: search text. Every word has to match the item's details (title,
+  description, people, genres, year, language). Entries have no tags.
+- `category`, `language`: lists, validated and matched as on
+  `GET /api/v3/reviews`.
+- `sort`: `-added` (the default, newest `added_at` first), `title` (A–Z,
+  ignoring case), `-rating` and `rating` (the data source's rating, high to
+  low and low to high), or `-year` (newest release first, by the start year of
+  a range or date). Items with no usable rating or year ("N/A", blank) go last
+  in both rating directions and in `-year`. Ties are broken by newest
+  `added_at`, then newest id. Anything else is 400 `VALIDATION_ERROR`.
+
+`GET /api/v3/watchlist/facets` takes the same `q`, `category` and `language`
+params, validated the same way (`sort`, `limit` and `offset` are ignored), and
+returns `total`, `categories` and `languages` shaped as on `/reviews/facets`:
+every chip, zero counts included, in the same order, and languages most common
+first. As there, `total` and the category counts ignore `category`, and the
+language counts ignore `language`. Without params it counts the whole
+watchlist.
 
 `POST /api/v3/watchlist` takes `item_id` and an optional `added_at`. It fetches
 and stores the item if it isn't stored yet, as `/items/{item_id}` does.

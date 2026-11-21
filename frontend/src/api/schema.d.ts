@@ -249,7 +249,7 @@ export interface paths {
         };
         /**
          * List the user's watchlist
-         * @description The logged-in user's entries, newest `added_at` first. `category` can be repeated or separated with commas.
+         * @description The logged-in user's entries. `q` searches the items' titles, descriptions, people, genres, years and languages; every word has to match. `category` and `language` can be repeated or separated with commas. `sort`: `-added` (newest `added_at` first, the default), `title`, `-rating` and `rating` (the provider rating), `-year` (newest release first). Missing or unparseable ratings and years go last in both directions; ties go to the newest `added_at`.
          */
         get: operations["watchlist_list"];
         put?: never;
@@ -292,8 +292,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Count watchlist entries by category
-         * @description Counts for the logged-in user's watchlist, for the watchlist page's category chips.
+         * Count watchlist entries by category and language
+         * @description Counts for the logged-in user's watchlist, for the watchlist page's category chips and language menu. Takes the filters of `GET /api/v3/watchlist`. `category` has no effect on `total` and the category counts, and `language` has no effect on the language counts, so a chip shows what you'd get by switching to it.
          */
         get: operations["watchlist_facets"];
         put?: never;
@@ -712,10 +712,12 @@ export interface components {
             meta: Record<string, never>;
         };
         WatchlistFacets: {
-            /** @description Entries on the watchlist */
+            /** @description Entries matching every filter except the category one */
             total: number;
             /** @description Every chip, in /categories order, zero counts included */
             categories: components["schemas"]["CategoryFacet"][];
+            /** @description Most common first, then by name */
+            languages: components["schemas"]["LanguageFacet"][];
         };
         WatchlistFacetsResponse: {
             data: components["schemas"]["WatchlistFacets"];
@@ -1458,10 +1460,22 @@ export interface operations {
             query?: {
                 /** @description Only these categories. Repeat the param or separate values with commas */
                 category?: ("movie" | "series" | "game" | "anime" | "anime:series" | "anime:movie" | "manga" | "book")[];
+                /** @description Only items in these languages. Repeat the param or separate values with commas */
+                language?: string[];
                 /** @description Page size. Default 20; values above 100 are cut down to 100, and invalid values fall back to the default. */
                 limit?: number;
                 /** @description How many entries to skip. */
                 offset?: number;
+                /** @description Search text. Every word has to match */
+                q?: string;
+                /**
+                 * @description * `-added` - -added
+                 *     * `title` - title
+                 *     * `-rating` - -rating
+                 *     * `rating` - rating
+                 *     * `-year` - -year
+                 */
+                sort?: "-added" | "title" | "-rating" | "rating" | "-year";
             };
             header?: never;
             path?: never;
@@ -1640,7 +1654,14 @@ export interface operations {
     };
     watchlist_facets: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only these categories. Repeat the param or separate values with commas */
+                category?: ("movie" | "series" | "game" | "anime" | "anime:series" | "anime:movie" | "manga" | "book")[];
+                /** @description Only items in these languages. Repeat the param or separate values with commas */
+                language?: string[];
+                /** @description Search text. Every word has to match */
+                q?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1653,6 +1674,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistFacetsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Unauthorized */

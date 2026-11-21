@@ -56,6 +56,7 @@ export const defaultWatchlist = [
       start_year: 2024,
       end_year: null,
       genres: ['Sci-Fi', 'Adventure'],
+      languages: ['English'],
       details: { media_type: 'movie' },
     }),
     added_at: '2025-04-02T12:00:00Z',
@@ -184,9 +185,16 @@ export const handlers = [
   http.get('/api/v3/watchlist', ({ response }) =>
     response(200).json(makeWatchlistPage(defaultWatchlist)),
   ),
-  // The counts for the two entries above.
+  // The counts for the two entries above, whatever the filters.
   http.get('/api/v3/watchlist/facets', ({ response }) =>
-    response(200).json(makeWatchlistFacets()),
+    response(200).json(
+      makeWatchlistFacets(undefined, {
+        languages: [
+          { name: 'English', count: 1 },
+          { name: 'Japanese', count: 1 },
+        ],
+      }),
+    ),
   ),
   // A new entry for the item asked for. Tests that need a 200, 409 or an
   // error override it with server.use.

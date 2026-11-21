@@ -26,6 +26,11 @@ export type WatchlistListParams = Omit<
   'limit' | 'offset'
 >
 
+/** The filters the counts take. */
+export type WatchlistFacetsParams = NonNullable<
+  paths['/api/v3/watchlist/facets']['get']['parameters']['query']
+>
+
 const all = ['watchlist'] as const
 const lists = () => [...all, 'list'] as const
 
@@ -37,7 +42,9 @@ export const watchlistKeys = {
   all,
   lists,
   list: (params: WatchlistListParams) => [...lists(), params] as const,
-  facets: () => [...all, 'facets'] as const,
+  allFacets: () => [...all, 'facets'] as const,
+  facets: (params: WatchlistFacetsParams) =>
+    [...all, 'facets', params] as const,
 }
 
 function nextOffset(last: WatchlistPage) {
@@ -49,7 +56,7 @@ function nextOffset(last: WatchlistPage) {
   return next < count ? next : undefined
 }
 
-/** Pages of the watchlist, newest first, with the count in each `meta`. */
+/** Pages of the watchlist, in the params' sort, with the count in each `meta`. */
 export function useWatchlist(params: WatchlistListParams) {
   return useInfiniteQuery({
     queryKey: watchlistKeys.list(params),
@@ -69,16 +76,25 @@ export function useWatchlist(params: WatchlistListParams) {
   })
 }
 
-/** The total and the count per category, for the chips. */
-export function useWatchlistFacets() {
+/**
+ * The total and the counts per category and language, for the chips and the
+ * menu. Without params, the whole watchlist's: the header tab and the page's
+ * hero share that key.
+ */
+export function useWatchlistFacets(params: WatchlistFacetsParams = {}) {
   return useQuery({
-    queryKey: watchlistKeys.facets(),
+    queryKey: watchlistKeys.facets(params),
     queryFn: async ({ signal }) => {
       const body = await unwrap(
-        client.GET('/api/v3/watchlist/facets', { signal }),
+        client.GET('/api/v3/watchlist/facets', {
+          params: { query: params },
+          signal,
+        }),
       )
       return body.data
     },
+    // Keeps the last counts while the next filter's counts load.
+    placeholderData: keepPreviousData,
   })
 }
 

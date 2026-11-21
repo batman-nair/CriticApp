@@ -1,52 +1,84 @@
 import { useEffect, useEffectEvent, useState } from 'react'
-import type { ReviewFacets } from '../../api/types'
 import {
   categoryLabel,
   categoryVars,
   FILTER_CATEGORIES,
 } from '../../lib/categories'
-import { Chip } from '../../ui/Chip/Chip'
-import { SearchField } from '../../ui/SearchField/SearchField'
-import { Select } from '../../ui/Select/Select'
+import { Chip } from '../Chip/Chip'
+import { SearchField } from '../SearchField/SearchField'
+import { Select } from '../Select/Select'
 import styles from './FilterPanel.module.css'
-import {
-  SORTS,
-  type ReviewFilters,
-  type useReviewFilters,
-} from './useReviewFilters'
 
 /** How long typing pauses before the search goes into the URL. */
 export const SEARCH_DEBOUNCE_MS = 300
 
-const SEARCH_LABEL = 'Search reviews'
-
-const GHOST_PLACEHOLDERS = {
-  loading: 'Loading your reviews…',
-  unavailable: 'Search is unavailable right now',
+/** `''` is "All" for the category and "any" for the language. */
+export interface FilterValues<S extends string> {
+  q: string
+  category: string
+  language: string
+  sort: S
 }
 
-export interface FilterPanelProps {
-  filters: ReviewFilters
-  setFilters: ReturnType<typeof useReviewFilters>['setFilters']
+/** The counts behind the chips and the language menu. */
+export interface FilterFacets {
+  total: number
+  categories: { id: string; count: number }[]
+  languages: { name: string; count: number }[]
+}
+
+type Ghost = 'loading' | 'unavailable'
+
+export interface FilterPanelProps<S extends string> {
+  filters: FilterValues<S>
+  setFilters: (
+    patch: Partial<FilterValues<S>>,
+    options?: { replace?: boolean },
+  ) => void
   /** Undefined while the counts load or after they failed. */
-  facets: ReviewFacets | undefined
+  facets?: FilterFacets
   /** The S5/S6 placeholder panel, before the list has loaded once. */
-  ghost: 'loading' | 'unavailable' | null
+  ghost: Ghost | null
   /** Focus the search box when the live panel mounts. */
   focusSearch?: boolean
+  /** The search box's accessible name. */
+  searchLabel: string
+  searchPlaceholder: string
+  /** The disabled search box's placeholder for each ghost. */
+  ghostPlaceholders: Record<Ghost, string>
+  /** The sort menu's options, the default first. */
+  sorts: readonly { value: S; label: string }[]
 }
 
-export function FilterPanel({ ghost, ...props }: FilterPanelProps) {
-  return ghost ? <GhostPanel ghost={ghost} /> : <LivePanel {...props} />
+export function FilterPanel<S extends string>({
+  ghost,
+  ...props
+}: FilterPanelProps<S>) {
+  return ghost ? (
+    <GhostPanel
+      ghost={ghost}
+      searchLabel={props.searchLabel}
+      ghostPlaceholders={props.ghostPlaceholders}
+    />
+  ) : (
+    <LivePanel {...props} />
+  )
 }
 
-function GhostPanel({ ghost }: { ghost: 'loading' | 'unavailable' }) {
+function GhostPanel({
+  ghost,
+  searchLabel,
+  ghostPlaceholders,
+}: { ghost: Ghost } & Pick<
+  FilterPanelProps<string>,
+  'searchLabel' | 'ghostPlaceholders'
+>) {
   return (
     <div className={styles.ghost}>
       <SearchField
         className={styles.ghostSearch}
-        label={SEARCH_LABEL}
-        placeholder={GHOST_PLACEHOLDERS[ghost]}
+        label={searchLabel}
+        placeholder={ghostPlaceholders[ghost]}
         value=""
         onValueChange={() => {}}
         disabled
@@ -67,12 +99,15 @@ function GhostPanel({ ghost }: { ghost: 'loading' | 'unavailable' }) {
   )
 }
 
-function LivePanel({
+function LivePanel<S extends string>({
   filters,
   setFilters,
   facets,
   focusSearch = false,
-}: Omit<FilterPanelProps, 'ghost'>) {
+  searchLabel,
+  searchPlaceholder,
+  sorts,
+}: Omit<FilterPanelProps<S>, 'ghost' | 'ghostPlaceholders'>) {
   // What's in the box. It reaches the URL as `q` after a pause in typing.
   const [draft, setDraft] = useState(filters.q)
   // The panel's own write until it lands, so it can't overwrite newer typing.
@@ -121,8 +156,8 @@ function LivePanel({
   return (
     <div className={styles.panel}>
       <SearchField
-        label={SEARCH_LABEL}
-        placeholder="Search my reviews — a title, a genre, a name, a word I used"
+        label={searchLabel}
+        placeholder={searchPlaceholder}
         value={draft}
         onValueChange={changeDraft}
         autoFocus={focusSearch}
@@ -157,9 +192,9 @@ function LivePanel({
           <Select
             label="Sort"
             value={filters.sort}
-            options={[...SORTS]}
+            options={[...sorts]}
             onValueChange={(value) => {
-              const sort = SORTS.find((option) => option.value === value)
+              const sort = sorts.find((option) => option.value === value)
               if (sort) setFilters({ sort: sort.value })
             }}
           />
@@ -174,7 +209,7 @@ function LivePanel({
  * case, so `?language=english` selects "English". A language with no facet
  * is added, so the menu still shows what's applied.
  */
-function languageSelect(language: string, facets: ReviewFacets | undefined) {
+function languageSelect(language: string, facets: FilterFacets | undefined) {
   const names = facets?.languages.map((facet) => facet.name) ?? []
   const match = names.find(
     (name) => name.toLowerCase() === language.toLowerCase(),

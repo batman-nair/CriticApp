@@ -5,6 +5,8 @@ the requesting user's entries.
 """
 
 from django.db import transaction
+from django.db.models import Case, FloatField, IntegerField, When
+from django.db.models.functions import Cast, Lower, Substr
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -20,9 +22,15 @@ from critic.api.schema import problem_responses, wrapped
 from critic.api.views import V3APIView, V3GenericAPIView
 from review.models import Review, WatchlistEntry
 from review.providers import ProviderError
-from review.utils.review_utils import categories_to_q, count_reviews_by_category
+from review.utils.review_utils import (
+    categories_to_q,
+    count_review_languages,
+    count_reviews_by_category,
+    item_word_q,
+    languages_to_q,
+)
 
-from .facets import CATEGORY_CHIP_IDS, CategoryFacetSerializer
+from .facets import CATEGORY_CHIP_IDS, CategoryFacetSerializer, LanguageFacetSerializer
 from .filters import CATEGORY_FILTER_CHOICES, CommaSeparatedListField
 from .items import ItemSerializer
 from .services import get_or_fetch_item, lock_item, provider_api_error
@@ -33,16 +41,64 @@ class WatchlistEntrySerializer(serializers.Serializer):
     added_at = serializers.DateTimeField()
 
 
-class WatchlistListParamsSerializer(serializers.Serializer):
+# ReviewItem.rating and .year are text: a rating can be "N/A" or blank, and a
+# year "2019", "2018–2021" or RAWG's "2019-05-01". The CAST is only reached
+# for values that pass the regex, so Postgres never casts "N/A". Missing
+# values sort last in both directions.
+_RATING = Case(
+    When(review_item__rating__regex=r'^\s*\d+(\.\d+)?\s*$', then=Cast('review_item__rating', FloatField())),
+    default=None,
+)
+_START_YEAR = Case(
+    When(review_item__year__regex=r'^\d{4}', then=Cast(Substr('review_item__year', 1, 4), IntegerField())),
+    default=None,
+)
+# Ties go to the newest added.
+_TIE_BREAK = ('-added_at', '-id')
+
+WATCHLIST_SORTS = {
+    '-added': _TIE_BREAK,
+    'title': (Lower('review_item__title'), *_TIE_BREAK),
+    '-rating': (_RATING.desc(nulls_last=True), *_TIE_BREAK),
+    'rating': (_RATING.asc(nulls_last=True), *_TIE_BREAK),
+    '-year': (_START_YEAR.desc(nulls_last=True), *_TIE_BREAK),
+}
+
+
+class WatchlistFilterParamsSerializer(serializers.Serializer):
+    q = serializers.CharField(
+        required=False, allow_blank=True, default='', help_text='Search text. Every word has to match',
+    )
     category = CommaSeparatedListField(
         child=serializers.ChoiceField(choices=CATEGORY_FILTER_CHOICES), required=False, default=list,
         help_text='Only these categories. Repeat the param or separate values with commas',
     )
+    language = CommaSeparatedListField(
+        child=serializers.CharField(), required=False, default=list,
+        help_text='Only items in these languages. Repeat the param or separate values with commas',
+    )
+
+
+class WatchlistListParamsSerializer(WatchlistFilterParamsSerializer):
+    sort = serializers.ChoiceField(choices=tuple(WATCHLIST_SORTS), default='-added')
+
+
+def filter_watchlist(user, params):
+    """The user's entries matching validated filter params, as an unordered queryset."""
+    entries = WatchlistEntry.objects.filter(user=user)
+    for word in params['q'].split():
+        entries = entries.filter(item_word_q(word))
+    if params['category']:
+        entries = entries.filter(categories_to_q(params['category']))
+    if params['language']:
+        entries = entries.filter(languages_to_q(params['language']))
+    return entries
 
 
 class WatchlistFacetsSerializer(serializers.Serializer):
-    total = serializers.IntegerField(help_text='Entries on the watchlist')
+    total = serializers.IntegerField(help_text='Entries matching every filter except the category one')
     categories = CategoryFacetSerializer(many=True, help_text='Every chip, in /categories order, zero counts included')
+    languages = LanguageFacetSerializer(many=True, help_text='Most common first, then by name')
 
 
 class WatchlistEntryCreateSerializer(serializers.Serializer):
@@ -71,8 +127,11 @@ class WatchlistView(V3GenericAPIView):
         operation_id='watchlist_list',
         summary="List the user's watchlist",
         description=(
-            'The logged-in user\'s entries, newest `added_at` first. `category` can be repeated or '
-            'separated with commas.'
+            'The logged-in user\'s entries. `q` searches the items\' titles, descriptions, people, genres, '
+            'years and languages; every word has to match. `category` and `language` can be repeated or '
+            'separated with commas. `sort`: `-added` (newest `added_at` first, the default), `title`, '
+            '`-rating` and `rating` (the provider rating), `-year` (newest release first). Missing or '
+            'unparseable ratings and years go last in both directions; ties go to the newest `added_at`.'
         ),
         parameters=[
             WatchlistListParamsSerializer,
@@ -94,10 +153,8 @@ class WatchlistView(V3GenericAPIView):
     def get(self, request):
         params = WatchlistListParamsSerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
-        entries = WatchlistEntry.objects.filter(user=request.user).select_related('review_item')
-        if params.validated_data['category']:
-            entries = entries.filter(categories_to_q(params.validated_data['category']))
-        page = self.paginate_queryset(entries.order_by('-added_at', '-id'))
+        entries = filter_watchlist(request.user, params.validated_data).select_related('review_item')
+        page = self.paginate_queryset(entries.order_by(*WATCHLIST_SORTS[params.validated_data['sort']]))
         return self.get_paginated_response(WatchlistEntrySerializer(page, many=True).data)
 
     @extend_schema(
@@ -153,17 +210,28 @@ class WatchlistFacetsView(V3APIView):
     @extend_schema(
         tags=['watchlist'],
         operation_id='watchlist_facets',
-        summary='Count watchlist entries by category',
-        description="Counts for the logged-in user's watchlist, for the watchlist page's category chips.",
-        responses={200: wrapped(WatchlistFacetsSerializer), **problem_responses(401)},
+        summary='Count watchlist entries by category and language',
+        description=(
+            "Counts for the logged-in user's watchlist, for the watchlist page's category chips and language "
+            'menu. Takes the filters of `GET /api/v3/watchlist`. `category` has no effect on `total` and the '
+            "category counts, and `language` has no effect on the language counts, so a chip shows what you'd "
+            'get by switching to it.'
+        ),
+        parameters=[WatchlistFilterParamsSerializer],
+        responses={200: wrapped(WatchlistFacetsSerializer), **problem_responses(400, 401)},
     )
     def get(self, request):
+        params = WatchlistFilterParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        filters = params.validated_data
         total, category_counts = count_reviews_by_category(
-            WatchlistEntry.objects.filter(user=request.user), CATEGORY_CHIP_IDS,
+            filter_watchlist(request.user, {**filters, 'category': []}), CATEGORY_CHIP_IDS,
         )
+        languages = count_review_languages(filter_watchlist(request.user, {**filters, 'language': []}))
         return api_response(WatchlistFacetsSerializer({
             'total': total,
             'categories': [{'id': chip_id, 'count': category_counts[chip_id]} for chip_id in CATEGORY_CHIP_IDS],
+            'languages': [{'name': name, 'count': count} for name, count in languages],
         }).data)
 
 

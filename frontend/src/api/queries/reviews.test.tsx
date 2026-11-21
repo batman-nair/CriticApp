@@ -346,7 +346,7 @@ function seededQueryClient() {
   queryClient.setQueryData(tagKeys.list(), 'old tags')
   queryClient.setQueryData(searchKey, 'old search')
   queryClient.setQueryData(watchlistKey, 'old watchlist')
-  queryClient.setQueryData(watchlistKeys.facets(), 'old watchlist facets')
+  queryClient.setQueryData(watchlistKeys.facets({}), 'old watchlist facets')
   return queryClient
 }
 
@@ -459,7 +459,7 @@ it('sends the new review, caches it and refetches the rest', async () => {
   expect(isInvalidated(queryClient, searchKey)).toBe(true)
   // The server took the title off the watchlist.
   expect(isInvalidated(queryClient, watchlistKey)).toBe(true)
-  expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+  expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(true)
 })
 
 it('gets the new review back from the default handler', async () => {

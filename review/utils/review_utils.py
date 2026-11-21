@@ -45,12 +45,24 @@ def categories_to_q(categories: list) -> Optional[Q]:
     return query_obj
 
 
-def _languages_to_q(languages: list) -> Q:
+def languages_to_q(languages: list) -> Q:
     # language holds a comma-separated list ("Korean, English"). Match whole
     # entries in any position, so "English" doesn't match "Old English".
     # languages must not be empty.
     alternatives = '|'.join(re.escape(language) for language in languages)
     return Q(review_item__language__iregex=r'(^|,)\s*(' + alternatives + r')\s*(,|$)')
+
+
+def item_word_q(word: str) -> Q:
+    """Matches rows with a `review_item` FK whose item has `word` in any searched field."""
+    word_query_obj = Q(review_item__title__icontains=word)
+    word_query_obj |= Q(review_item__description__icontains=word)
+    word_query_obj |= Q(review_item__attr1__icontains=word)
+    word_query_obj |= Q(review_item__attr2__icontains=word)
+    word_query_obj |= Q(review_item__year__icontains=word)
+    word_query_obj |= Q(review_item__attr3__icontains=word)
+    word_query_obj |= Q(review_item__language__icontains=word)
+    return word_query_obj
 
 
 def get_filtered_review_objects(
@@ -65,14 +77,7 @@ def get_filtered_review_objects(
 ) -> list[Review]:
     query_obj = None
     for word in query.split():
-        word_query_obj = Q(review_item__title__icontains=word)
-        word_query_obj |= Q(review_tags__icontains=word)
-        word_query_obj |= Q(review_item__description__icontains=word)
-        word_query_obj |= Q(review_item__attr1__icontains=word)
-        word_query_obj |= Q(review_item__attr2__icontains=word)
-        word_query_obj |= Q(review_item__year__icontains=word)
-        word_query_obj |= Q(review_item__attr3__icontains=word)
-        word_query_obj |= Q(review_item__language__icontains=word)
+        word_query_obj = item_word_q(word) | Q(review_tags__icontains=word)
         if query_obj is None:
             query_obj = word_query_obj
         else:
@@ -101,7 +106,7 @@ def get_filtered_review_objects(
 
     include_languages = _normalize_categories(languages)
     if include_languages:
-        reviews = reviews.filter(_languages_to_q(include_languages))
+        reviews = reviews.filter(languages_to_q(include_languages))
 
     ordering = ORDERING_DICT.get(ordering, '')
     if ordering in ('review_item__title', '-review_item__title'):
