@@ -23,6 +23,7 @@ import {
   useWatchlist,
   useWatchlistFacets,
   watchlistKeys,
+  type WatchlistFacetsParams,
   type WatchlistListParams,
 } from './watchlist'
 
@@ -140,11 +141,12 @@ it('exposes a failure as an ApiError', async () => {
 
 it('keys every list under the lists key, and the facets outside it', () => {
   const list = watchlistKeys.list({ category: ['movie'] })
-  const facets = watchlistKeys.facets()
+  const facets = watchlistKeys.facets({ q: 'dune' })
 
   expect(list.slice(0, 2)).toEqual(watchlistKeys.lists())
   expect(watchlistKeys.lists().slice(0, 1)).toEqual(watchlistKeys.all)
-  expect(facets.slice(0, 1)).toEqual(watchlistKeys.all)
+  expect(facets.slice(0, 2)).toEqual(watchlistKeys.allFacets())
+  expect(watchlistKeys.allFacets().slice(0, 1)).toEqual(watchlistKeys.all)
   expect(facets.slice(0, 2)).not.toEqual(watchlistKeys.lists())
 })
 
@@ -196,6 +198,81 @@ it('asks for the facets and returns the counts', async () => {
   expect(result.current.data?.total).toBe(3)
 })
 
+it('asks for the facets with the filters', async () => {
+  const requests: URLSearchParams[] = []
+  const body = makeWatchlistFacets(
+    { movie: 2 },
+    { languages: [{ name: 'English', count: 2 }] },
+  )
+  server.use(
+    http.get('/api/v3/watchlist/facets', ({ request, response }) => {
+      requests.push(new URL(request.url).searchParams)
+      return response(200).json(body)
+    }),
+  )
+  const { result } = renderHook(
+    () =>
+      useWatchlistFacets({
+        q: 'dune',
+        category: ['movie'],
+        language: ['English'],
+      }),
+    { wrapper: queryWrapper() },
+  )
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  expect(requests.map((params) => Object.fromEntries(params))).toEqual([
+    { q: 'dune', category: 'movie', language: 'English' },
+  ])
+  expect(result.current.data).toEqual(body.data)
+})
+
+it('shares one request between the callers without params', async () => {
+  const requests: URLSearchParams[] = []
+  server.use(
+    http.get('/api/v3/watchlist/facets', ({ request, response }) => {
+      requests.push(new URL(request.url).searchParams)
+      return response(200).json(makeWatchlistFacets())
+    }),
+  )
+  const { result } = renderHook(
+    () => [useWatchlistFacets(), useWatchlistFacets({})] as const,
+    { wrapper: queryWrapper() },
+  )
+
+  await waitFor(() => expect(result.current[1].isSuccess).toBe(true))
+  expect(result.current[0].isSuccess).toBe(true)
+  expect(requests).toHaveLength(1)
+})
+
+it("keeps the previous counts while the next filter's load", async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  server.use(
+    http.get('/api/v3/watchlist/facets', async ({ request, response }) => {
+      if (new URL(request.url).searchParams.get('q') === null) {
+        return response(200).json(makeWatchlistFacets({ movie: 2 }))
+      }
+      await gate
+      return response(200).json(makeWatchlistFacets({ movie: 1 }))
+    }),
+  )
+  const { result, rerender } = renderHook(
+    (params: WatchlistFacetsParams) => useWatchlistFacets(params),
+    { wrapper: queryWrapper(), initialProps: {} as WatchlistFacetsParams },
+  )
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+  rerender({ q: 'dune' })
+
+  expect(result.current.isPlaceholderData).toBe(true)
+  expect(result.current.data?.total).toBe(2)
+
+  release()
+  await waitFor(() => expect(result.current.isPlaceholderData).toBe(false))
+  expect(result.current.data?.total).toBe(1)
+})
+
 it('exposes a failed facets request as an ApiError', async () => {
   server.use(
     http.get('/api/v3/watchlist/facets', ({ response }) =>
@@ -239,7 +316,7 @@ describe('useAddToWatchlist', () => {
   function seededQueryClient() {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData(watchlistKeys.list({}), 'old list')
-    queryClient.setQueryData(watchlistKeys.facets(), 'old facets')
+    queryClient.setQueryData(watchlistKeys.facets({}), 'old facets')
     queryClient.setQueryData(searchKeys.list(elsewhere), [
       makeSearchResult({ id: 'igdb:1', title: 'Elden Ring' }),
     ])
@@ -303,7 +380,7 @@ describe('useAddToWatchlist', () => {
     await act(() => result.current.add.mutateAsync({ item_id: dune.id }))
 
     expect(isInvalidated(queryClient, watchlistKeys.list({}))).toBe(true)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(true)
     expect(
       queryClient
         .getQueryData<SearchResult[]>(searchKeys.list(onScreen))
@@ -371,7 +448,7 @@ describe('useAddToWatchlist', () => {
       ).rejects.toMatchObject({ status: 409, code: 'ALREADY_REVIEWED' })
     })
 
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(false)
     expect(isInvalidated(queryClient, searchKeys.list(elsewhere))).toBe(false)
   })
 })
@@ -413,7 +490,7 @@ describe('useRemoveFromWatchlist', () => {
       movies,
       infinite(makeWatchlistPage([dune, arrival])),
     )
-    queryClient.setQueryData(watchlistKeys.facets(), makeWatchlistFacets())
+    queryClient.setQueryData(watchlistKeys.facets({}), makeWatchlistFacets())
     return queryClient
   }
 
@@ -570,7 +647,7 @@ describe('useRemoveFromWatchlist', () => {
     expect(isInvalidated(queryClient, searchKeys.list(onScreen))).toBe(false)
     expect(searches).toHaveLength(1)
     expect(isInvalidated(queryClient, all)).toBe(true)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(true)
   })
 
   it('puts back only its own card when one of two removes fails', async () => {
@@ -651,12 +728,12 @@ describe('useRemoveFromWatchlist', () => {
       result.current.add.mutateAsync({ item_id: frieren.item.id }),
     )
     expect(isInvalidated(queryClient, all)).toBe(false)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(false)
 
     release(arrival.item.id)
     await act(() => removal)
     expect(isInvalidated(queryClient, all)).toBe(true)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(true)
   })
 
   it('waits for the last of two removes before refetching', async () => {
@@ -675,12 +752,12 @@ describe('useRemoveFromWatchlist', () => {
     release(dune.item.id)
     await act(() => first)
     expect(isInvalidated(queryClient, all)).toBe(false)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(false)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(false)
     expect(cachedIds(queryClient, all)).toEqual([frieren.item.id])
 
     release(arrival.item.id)
     await act(() => second)
     expect(isInvalidated(queryClient, all)).toBe(true)
-    expect(isInvalidated(queryClient, watchlistKeys.facets())).toBe(true)
+    expect(isInvalidated(queryClient, watchlistKeys.facets({}))).toBe(true)
   })
 })
