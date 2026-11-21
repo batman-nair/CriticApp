@@ -408,6 +408,44 @@ it('leaves out a category or sort the API would reject', async () => {
   }
 })
 
+it('offers the four review sorts, and searches my reviews', async () => {
+  const user = userEvent.setup()
+  const { router } = renderRoute('/')
+  await waitForCards(2)
+  const sort = screen.getByRole('combobox', { name: 'Sort' })
+  expect(sort).toHaveTextContent(/^Recently updated$/)
+  expect(searchBox()).toHaveAttribute(
+    'placeholder',
+    'Search my reviews — a title, a genre, a name, a word I used',
+  )
+
+  await user.click(sort)
+
+  const options = await screen.findAllByRole('option')
+  expect(options.map((option) => option.textContent)).toEqual([
+    'Recently updated',
+    'A–Z',
+    'Rating: high to low',
+    'Rating: low to high',
+  ])
+
+  await user.click(screen.getByRole('option', { name: 'A–Z' }))
+
+  expect(router.state.historyAction).toBe('PUSH')
+  expect(router.state.location.search).toBe('?sort=title')
+})
+
+it('does not navigate from the selected chip', async () => {
+  const user = userEvent.setup()
+  const { router } = renderRoute('/?category=movie')
+  await waitForCards(2)
+  const location = router.state.location
+
+  await user.click(chip('Movies'))
+
+  expect(router.state.location).toBe(location)
+})
+
 it('counts every review in the hero, and the matches in the count row', async () => {
   servePages({ 0: makeReviewPage(reviews(3)) })
   // The filtered counts differ, to show which ones the hero uses.

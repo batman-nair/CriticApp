@@ -1,38 +1,107 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import {
+  createMemoryRouter,
+  RouterProvider,
+  useSearchParams,
+} from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReviewFacets } from '../../api/types'
 import { expectNoAxeViolations } from '../../test/axe'
-import { makeReviewFacets } from '../../test/fixtures'
-import { FilterPanel, type FilterPanelProps } from './FilterPanel'
-import { useReviewFilters, type ReviewFilters } from './useReviewFilters'
+import {
+  FilterPanel,
+  type FilterFacets,
+  type FilterPanelProps,
+  type FilterValues,
+} from './FilterPanel'
 
-const facets = makeReviewFacets({
+const counts: Record<string, number> = { movie: 1, 'anime:series': 1 }
+
+const facets: FilterFacets = {
   total: 5,
+  categories: [
+    'movie',
+    'series',
+    'game',
+    'anime:series',
+    'anime:movie',
+    'manga',
+    'book',
+  ].map((id) => ({ id, count: counts[id] ?? 0 })),
   languages: [
     { name: 'English', count: 3 },
     { name: 'Japanese', count: 2 },
   ],
-}).data
-
-interface HarnessProps {
-  facets?: ReviewFacets
-  ghost?: FilterPanelProps['ghost']
 }
 
-/** The panel as the page uses it, plus the page's "Clear filters". */
-function Harness({ facets, ghost = null }: HarnessProps) {
-  const { filters, setFilters, clearFilters } = useReviewFilters()
+/** The wording and sorts the panel is given, unless a test says otherwise. */
+const text = {
+  searchLabel: 'Search reviews',
+  searchPlaceholder: 'Search my reviews',
+  ghostPlaceholders: {
+    loading: 'Loading your reviews…',
+    unavailable: 'Search is unavailable right now',
+  },
+  sorts: [
+    { value: '-updated', label: 'Recently updated' },
+    { value: 'title', label: 'A–Z' },
+    { value: '-rating', label: 'Rating: high to low' },
+    { value: 'rating', label: 'Rating: low to high' },
+  ],
+} satisfies Partial<FilterPanelProps<string>>
+
+const FILTER_KEYS = ['q', 'category', 'language', 'sort'] as const
+
+type HarnessProps = Partial<
+  Pick<FilterPanelProps<string>, 'facets' | 'ghost' | keyof typeof text>
+>
+
+/**
+ * The panel on filters kept in the URL, the first sort the default, plus a
+ * "Clear filters" like the pages'.
+ */
+function Harness({ ghost = null, ...props }: HarnessProps) {
+  const { sorts } = { ...text, ...props }
+  const [searchParams, setSearchParams] = useSearchParams()
+  const defaults: FilterValues<string> = {
+    q: '',
+    category: '',
+    language: '',
+    sort: sorts[0]!.value,
+  }
+  const filters: FilterValues<string> = {
+    q: searchParams.get('q') ?? '',
+    category: searchParams.get('category') ?? '',
+    language: searchParams.get('language') ?? '',
+    sort:
+      sorts.find((sort) => sort.value === searchParams.get('sort'))?.value ??
+      defaults.sort,
+  }
+
+  function setFilters(
+    patch: Partial<FilterValues<string>>,
+    { replace = false } = {},
+  ) {
+    const next = { ...filters, ...patch }
+    const params = new URLSearchParams()
+    for (const key of FILTER_KEYS) {
+      if (next[key] !== defaults[key]) params.set(key, next[key])
+    }
+    setSearchParams(params, { replace })
+  }
+
   return (
     <>
       <FilterPanel
+        {...text}
+        {...props}
         filters={filters}
         setFilters={setFilters}
-        facets={facets}
         ghost={ghost}
       />
-      <button type="button" onClick={clearFilters}>
+      <button
+        type="button"
+        onClick={() => setFilters({ q: '', category: '', language: '' })}
+      >
         Clear filters
       </button>
     </>
@@ -183,7 +252,7 @@ describe('search', () => {
   it('keeps newer typing when its own earlier write lands', async () => {
     const user = setupUser()
     const setFilters = vi.fn()
-    const filters: ReviewFilters = {
+    const filters: FilterValues<string> = {
       q: '',
       category: '',
       language: '',
@@ -191,6 +260,7 @@ describe('search', () => {
     }
     const panel = (q: string) => (
       <FilterPanel
+        {...text}
         filters={{ ...filters, q }}
         setFilters={setFilters}
         facets={facets}
@@ -252,15 +322,6 @@ describe('categories', () => {
 
     expect(params().get('category')).toBeNull()
   })
-
-  it('does not navigate from the selected chip', async () => {
-    const user = userEvent.setup()
-    const { locations } = renderPanel('/?category=movie')
-
-    await user.click(screen.getByRole('button', { name: 'Movies 1' }))
-
-    expect(locations).toHaveLength(1)
-  })
 })
 
 describe('language', () => {
@@ -316,7 +377,7 @@ describe('language', () => {
 })
 
 describe('sort', () => {
-  it('offers the four sorts and writes the one picked', async () => {
+  it('offers the sorts it is given and writes the one picked', async () => {
     const user = userEvent.setup()
     const { router, params } = renderPanel()
     expect(sort()).toHaveTextContent(/^Recently updated$/)
@@ -414,6 +475,44 @@ describe('ghost', () => {
       'Search is unavailable right now',
     )
   })
+})
+
+it('shows the wording and sorts it is given', async () => {
+  const user = userEvent.setup()
+  const props = {
+    facets,
+    searchLabel: 'Search your watchlist',
+    searchPlaceholder: 'Search your watchlist — a title, a genre, a name',
+    ghostPlaceholders: {
+      loading: 'Loading your watchlist…',
+      unavailable: 'Your watchlist search is unavailable',
+    },
+    sorts: [
+      { value: '-added', label: 'Recently added' },
+      { value: '-year', label: 'Release year: newest first' },
+    ],
+  }
+  const watchlistSearch = () =>
+    screen.getByRole('searchbox', { name: 'Search your watchlist' })
+  const { unmount } = renderPanel('/', props)
+
+  expect(watchlistSearch()).toHaveAttribute(
+    'placeholder',
+    'Search your watchlist — a title, a genre, a name',
+  )
+  expect(sort()).toHaveTextContent(/^Recently added$/)
+  await user.click(sort())
+  expect(await optionNames()).toEqual([
+    'Recently added',
+    'Release year: newest first',
+  ])
+  unmount()
+
+  renderPanel('/', { ...props, ghost: 'loading' })
+  expect(watchlistSearch()).toHaveAttribute(
+    'placeholder',
+    'Loading your watchlist…',
+  )
 })
 
 it('has no axe violations', async () => {

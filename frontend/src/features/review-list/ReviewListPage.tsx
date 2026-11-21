@@ -7,9 +7,9 @@ import { cx } from '../../lib/cx'
 import type { ReviewListOutlet } from '../../lib/reviewListOutlet'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
 import { Button } from '../../ui/Button/Button'
+import { FilterPanel } from '../../ui/FilterPanel/FilterPanel'
 import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { EmptyShelf } from './EmptyShelf'
-import { FilterPanel } from './FilterPanel'
 import grid from './grid.module.css'
 import { LoadError } from './LoadError'
 import { NoMatches } from './NoMatches'
@@ -17,10 +17,16 @@ import { ReviewCard } from './ReviewCard'
 import { ReviewListSkeleton } from './ReviewListSkeleton'
 import styles from './ReviewListPage.module.css'
 import {
+  SORTS,
   toFacetParams,
   toListParams,
   useReviewFilters,
 } from './useReviewFilters'
+
+const GHOST_PLACEHOLDERS = {
+  loading: 'Loading your reviews…',
+  unavailable: 'Search is unavailable right now',
+}
 
 /**
  * Every page's reviews, each once. Offset paging under "recently updated" can
@@ -167,6 +173,10 @@ export function ReviewListPage() {
           setFilters={setFilters}
           facets={facets.data}
           ghost={ghost}
+          searchLabel="Search reviews"
+          searchPlaceholder="Search my reviews — a title, a genre, a name, a word I used"
+          ghostPlaceholders={GHOST_PLACEHOLDERS}
+          sorts={SORTS}
         />
       )}
       {listShown && !emptyShelf && (
