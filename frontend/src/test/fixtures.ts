@@ -159,6 +159,7 @@ export function makeWatchlistFacets(
     data: {
       total: categories.reduce((sum, category) => sum + category.count, 0),
       categories,
+      languages: [],
       ...overrides,
     },
     meta: {},
