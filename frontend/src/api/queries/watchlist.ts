@@ -56,7 +56,7 @@ function nextOffset(last: WatchlistPage) {
   return next < count ? next : undefined
 }
 
-/** Pages of the watchlist, newest first, with the count in each `meta`. */
+/** Pages of the watchlist, in the params' sort, with the count in each `meta`. */
 export function useWatchlist(params: WatchlistListParams) {
   return useInfiniteQuery({
     queryKey: watchlistKeys.list(params),
