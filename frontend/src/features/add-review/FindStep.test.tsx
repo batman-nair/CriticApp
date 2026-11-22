@@ -188,10 +188,9 @@ it('names no provider on a 502 when /categories failed', async () => {
     ),
   )
   serveSearch(() =>
-    Response.json(
-      makeProblem({ status: 502, code: 'UPSTREAM_ERROR' }),
-      { status: 502 },
-    ),
+    Response.json(makeProblem({ status: 502, code: 'UPSTREAM_ERROR' }), {
+      status: 502,
+    }),
   )
   renderStep()
 
