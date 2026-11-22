@@ -67,7 +67,11 @@ it('opens a card’s details over the page, without asking for the item', async 
     within(dialog()).getByRole('heading', { level: 2, name: 'Dune: Part Two' }),
   ).toBeInTheDocument()
   expect(within(dialog()).getByText('Movie · 2024')).toBeInTheDocument()
-  expect(within(dialog()).getByText('2 Apr 2025')).toBeInTheDocument()
+  // The day itself depends on the time zone the test runs in.
+  expect(dialog().querySelector('time')).toHaveAttribute(
+    'datetime',
+    '2025-04-02T12:00:00Z',
+  )
   expect(
     await within(dialog()).findByText('IMDb', { selector: 'dt' }),
   ).toBeInTheDocument()
@@ -94,7 +98,10 @@ it('shows a listed title from a direct link, with the date it was added', async 
       name: 'Frieren: Beyond Journey’s End',
     }),
   ).toBeInTheDocument()
-  expect(within(dialog()).getByText('1 Apr 2025')).toBeInTheDocument()
+  expect(dialog().querySelector('time')).toHaveAttribute(
+    'datetime',
+    '2025-04-01T12:00:00Z',
+  )
   // Tinted as the card is.
   expect(dialog().style.getPropertyValue('--cat-base')).toBe(
     'var(--cat-anime-series-base)',
@@ -171,6 +178,8 @@ it('opens Review it in its place, so closing that goes back to the page', async 
 
   await waitFor(() => expect(router.state.location.pathname).toBe('/watchlist'))
   expect(router.state.location.search).toBe('?sort=title')
+  // The details' Review it is gone, so focus goes to the card instead.
+  await waitFor(() => expect(cardLink('Dune: Part Two')).toHaveFocus())
 })
 
 it('has no axe violations', async () => {

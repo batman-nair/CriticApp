@@ -32,6 +32,7 @@ it.each([
   expect(formatMediaType(value)).toBe(expected)
 })
 
-it('formats a timestamp as its day', () => {
-  expect(formatDate('2025-04-02T12:00:00Z')).toBe('2 Apr 2025')
+it('formats a timestamp as its day, where the reader is', () => {
+  // Local time, so the day is the same in every time zone.
+  expect(formatDate('2025-04-02T12:00:00')).toBe('2 Apr 2025')
 })

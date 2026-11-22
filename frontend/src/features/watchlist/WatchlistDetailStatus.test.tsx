@@ -38,7 +38,11 @@ it.each(['loading', 'not-found', 'error'] as const)(
   'has no axe violations when %s',
   async (kind) => {
     const { container } = render(
-      <WatchlistDetailStatus kind={kind} onAction={() => {}} />,
+      kind === 'loading' ? (
+        <WatchlistDetailStatus kind={kind} />
+      ) : (
+        <WatchlistDetailStatus kind={kind} onAction={() => {}} />
+      ),
     )
 
     await expectNoAxeViolations(container)

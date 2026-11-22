@@ -4,7 +4,8 @@ import { expectNoAxeViolations } from '../../test/axe'
 import { makeItem } from '../../test/fixtures'
 import { WatchlistDetail } from './WatchlistDetail'
 
-const ADDED = '2025-04-02T12:00:00Z'
+// Local time, so the day is the same in every time zone.
+const ADDED = '2025-04-02T12:00:00'
 
 it('shows the poster, category, years and title', () => {
   const { container } = render(

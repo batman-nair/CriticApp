@@ -4,18 +4,17 @@ import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { VisuallyHidden } from '../../ui/VisuallyHidden/VisuallyHidden'
 import styles from './WatchlistDetailStatus.module.css'
 
-interface WatchlistDetailStatusProps {
-  kind: 'loading' | 'not-found' | 'error'
-  /** "Back to the watchlist" when not found, "Try again" on an error. */
-  onAction?: () => void
-}
+type WatchlistDetailStatusProps =
+  | { kind: 'loading' }
+  | {
+      kind: 'not-found' | 'error'
+      /** "Back to the watchlist" when not found, "Try again" on an error. */
+      onAction: () => void
+    }
 
 /** The details dialog's body when there's no title to show yet. */
-export function WatchlistDetailStatus({
-  kind,
-  onAction,
-}: WatchlistDetailStatusProps) {
-  if (kind === 'loading') {
+export function WatchlistDetailStatus(props: WatchlistDetailStatusProps) {
+  if (props.kind === 'loading') {
     return (
       <div aria-busy="true">
         <div role="status">
@@ -34,6 +33,7 @@ export function WatchlistDetailStatus({
     )
   }
 
+  const { kind, onAction } = props
   if (kind === 'not-found') {
     return (
       <div className={styles.root}>

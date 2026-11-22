@@ -1,10 +1,12 @@
 import * as RadixDialog from '@radix-ui/react-dialog'
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type CSSProperties,
   type Key,
+  type RefObject,
   type ReactNode,
 } from 'react'
 import { categoryVars } from '../../lib/categories'
@@ -51,6 +53,25 @@ interface DialogProps {
   children: ReactNode
 }
 
+/** Where a dialog returns focus to when it closes. */
+interface Opener {
+  element: Element | null
+  /**
+   * The opener of the dialog `element` is in, if any: where focus goes when
+   * this dialog replaced that one, taking `element` with it.
+   */
+  parent?: Opener
+}
+
+const openers = new WeakMap<Element, RefObject<Opener>>()
+
+function returnFocus(opener: Opener | undefined) {
+  if (!opener) return
+  const { element } = opener
+  if (element instanceof HTMLElement && element.isConnected) element.focus()
+  else returnFocus(opener.parent)
+}
+
 export function Dialog({
   open,
   onOpenChange,
@@ -73,10 +94,18 @@ export function Dialog({
   // links. Read here rather than in onOpenAutoFocus, which FocusScope skips
   // when a child has already taken focus with autoFocus.
   const [wasOpen, setWasOpen] = useState(false)
-  const [opener, setOpener] = useState<Element | null>(null)
+  const [opener, setOpener] = useState<Opener>({ element: null })
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) setOpener(document.activeElement)
+    if (open) {
+      const element = document.activeElement
+      // Opened from inside another dialog, which this one may replace.
+      const parent = element?.closest('[role="dialog"]')
+      setOpener({
+        element,
+        parent: parent ? openers.get(parent)?.current : undefined,
+      })
+    }
   }
 
   const mounted = useRef(false)
@@ -87,7 +116,18 @@ export function Dialog({
     }
   }, [])
 
-  const contentRef = useRef<HTMLDivElement>(null)
+  // So a dialog opened from inside this one can find where this one returns
+  // focus to. A callback ref, as the portal mounts the content after this
+  // component's effects have run.
+  const openerRef = useRef(opener)
+  useEffect(() => {
+    openerRef.current = opener
+  }, [opener])
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const setContent = useCallback((node: HTMLDivElement | null) => {
+    contentRef.current = node
+    if (node) openers.set(node, openerRef)
+  }, [])
   const drag = useSheetDrag(
     contentRef,
     dismissible ? () => onOpenChange(false) : undefined,
@@ -109,7 +149,7 @@ export function Dialog({
   // sends it too, with `open` still true or the Dialog already gone.
   const handleCloseAutoFocus = (event: Event) => {
     event.preventDefault()
-    if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    returnFocus(opener)
     if (!open && mounted.current) onExited?.()
   }
 
@@ -118,7 +158,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={styles.overlay} />
         <RadixDialog.Content
-          ref={contentRef}
+          ref={setContent}
           className={cx(
             styles.content,
             styles[size],
