@@ -18,7 +18,8 @@ function useCurrentTab(): 'reviews' | 'watchlist' | null {
 }
 
 function WatchlistTab({ current }: { current: boolean }) {
-  // The same query as the page's hero count, so one request serves both.
+  // The same query the page uses to tell empty from no matches, so one
+  // request serves both.
   const { data } = useWatchlistFacets()
   return (
     <Link

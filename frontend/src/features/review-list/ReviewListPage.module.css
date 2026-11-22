@@ -26,24 +26,17 @@
   color: var(--cat-book);
 }
 
-.subtitle {
-  margin-bottom: var(--space-6);
-  color: var(--muted);
-  font-size: var(--text-15);
-}
-
-.subtitleSkeleton {
-  margin-bottom: var(--space-10);
-}
-
-/* From board 1: the number of results and "Clear filters". */
+/*
+ * From board 1: "Clear filters". The number of results is for screen readers.
+ * The button's height with or without it, so the cards don't jump.
+ */
 .countRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: 22px var(--space-4) var(--space-8);
-  color: var(--muted);
+  min-height: 44px;
+  padding: 0 var(--space-4) var(--space-8);
   font-size: var(--text-14);
 }
 
@@ -102,16 +95,6 @@
 
   .title {
     font-size: var(--text-hero-phone);
-  }
-
-  .subtitle {
-    margin-bottom: 0;
-    font-size: var(--text-14);
-  }
-
-  /* S13 shows no count placeholder on phones. */
-  .subtitleSkeleton {
-    display: none;
   }
 
   .results {

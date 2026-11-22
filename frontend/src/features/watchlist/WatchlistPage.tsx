@@ -21,8 +21,8 @@ import { Button } from '../../ui/Button/Button'
 import { buttonClass } from '../../ui/Button/buttonClass'
 import { FilterPanel } from '../../ui/FilterPanel/FilterPanel'
 import { Icon } from '../../ui/Icon/Icon'
-import { Skeleton } from '../../ui/Skeleton/Skeleton'
 import { Toast } from '../../ui/Toast/Toast'
+import { VisuallyHidden } from '../../ui/VisuallyHidden/VisuallyHidden'
 import grid from './grid.module.css'
 import {
   searchCategoryFor,
@@ -47,7 +47,7 @@ const GHOST_PLACEHOLDERS = {
   unavailable: 'Search is unavailable right now',
 }
 
-const FALLBACK_SUBTITLE = 'Things to watch, play and read later.'
+const SUBTITLE = 'Things to watch, play and read later.'
 
 /**
  * Every page's entries, each once. Offset paging can repeat an entry on the
@@ -75,11 +75,6 @@ type Notice =
     }
   | { kind: 'error'; id: number; text: string }
 
-function countLabel(total: number) {
-  if (total === 0) return 'Nothing saved yet.'
-  return `${total} ${total === 1 ? 'title' : 'titles'} to watch, play or read later.`
-}
-
 function resultsLabel(count: number) {
   return count === 1 ? '1 title' : `${count} titles`
 }
@@ -90,8 +85,9 @@ export function WatchlistPage() {
   const query = useWatchlist(toListParams(filters))
   // The chips' counts and the language menu, for the filters as they are.
   const facets = useWatchlistFacets(toFacetParams(filters))
-  // The hero counts every entry: the header tab's query.
-  const heroFacets = useWatchlistFacets()
+  // Every entry, to tell an empty watchlist from no matches: the header
+  // tab's query.
+  const allFacets = useWatchlistFacets()
   const addLink = useAddToWatchlistLink()
   // "Add a <category>" starts the sheet on the chip's category.
   const addInCategoryLink = useAddToWatchlistLink(
@@ -111,7 +107,7 @@ export function WatchlistPage() {
   // The session ran out while the page was open: the owner guard then goes
   // to the login page, which comes back here. Retrying would only 401 again.
   const queryClient = useQueryClient()
-  const unauthenticated = [query.error, facets.error, heroFacets.error].some(
+  const unauthenticated = [query.error, facets.error, allFacets.error].some(
     (error) =>
       error instanceof ApiError &&
       error.status === 401 &&
@@ -253,7 +249,7 @@ export function WatchlistPage() {
 
   // When the counts fail, the list's own count stands in, if it's unfiltered.
   const total =
-    heroFacets.data?.total ??
+    allFacets.data?.total ??
     (!isFiltered && data && !query.isPlaceholderData ? count : undefined)
 
   // Branch on the data, not isError: a failed next page or background refetch
@@ -266,7 +262,7 @@ export function WatchlistPage() {
     // An empty filtered page is "no matches" only once the counts say the
     // watchlist has something, and only for the filters it was asked for.
     (entries.length === 0 &&
-      ((isFiltered && heroFacets.isPending) || query.isPlaceholderData))
+      ((isFiltered && allFacets.isPending) || query.isPlaceholderData))
   ) {
     state = 'loading'
   } else if (entries.length === 0 && (total === 0 || !isFiltered)) {
@@ -307,23 +303,9 @@ export function WatchlistPage() {
 
   function retry() {
     void query.refetch()
-    // So the chips and the hero get their counts back too.
+    // So the chips and the empty state get their counts back too.
     if (facets.isError) void facets.refetch()
-    if (heroFacets.isError) void heroFacets.refetch()
-  }
-
-  let subtitle
-  if (firstLoad && state === 'error') {
-    subtitle = <p className={styles.subtitle}>{FALLBACK_SUBTITLE}</p>
-  } else if (state === 'empty') {
-    // Not older counts that say otherwise.
-    subtitle = <p className={styles.subtitle}>{countLabel(0)}</p>
-  } else if (total !== undefined) {
-    subtitle = <p className={styles.subtitle}>{countLabel(total)}</p>
-  } else if (heroFacets.isPending || query.isPending) {
-    subtitle = <Skeleton className={styles.subtitleSkeleton} />
-  } else {
-    subtitle = <p className={styles.subtitle}>{FALLBACK_SUBTITLE}</p>
+    if (allFacets.isError) void allFacets.refetch()
   }
 
   // A chip the page can't filter by isn't shown. Without the counts, the
@@ -381,7 +363,7 @@ export function WatchlistPage() {
             </span>
           </span>
           <h1 className={styles.title}>Up next.</h1>
-          {subtitle}
+          <p className={styles.subtitle}>{SUBTITLE}</p>
         </div>
         <Link
           {...addLink}
@@ -415,8 +397,11 @@ export function WatchlistPage() {
       )}
       {listShown && state !== 'empty' && (
         <div className={styles.countRow}>
+          {/* Not shown, but still announced when the filters change. */}
           <span aria-live="polite">
-            {count !== undefined ? resultsLabel(count) : ''}
+            <VisuallyHidden>
+              {count !== undefined ? resultsLabel(count) : ''}
+            </VisuallyHidden>
           </span>
           {isFiltered && (
             <button type="button" className={styles.clear} onClick={clearAll}>
