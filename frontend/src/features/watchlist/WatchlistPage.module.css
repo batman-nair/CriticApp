@@ -45,13 +45,14 @@
   padding: 0 var(--space-20);
 }
 
+/* As on the main page: the button's height, so the cards don't jump. */
 .countRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: var(--space-18) var(--space-2) var(--space-8);
-  color: var(--muted);
+  min-height: 44px;
+  padding: 0 var(--space-2) var(--space-8);
   font-size: var(--text-14);
 }
 
@@ -146,7 +147,7 @@
   }
 
   .countRow {
-    padding: var(--space-14) var(--space-2) var(--space-4);
+    padding: 0 var(--space-2) var(--space-4);
     font-size: var(--text-13);
   }
 

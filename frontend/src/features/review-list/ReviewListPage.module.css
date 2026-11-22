@@ -26,14 +26,17 @@
   color: var(--cat-book);
 }
 
-/* From board 1: "Clear filters". The number of results is for screen readers. */
+/*
+ * From board 1: "Clear filters". The number of results is for screen readers.
+ * The button's height with or without it, so the cards don't jump.
+ */
 .countRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-12);
-  padding: 22px var(--space-4) var(--space-8);
-  color: var(--muted);
+  min-height: 44px;
+  padding: 0 var(--space-4) var(--space-8);
   font-size: var(--text-14);
 }
 
