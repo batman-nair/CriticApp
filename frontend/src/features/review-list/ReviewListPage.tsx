@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { Outlet } from 'react-router'
 import { useReviewFacets, useReviewList } from '../../api/queries/reviews'
 import type { ReviewPage } from '../../api/types'
-import { OWNER_USERNAME } from '../../config'
 import { cx } from '../../lib/cx'
 import type { ReviewListOutlet } from '../../lib/reviewListOutlet'
 import { useLoadMoreOnScroll } from '../../lib/useLoadMoreOnScroll'
 import { Button } from '../../ui/Button/Button'
 import { FilterPanel } from '../../ui/FilterPanel/FilterPanel'
-import { Skeleton } from '../../ui/Skeleton/Skeleton'
+import { VisuallyHidden } from '../../ui/VisuallyHidden/VisuallyHidden'
 import { EmptyShelf } from './EmptyShelf'
 import grid from './grid.module.css'
 import { LoadError } from './LoadError'
@@ -43,11 +42,6 @@ function uniqueReviews(pages: ReviewPage[]) {
     })
 }
 
-function countLabel(count: number) {
-  if (count === 0) return 'No reviews yet'
-  return `${count} ${count === 1 ? 'review' : 'reviews'}, rated out of ten`
-}
-
 function resultsLabel(count: number) {
   return count === 1 ? '1 review' : `${count} reviews`
 }
@@ -57,8 +51,6 @@ export function ReviewListPage() {
   const query = useReviewList(toListParams(filters))
   // The chips' counts and the language menu, for the filters as they are.
   const facets = useReviewFacets(toFacetParams(filters))
-  // The hero counts every review. Without filters, the same query as above.
-  const heroFacets = useReviewFacets({ username: OWNER_USERNAME })
   const {
     data,
     hasNextPage,
@@ -93,13 +85,6 @@ export function ReviewListPage() {
   const emptyShelf =
     data && !query.isPlaceholderData && !isFiltered && count === 0
 
-  // When the counts fail, the list's own count stands in, if it's unfiltered.
-  const heroTotal =
-    heroFacets.data?.total ??
-    (heroFacets.isError && !isFiltered && !query.isPlaceholderData
-      ? count
-      : undefined)
-
   // "Clear filters" starts the panel afresh: a search still being typed is
   // dropped rather than written after the clear, and the search box takes the
   // focus from the button, which goes away.
@@ -111,9 +96,8 @@ export function ReviewListPage() {
 
   function retry() {
     void query.refetch()
-    // So the chips and the hero get their counts back too.
+    // So the chips get their counts back too.
     if (facets.isError) void facets.refetch()
-    if (heroFacets.isError) void heroFacets.refetch()
   }
 
   // Branch on the data, not isError: a failed next page or background refetch
@@ -149,20 +133,6 @@ export function ReviewListPage() {
           <span className={styles.played}>played</span> and{' '}
           <span className={styles.read}>read</span>.
         </h1>
-        {/* S6 has no count. */}
-        {ghost !== 'unavailable' &&
-          (heroTotal !== undefined ? (
-            <p className={styles.subtitle}>{countLabel(heroTotal)}</p>
-          ) : (
-            heroFacets.isPending && (
-              <Skeleton
-                className={styles.subtitleSkeleton}
-                width={170}
-                height={14}
-                radius={7}
-              />
-            )
-          ))}
       </section>
       {/* S3: the empty shelf has no filters. */}
       {!emptyShelf && (
@@ -181,8 +151,11 @@ export function ReviewListPage() {
       )}
       {listShown && !emptyShelf && (
         <div className={styles.countRow}>
+          {/* Not shown, but still announced when the filters change. */}
           <span aria-live="polite">
-            {count !== undefined ? resultsLabel(count) : ''}
+            <VisuallyHidden>
+              {count !== undefined ? resultsLabel(count) : ''}
+            </VisuallyHidden>
           </span>
           {isFiltered && (
             <button

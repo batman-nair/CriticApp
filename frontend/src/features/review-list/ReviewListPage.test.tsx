@@ -24,6 +24,7 @@ import { stubSystemTheme } from '../../test/matchMedia'
 import { createTestQueryClient } from '../../test/render'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
+import visuallyHidden from '../../ui/VisuallyHidden/VisuallyHidden.module.css'
 import { ReviewListPage } from './ReviewListPage'
 import styles from './ReviewListPage.module.css'
 
@@ -129,47 +130,30 @@ const chip = (label: string) =>
     { name: new RegExp(`^${label}( \\d+)?$`) },
   )
 
-it('shows skeletons, in the list and the hero, until the first page', async () => {
+it('shows skeletons in the list until the first page', async () => {
   const gate = deferred()
   servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
-  // The hero's count comes from the counts.
-  serveFacets({}, gate.promise)
-  const { container } = renderRoute('/')
+  renderRoute('/')
 
   expect(screen.getByRole('status')).toHaveTextContent('Loading your reviews')
-  expect(
-    container.querySelector(`.${styles.subtitleSkeleton}`),
-  ).toBeInTheDocument()
 
   gate.resolve()
   await waitForCards(2)
   expect(screen.queryByText('Loading your reviews')).not.toBeInTheDocument()
-  expect(container.querySelector(`.${styles.subtitleSkeleton}`)).toBeNull()
 })
 
-it('shows the first page of the owner’s reviews with the count', async () => {
+it('shows the first page of the owner’s reviews, with no count in the hero', async () => {
   const { requests } = servePages({
     0: makeReviewPage(reviews(20), { count: 45 }),
   })
   serveFacets({ total: 45 })
   renderRoute('/')
 
-  expect(
-    await screen.findByText('45 reviews, rated out of ten'),
-  ).toBeInTheDocument()
-  expect(cards()).toHaveLength(20)
+  await waitForCards(20)
   expect(screen.getAllByRole('listitem')).toHaveLength(20)
   expect(requests[0]?.get('username')).toBe(OWNER_USERNAME)
-})
-
-it('counts a single review in the singular', async () => {
-  servePages({ 0: makeReviewPage(reviews(1)) })
-  serveFacets({ total: 1 })
-  renderRoute('/')
-
-  expect(
-    await screen.findByText('1 review, rated out of ten'),
-  ).toBeInTheDocument()
+  const hero = screen.getByRole('heading', { level: 1 }).closest('section')
+  expect(hero).not.toHaveTextContent(/\d/)
 })
 
 it('loads the next page when the end of the list comes near', async () => {
@@ -226,7 +210,6 @@ it('shows the empty shelf when there are no reviews', async () => {
   expect(
     await screen.findByRole('heading', { name: 'Your shelf is empty' }),
   ).toBeInTheDocument()
-  expect(screen.getByText('No reviews yet')).toBeInTheDocument()
   expect(container.querySelector(`.${styles.sentinel}`)).toBeNull()
 })
 
@@ -249,7 +232,6 @@ it('shows the error, and skeletons then cards after "Try again"', async () => {
 
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent('Couldn’t load your reviews')
-  expect(screen.queryByText(/rated out of ten/)).not.toBeInTheDocument()
 
   // Hold the retry, to see what shows while it runs.
   servePages({ 0: makeReviewPage(reviews(2)) }, { 0: gate.promise })
@@ -386,9 +368,8 @@ it('sends the URL’s filters to the list, and all but the sort to the counts', 
   expect(request?.get('language')).toBe('English')
   expect(request?.get('sort')).toBe('-rating')
 
-  // The panel's counts and the hero's.
-  await waitFor(() => expect(facets.requests).toHaveLength(2))
-  const filtered = facets.requests.find((params) => params.has('q'))
+  await waitFor(() => expect(facets.requests).toHaveLength(1))
+  const [filtered] = facets.requests
   expect(filtered?.get('q')).toBe('dune')
   expect(filtered?.get('category')).toBe('movie')
   expect(filtered?.get('language')).toBe('English')
@@ -446,16 +427,14 @@ it('does not navigate from the selected chip', async () => {
   expect(router.state.location).toBe(location)
 })
 
-it('counts every review in the hero, and the matches in the count row', async () => {
+it('announces the matches without showing them, and counts them on the chips', async () => {
   servePages({ 0: makeReviewPage(reviews(3)) })
-  // The filtered counts differ, to show which ones the hero uses.
-  serveFacets((params) => (params.has('q') ? { total: 7 } : { total: 45 }))
+  serveFacets({ total: 7 })
   renderRoute('/?q=dune&category=game')
 
-  expect(
-    await screen.findByText('45 reviews, rated out of ten'),
-  ).toBeInTheDocument()
-  expect(screen.getByText('3 reviews')).toHaveAttribute('aria-live', 'polite')
+  const matches = await screen.findByText('3 reviews')
+  expect(matches).toHaveClass(visuallyHidden.root!)
+  expect(matches.closest('[aria-live="polite"]')).toBeInTheDocument()
   await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 7'))
 })
 
@@ -558,12 +537,11 @@ it('shows the search as unavailable when the first page fails', async () => {
   ).not.toBeInTheDocument()
 })
 
-it('keeps the live panel and the hero count when a filter fails later', async () => {
+it('keeps the live panel when a filter fails later', async () => {
   const user = userEvent.setup()
   serveFacets({ total: 45 })
   const { router } = renderRoute('/')
   await waitForCards(2)
-  expect(screen.getByText('45 reviews, rated out of ten')).toBeInTheDocument()
 
   servePages({ 0: 'error' })
   await user.click(chip('Games'))
@@ -572,7 +550,6 @@ it('keeps the live panel and the hero count when a filter fails later', async ()
     'Couldn’t load your reviews',
   )
   expect(cards()).toHaveLength(0)
-  expect(screen.getByText('45 reviews, rated out of ten')).toBeInTheDocument()
   // Still there to change or clear the filter.
   expect(searchBox()).toBeEnabled()
   await user.type(searchBox(), 'du')
@@ -595,10 +572,6 @@ it('keeps the live panel when only the counts fail', async () => {
   await waitForCards(20)
   await waitFor(() => expect(facets.requests).toHaveLength(1))
 
-  // The list's count stands in for the hero's.
-  expect(
-    await screen.findByText('45 reviews, rated out of ten'),
-  ).toBeInTheDocument()
   expect(searchBox()).toBeEnabled()
   expect(chip('All')).toHaveAccessibleName('All')
   expect(chip('Movies')).toHaveAccessibleName('Movies')
@@ -622,7 +595,6 @@ it('refetches the failed counts too on "Try again"', async () => {
 
   await waitForCards(2)
   await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
-  expect(screen.getByText('2 reviews, rated out of ten')).toBeInTheDocument()
 })
 
 it('keeps the panel and the focused search while a cleared search loads', async () => {
@@ -667,23 +639,6 @@ it('drops a search still being typed on "Clear filters", and focuses the search'
   expect(router.state.location.search).toBe('')
   expect(searchBox()).toHaveValue('')
   expect(searchBox()).toHaveFocus()
-})
-
-it('refetches a failed hero count on "Try again" while a filter is set', async () => {
-  const user = userEvent.setup()
-  servePages({ 0: ['error', makeReviewPage(reviews(2))] })
-  const facets = serveFacets('error')
-  renderRoute('/?category=game')
-  const alert = await screen.findByRole('alert')
-  await waitFor(() => expect(facets.requests).toHaveLength(2))
-
-  serveFacets({ total: 45 })
-  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
-
-  await waitForCards(2)
-  expect(
-    await screen.findByText('45 reviews, rated out of ten'),
-  ).toBeInTheDocument()
 })
 
 /** A child route showing what the list hands down, as the detail reads it. */

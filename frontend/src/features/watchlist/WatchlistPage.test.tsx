@@ -23,6 +23,7 @@ import { stubSystemTheme } from '../../test/matchMedia'
 import { createTestQueryClient } from '../../test/render'
 import { renderRoute } from '../../test/renderRoute'
 import { server } from '../../test/server'
+import visuallyHidden from '../../ui/VisuallyHidden/VisuallyHidden.module.css'
 import { WatchlistPage } from './WatchlistPage'
 import styles from './WatchlistPage.module.css'
 
@@ -150,7 +151,8 @@ it('shows the entries in the server’s order, with the category and years', asy
   expect(
     within(second!).getByText('Anime series · 2023–2024'),
   ).toBeInTheDocument()
-  expect(screen.getByText('2 titles')).toBeInTheDocument()
+  // Announced, not shown.
+  expect(screen.getByText('2 titles')).toHaveClass(visuallyHidden.root!)
   expect(
     screen.queryByRole('button', { name: 'Clear filters' }),
   ).not.toBeInTheDocument()
@@ -166,18 +168,13 @@ it('shows the hero', async () => {
     'Your watchlist · only you can see this',
   )
   expect(
-    await screen.findByText('2 titles to watch, play or read later.'),
+    screen.getByText('Things to watch, play and read later.'),
   ).toBeInTheDocument()
-})
-
-it('counts a single title in the singular', async () => {
-  serveList(() => makeWatchlistPage(entries(1)))
-  serveFacets({ game: 1 })
-  renderPage()
-
+  // No count in the hero.
+  await waitForCards(2)
   expect(
-    await screen.findByText('1 title to watch, play or read later.'),
-  ).toBeInTheDocument()
+    screen.getByRole('heading', { level: 1 }).closest('section'),
+  ).not.toHaveTextContent(/\d/)
 })
 
 it('shows each chip with its count, the anime split in two', async () => {
@@ -246,16 +243,13 @@ it.each(['bogus', 'anime', 'movie,game'])(
   },
 )
 
-it('shows skeletons in the hero and the grid, and the ghost panel, until the first page', async () => {
+it('shows skeletons in the grid, and the ghost panel, until the first page', async () => {
   const gate = deferred()
   serveList(() => makeWatchlistPage(entries(2)), gate.promise)
   serveFacets({ movie: 2 }, gate.promise)
-  const { container } = renderPage()
+  renderPage()
 
   expect(pageStatus()).toHaveTextContent('Loading your watchlist')
-  expect(
-    container.querySelector(`.${styles.subtitleSkeleton}`),
-  ).toBeInTheDocument()
   expect(searchBox()).toBeDisabled()
   expect(searchBox()).toHaveAttribute('placeholder', 'Loading your watchlist…')
   expect(chips()).toBeNull()
@@ -264,7 +258,6 @@ it('shows skeletons in the hero and the grid, and the ghost panel, until the fir
   gate.resolve()
   await waitForCards(2)
   expect(screen.queryByText('Loading your watchlist')).not.toBeInTheDocument()
-  expect(container.querySelector(`.${styles.subtitleSkeleton}`)).toBeNull()
   expect(searchBox()).toBeEnabled()
   expect(searchBox()).toHaveAttribute(
     'placeholder',
@@ -304,9 +297,7 @@ it('shows the error, then the list after "Try again"', async () => {
   await waitForCards(2)
   // The failed counts are asked for again too.
   expect(facets.requests).toHaveLength(1)
-  expect(
-    await screen.findByText('2 titles to watch, play or read later.'),
-  ).toBeInTheDocument()
+  await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
 })
 
 it('shows the empty state without chips', async () => {
@@ -319,7 +310,6 @@ it('shows the empty state without chips', async () => {
       name: 'Nothing on your watchlist yet',
     }),
   ).toBeInTheDocument()
-  expect(screen.getByText('Nothing saved yet.')).toBeInTheDocument()
   expect(chips()).toBeNull()
   expect(
     screen.queryByRole('searchbox', { name: 'Search your watchlist' }),
@@ -368,7 +358,6 @@ it('shows the empty state for an empty list under All, whatever the counts say',
   expect(
     screen.queryByRole('button', { name: 'Show all' }),
   ).not.toBeInTheDocument()
-  expect(screen.getByText('Nothing saved yet.')).toBeInTheDocument()
 })
 
 it('leaves out a chip the page can’t filter by', async () => {
@@ -463,7 +452,7 @@ it('keeps the cards on screen while the next category loads', async () => {
   expect(results).not.toHaveAttribute('aria-busy')
 })
 
-it('keeps the chips and the count when a chip fails later, until another is picked', async () => {
+it('keeps the chips when a chip fails later, until another is picked', async () => {
   const user = userEvent.setup()
   serveList((category) =>
     category === 'book' ? 'error' : makeWatchlistPage(entries(2)),
@@ -478,9 +467,6 @@ it('keeps the chips and the count when a chip fails later, until another is pick
   )
   expect(cards()).toHaveLength(0)
   expect(chip('Books')).toHaveAttribute('aria-pressed', 'true')
-  expect(
-    screen.getByText('2 titles to watch, play or read later.'),
-  ).toBeInTheDocument()
 
   await user.click(chip('All'))
 
@@ -488,7 +474,7 @@ it('keeps the chips and the count when a chip fails later, until another is pick
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
-it('uses the list’s count when the counts fail, and the chips still filter', async () => {
+it('announces the list’s count when the counts fail, and the chips still filter', async () => {
   const user = userEvent.setup()
   serveList((category) =>
     category === 'movie'
@@ -499,11 +485,8 @@ it('uses the list’s count when the counts fail, and the chips still filter', a
   renderPage()
   await waitForCards(3)
 
-  expect(
-    await screen.findByText('3 titles to watch, play or read later.'),
-  ).toBeInTheDocument()
   // The panel's chips go without counts, as on the main page; the count row
-  // has the list's.
+  // announces the list's.
   expect(chip('All')).toHaveAccessibleName('All')
   expect(chip('Movies')).toHaveAccessibleName('Movies')
   expect(screen.getByText('3 titles')).toBeInTheDocument()
@@ -511,10 +494,7 @@ it('uses the list’s count when the counts fail, and the chips still filter', a
   await user.click(chip('Movies'))
 
   await waitForCards(1)
-  // A category's count isn't the total.
-  expect(
-    screen.getByText('Things to watch, play and read later.'),
-  ).toBeInTheDocument()
+  expect(await screen.findByText('1 title')).toBeInTheDocument()
 })
 
 describe('search, language and sort', () => {
@@ -533,16 +513,13 @@ describe('search, language and sort', () => {
     // Written over the entry, not one per pause.
     expect(router.state.historyAction).toBe('REPLACE')
     await waitFor(() => expect(list.requests.at(-1)?.get('q')).toBe('dune'))
-    // The hero's counts stay the whole watchlist's.
+    // The whole watchlist's counts, for the empty state, stay as they are.
     await waitFor(() =>
       expect(facets.requests.map((params) => params.toString())).toEqual([
         '',
         'q=dune',
       ]),
     )
-    expect(
-      screen.getByText('2 titles to watch, play or read later.'),
-    ).toBeInTheDocument()
   })
 
   it('sends a picked chip to the list and the panel’s counts', async () => {
@@ -662,7 +639,9 @@ describe('search, language and sort', () => {
     expect(
       screen.getByText('Try another word, or widen the category or language.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('0 titles')).toHaveAttribute('aria-live', 'polite')
+    expect(
+      screen.getByText('0 titles').closest('[aria-live="polite"]'),
+    ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'Nothing on your watchlist yet' }),
     ).not.toBeInTheDocument()
@@ -1150,7 +1129,7 @@ describe('Remove and Undo', () => {
     expect(writes).toEqual([`DELETE ${arrival.item.id}`])
 
     gate.resolve()
-    expect(await screen.findByText('2 titles to watch, play or read later.'))
+    await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
     expect(titles()).toEqual(['Dune', 'Heat'])
   })
 
@@ -1161,7 +1140,7 @@ describe('Remove and Undo', () => {
     await waitForCards(3)
 
     await user.click(removeButton('Arrival'))
-    await screen.findByText('2 titles to watch, play or read later.')
+    await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
     await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
 
     await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival', 'Heat']))
@@ -1169,10 +1148,7 @@ describe('Remove and Undo', () => {
       { item_id: arrival.item.id, added_at: arrival.added_at },
     ])
     expect(toast()).toBeEmptyDOMElement()
-    expect(
-      await screen.findByText('3 titles to watch, play or read later.'),
-    ).toBeInTheDocument()
-    expect(chip('All')).toHaveAccessibleName('All 3')
+    await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 3'))
   })
 
   it('waits for the remove to finish before Undo puts it back', async () => {
@@ -1207,7 +1183,7 @@ describe('Remove and Undo', () => {
 
     await user.click(removeButton('Arrival'))
     // Settled: the counts refetched.
-    await screen.findByText('1 title to watch, play or read later.')
+    await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 1'))
 
     expect(titles()).toEqual(['Dune'])
     expect(toast()).toHaveTextContent('Removed Arrival from your watchlist.')
@@ -1284,7 +1260,7 @@ describe('Remove and Undo', () => {
 
     await waitFor(() => expect(titles()).toEqual(['Dune', 'Heat']))
     expect(toast()).toHaveTextContent('Removed Arrival from your watchlist.')
-    await screen.findByText('2 titles to watch, play or read later.')
+    await waitFor(() => expect(chip('All')).toHaveAccessibleName('All 2'))
     await user.click(within(toast()).getByRole('button', { name: 'Undo' }))
 
     await waitFor(() => expect(titles()).toEqual(['Dune', 'Arrival', 'Heat']))
