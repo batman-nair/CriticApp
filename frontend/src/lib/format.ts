@@ -26,3 +26,14 @@ export function formatMediaType(value: string | null): string {
     .join(' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
+
+const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
+/** A timestamp's day, as "2 Apr 2025". */
+export function formatDate(value: string): string {
+  return DATE_FORMAT.format(new Date(value))
+}

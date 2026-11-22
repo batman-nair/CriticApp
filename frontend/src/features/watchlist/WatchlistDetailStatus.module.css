@@ -1,0 +1,86 @@
+/* As the review dialog's not-found and error bodies. */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: 62px 0 66px;
+  text-align: center;
+}
+
+.title {
+  font-size: var(--text-22);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-125);
+}
+
+.text {
+  color: var(--muted);
+}
+
+/* Two classes: Button's .lg sets these at one. */
+.root .action {
+  height: 44px;
+  margin-top: var(--space-8);
+  padding: 0 var(--space-18);
+  border-radius: var(--radius-12);
+}
+
+/* WatchlistDetail's grid, so the title replaces it in place. */
+.skeleton {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-28);
+}
+
+.poster {
+  --skeleton-radius: var(--radius-16);
+
+  align-self: start;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding-top: var(--space-6);
+}
+
+.titleLine {
+  --skeleton-height: 36px;
+  --skeleton-radius: var(--radius-10);
+
+  margin-bottom: var(--space-10);
+}
+
+@media (max-width: 639px) {
+  .root {
+    gap: var(--space-10);
+    padding: 70px var(--space-4) 48px;
+  }
+
+  .title {
+    font-size: var(--text-21);
+  }
+
+  .root .action {
+    height: 48px;
+    margin-top: var(--space-6);
+    padding: 0 var(--space-20);
+    border-radius: var(--radius-14);
+  }
+
+  .skeleton {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: var(--space-16);
+  }
+
+  .poster {
+    --skeleton-radius: var(--radius-14);
+  }
+
+  .titleLine {
+    --skeleton-height: 28px;
+  }
+}

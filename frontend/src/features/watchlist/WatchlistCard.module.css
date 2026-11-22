@@ -1,5 +1,7 @@
 /* From boards 1 and 13. */
 .card {
+  /* For the title link's ::after, which covers the card. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
@@ -9,6 +11,12 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-18);
   background: var(--surface);
+}
+
+/* The ring goes round the card, not the title the link wraps. */
+.card:has(.link:focus-visible) {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
 }
 
 /* Added in the sheet just now. */
@@ -67,8 +75,28 @@
   line-height: var(--leading-125);
 }
 
+/* Opens the details; ::after makes the whole card the target. */
+.link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
 /* Under the title, at the card's foot: Review it, then Remove. */
 .actions {
+  /* Above the title link's ::after, so they stay their own targets. */
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: var(--space-6);
   margin-top: auto;
