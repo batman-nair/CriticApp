@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -79,6 +79,22 @@ it('shows the fallback letter, named for the title, without an image', () => {
   expect(
     screen.getByRole('img', { name: 'Poster for Cowboy Bebop' }),
   ).toHaveTextContent('C')
+})
+
+it('links the title to its details, keeping the page’s query', () => {
+  const item = makeItem({ id: 'mal:52991', title: 'Frieren' })
+  renderCard(
+    <WatchlistCard onRemove={noop} entry={makeWatchlistEntry({ item })} />,
+    '/watchlist?category=anime%3Aseries',
+  )
+
+  const link = within(
+    screen.getByRole('heading', { level: 2, name: 'Frieren' }),
+  ).getByRole('link', { name: 'Frieren' })
+  expect(link).toHaveAttribute(
+    'href',
+    '/watchlist/items/mal%3A52991?category=anime%3Aseries',
+  )
 })
 
 it('links Review it to the sheet for the title, keeping the page’s query', () => {

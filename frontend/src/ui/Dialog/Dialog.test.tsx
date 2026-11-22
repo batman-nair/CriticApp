@@ -125,6 +125,54 @@ it('returns focus when a child took it with autoFocus', async () => {
   await waitFor(() => expect(opener()).toHaveFocus())
 })
 
+/** Dialog A, whose Next replaces it with dialog B, as one route does another. */
+function Replacing() {
+  const [shown, setShown] = useState<'none' | 'a' | 'b'>('none')
+  const close = (open: boolean) => {
+    if (!open) setShown('none')
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => setShown('a')}>
+        Open
+      </button>
+      {shown === 'a' && (
+        <Dialog title="A" open onOpenChange={close}>
+          <button type="button" onClick={() => setShown('b')}>
+            Next
+          </button>
+        </Dialog>
+      )}
+      {shown === 'b' && (
+        <Dialog title="B" open onOpenChange={close}>
+          <button type="button">Inside</button>
+        </Dialog>
+      )}
+    </>
+  )
+}
+
+it('returns focus to where a dialog it replaced would have', async () => {
+  const user = userEvent.setup()
+  render(<Replacing />)
+  await user.click(opener())
+  await user.click(
+    within(await screen.findByRole('dialog', { name: 'A' })).getByRole(
+      'button',
+      { name: 'Next' },
+    ),
+  )
+  await screen.findByRole('dialog', { name: 'B' })
+
+  await user.keyboard('{Escape}')
+
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  )
+  await waitFor(() => expect(opener()).toHaveFocus())
+})
+
 it('is named by a visible title', async () => {
   await setup()
 

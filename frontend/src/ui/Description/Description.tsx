@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { cx } from '../../lib/cx'
-import { Icon } from '../../ui/Icon/Icon'
+import { Icon } from '../Icon/Icon'
 import styles from './Description.module.css'
 
 /**

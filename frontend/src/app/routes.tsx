@@ -5,6 +5,7 @@ import { AddReviewPage } from '../features/add-review/AddReviewPage'
 import { AddToWatchlistSheet } from '../features/add-review/AddToWatchlistSheet'
 import { ReviewDetailPage } from '../features/review-detail/ReviewDetailPage'
 import { ReviewListPage } from '../features/review-list/ReviewListPage'
+import { WatchlistDetailPage } from '../features/watchlist/WatchlistDetailPage'
 import { WatchlistPage } from '../features/watchlist/WatchlistPage'
 import { AppLayout } from '../layout/AppLayout'
 import { DialogErrorPage } from '../layout/DialogErrorPage'
@@ -64,6 +65,13 @@ export const routes: RouteObject[] = [
                     // A crash in the sheet leaves the watchlist behind it.
                     errorElement: <DialogErrorPage />,
                     handle: { title: 'Add to watchlist' },
+                  },
+                  {
+                    // A card's details, with Review it.
+                    path: 'items/:itemId',
+                    element: <WatchlistDetailPage />,
+                    errorElement: <DialogErrorPage />,
+                    handle: { title: 'Watchlist' },
                   },
                   {
                     // Review it: the add-review sheet, on Rate with the title.

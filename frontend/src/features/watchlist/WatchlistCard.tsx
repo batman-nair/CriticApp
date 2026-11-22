@@ -7,18 +7,8 @@ import { fromParentState } from '../../ui/Dialog/useRouteDialog'
 import { Icon } from '../../ui/Icon/Icon'
 import { IconButton } from '../../ui/IconButton/IconButton'
 import { Poster } from '../../ui/Poster/Poster'
+import { singularLabel } from './singularLabel'
 import styles from './WatchlistCard.module.css'
-
-// One title, so singular, unlike the chips' categoryLabel.
-const SINGULAR_LABELS = new Map([
-  ['movie', 'Movie'],
-  ['series', 'Series'],
-  ['game', 'Game'],
-  ['anime:series', 'Anime series'],
-  ['anime:movie', 'Anime movie'],
-  ['manga', 'Manga'],
-  ['book', 'Book'],
-])
 
 interface WatchlistCardProps {
   entry: WatchlistEntry
@@ -63,11 +53,22 @@ export function WatchlistCard({
       <div className={styles.body}>
         <span className={styles.meta}>
           <span className={styles.dot} aria-hidden="true" />
-          {SINGULAR_LABELS.get(category) ?? category}
+          {singularLabel(category)}
           {years && ` · ${years}`}
         </span>
         <h2 id={titleId} className={styles.title}>
-          {item.title}
+          {/* Stretched over the card by ::after; the actions sit above it. */}
+          <Link
+            className={styles.link}
+            to={{
+              pathname: `/watchlist/items/${encodeURIComponent(item.id)}`,
+              search: location.search,
+            }}
+            state={fromParentState}
+            preventScrollReset
+          >
+            {item.title}
+          </Link>
         </h2>
       </div>
       <div className={styles.actions}>

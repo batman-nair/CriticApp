@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { formatMediaType, formatYears } from './format'
+import { formatDate, formatMediaType, formatYears } from './format'
 
 it.each([
   [2018, 2021, '2018–2021'],
@@ -30,4 +30,9 @@ it.each([
   ['oel', 'OEL'],
 ])('formats the media type %j as "%s"', (value, expected) => {
   expect(formatMediaType(value)).toBe(expected)
+})
+
+it('formats a timestamp as its day, where the reader is', () => {
+  // Local time, so the day is the same in every time zone.
+  expect(formatDate('2025-04-02T12:00:00')).toBe('2 Apr 2025')
 })

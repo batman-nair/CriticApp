@@ -8,7 +8,7 @@ import {
 import { formatMediaType, formatYears } from '../../lib/format'
 import { Icon } from '../../ui/Icon/Icon'
 import { Poster } from '../../ui/Poster/Poster'
-import { Description } from './Description'
+import { Description } from '../../ui/Description/Description'
 import styles from './ReviewDetail.module.css'
 
 interface ReviewDetailProps {

@@ -231,8 +231,9 @@ export function WatchlistPage() {
     [entries, data, query.isPending],
   )
 
-  // The boards never show the toast over a sheet. Opening one (the add sheet
-  // or Review it) dismisses it; the removal stays. Adjusted during render.
+  // The boards never show the toast over a sheet. Opening one (the add sheet,
+  // a title's details or Review it) dismisses it; the removal stays. Adjusted
+  // during render.
   const child = useOutlet(outlet)
   const childOpen = child !== null
   const [wasChildOpen, setWasChildOpen] = useState(childOpen)
@@ -480,7 +481,8 @@ export function WatchlistPage() {
         )}
         {notice?.kind === 'error' && notice.text}
       </Toast>
-      {/* The add sheet and Review it, which starts on a loaded card's title. */}
+      {/* The add sheet, a title's details and Review it, which start on a
+          loaded card's title. */}
       {child}
     </>
   )

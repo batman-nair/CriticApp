@@ -159,6 +159,26 @@ describe('routes', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('shows /watchlist/items/:itemId over the watchlist', async () => {
+    renderRoute('/watchlist/items/tt15239678')
+    expect(
+      await screen.findByRole('dialog', { name: 'Dune: Part Two' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Up next.', hidden: true }),
+    ).toBeInTheDocument()
+  })
+
+  it('sends someone logged out from /watchlist/items/:itemId to the login page', async () => {
+    server.use(sessionAs(null))
+    const { router } = renderRoute('/watchlist/items/mal%3A1')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(router.state.location.search).toBe(
+      '?next=%2Fwatchlist%2Fitems%2Fmal%253A1',
+    )
+  })
+
   it('shows /watchlist/review/:itemId over the watchlist, on Rate', async () => {
     renderRoute('/watchlist/review/tt15239678')
     const dialog = await screen.findByRole('dialog', { name: 'Rate it' })
@@ -220,6 +240,7 @@ describe('document title', () => {
     ['/add', 'Add review · Critic'],
     ['/watchlist', 'Watchlist · Critic'],
     ['/watchlist/add', 'Add to watchlist · Critic'],
+    ['/watchlist/items/mal%3A1', 'Watchlist · Critic'],
     ['/watchlist/review/mal%3A1', 'Add review · Critic'],
     ['/login', 'Log in · Critic'],
     ['/does-not-exist', 'Page not found · Critic'],
