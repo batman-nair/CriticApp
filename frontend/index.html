@@ -8,9 +8,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#f4f1ec" />
     <script>
-      // Sets the theme before first paint. Keep the key and the logic in step
-      // with src/layout/useTheme.ts.
+      // Sets the theme before first paint. Keep the key, the colours and the
+      // logic in step with src/layout/useTheme.ts.
       ;(function () {
         var theme
         try {
@@ -22,6 +23,10 @@
             : 'light'
         }
         document.documentElement.dataset.theme = theme
+        // The browser and installed-app chrome: the page background.
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute('content', theme === 'dark' ? '#181614' : '#f4f1ec')
       })()
     </script>
   </head>

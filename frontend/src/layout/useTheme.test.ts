@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { stubSystemTheme } from '../test/matchMedia'
+import { THEME_COLORS } from '../lib/themeColors'
 import { useTheme } from './useTheme'
 
 const KEY = 'critic-theme'
@@ -11,7 +12,16 @@ afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
   delete root.dataset.theme
+  document.head.querySelector('meta[name="theme-color"]')?.remove()
 })
+
+function addThemeColorMeta() {
+  const meta = document.createElement('meta')
+  meta.name = 'theme-color'
+  meta.content = THEME_COLORS.light
+  document.head.append(meta)
+  return meta
+}
 
 function blockStorage() {
   const blocked = () => {
@@ -108,4 +118,21 @@ it('still toggles for the session when storage throws', () => {
   act(() => result.current.toggle())
   expect(result.current.theme).toBe('dark')
   expect(root.dataset.theme).toBe('dark')
+})
+
+it('keeps the theme colour in step with the theme', () => {
+  stubSystemTheme('dark')
+  const meta = addThemeColorMeta()
+  const { result } = renderHook(() => useTheme())
+  expect(meta.content).toBe(THEME_COLORS.dark)
+  act(() => result.current.toggle())
+  expect(meta.content).toBe(THEME_COLORS.light)
+})
+
+it('follows a live system change with the theme colour', () => {
+  const setSystem = stubSystemTheme('light')
+  const meta = addThemeColorMeta()
+  renderHook(() => useTheme())
+  act(() => setSystem('dark'))
+  expect(meta.content).toBe(THEME_COLORS.dark)
 })

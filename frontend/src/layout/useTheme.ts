@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { THEME_COLORS } from '../lib/themeColors'
 
 export type Theme = 'light' | 'dark'
 
@@ -30,14 +31,21 @@ function currentTheme(): Theme {
   return isTheme(applied) ? applied : (storedTheme() ?? systemTheme())
 }
 
-function applyTheme(theme: Theme) {
+function setDocumentTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', THEME_COLORS[theme])
+}
+
+function applyTheme(theme: Theme) {
+  setDocumentTheme(theme)
   listeners.forEach((listener) => listener())
 }
 
 function subscribe(listener: () => void) {
   // A page without the inline script: make the DOM agree with the snapshot.
-  document.documentElement.dataset.theme = currentTheme()
+  setDocumentTheme(currentTheme())
 
   const media = matchMedia(DARK_QUERY)
   const onSystemChange = () => {
